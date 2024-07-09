@@ -45,7 +45,7 @@ def s2hk(content):
     return converter.convert(content)
 
 
-def select_model(**kwargs):
+def select_model(model_choice, **kwargs):
     # Use kwargs to override default parameters if provided
     model_params = {
         "model_name": "gpt-4o",
@@ -54,11 +54,14 @@ def select_model(**kwargs):
     }
     model_params.update(kwargs)
 
-    # Uncomment the model you want to use
-    model = ChatOpenAI(**model_params)
-    # model = ChatOpenRouter(**model_params)
-    # model = AzureChatOpenAI(**model_params)
-    # model = Together(**model_params)
+    if model_choice == "OpenAI":
+        model = ChatOpenAI(**model_params)
+    elif model_choice == "AzureOpenAI":
+        model = AzureChatOpenAI(**model_params)
+    elif model_choice == "OpenRouter":
+        model = ChatOpenRouter(**model_params)
+    elif model_choice == "Together":
+        model = Together(**model_params)
 
     return model
 
@@ -116,10 +119,10 @@ def display_images(input_images):
         plt_img_base64(image_data)
 
 
-def get_answer(system_prompt, input, **kwargs):
+def get_answer(system_prompt, input, model_choice, **kwargs):
     input_text, input_images = process_input(input)
     prompt = create_prompt(system_prompt, input_text, input_images)
-    model = select_model(**kwargs)
+    model = select_model(model_choice, **kwargs)
     chain = create_chain(prompt, model)
 
     print(input_text)
