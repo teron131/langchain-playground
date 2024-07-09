@@ -1,3 +1,4 @@
 .env
 *.log
 images/*
+audio/*
