@@ -77,7 +77,7 @@ def process_input(input):
 
 
 def create_prompt(system_prompt, input_text, input_images):
-    return ChatPromptTemplate.from_messages(
+    prompt = ChatPromptTemplate.from_messages(
         messages=[
             ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -96,10 +96,20 @@ def create_prompt(system_prompt, input_text, input_images):
             ),
         ]
     )
+    return prompt
 
 
 def create_chain(prompt, model):
-    return RunnablePassthrough.assign(chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("chat_history")) | prompt | model | StrOutputParser() | RunnableLambda(s2hk)
+    chain = (
+        RunnablePassthrough.assign(
+            chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("chat_history"),
+        )
+        | prompt
+        | model
+        | StrOutputParser()
+        | RunnableLambda(s2hk)
+    )
+    return chain
 
 
 def invoke_chain(chain, input_text, input_images):
@@ -107,11 +117,6 @@ def invoke_chain(chain, input_text, input_images):
         response = chain.invoke({"text": input_text, "image_data": input_images})
         print(callback, end="\n\n")
     return response
-
-
-def save_context(input, response):
-    input_str = input["text"] if isinstance(input, dict) else str(input)
-    memory.save_context({"input": input_str}, {"output": response})
 
 
 def display_images(input_images):
@@ -126,9 +131,14 @@ def get_answer(system_prompt, input, model_choice, **kwargs):
     chain = create_chain(prompt, model)
 
     print(input_text)
-    response = invoke_chain(chain, input_text, input_images)
+    with get_openai_callback() as callback:
+        response = chain.invoke({"text": input_text, "image_data": input_images})
+        print(callback, end="\n\n")
     print(response)
-    save_context(input, response)
+
+    input_str = input["text"] if isinstance(input, dict) else str(input)
+    memory.save_context({"input": input_str}, {"output": response})
+
     display_images(input_images)
 
     return response
