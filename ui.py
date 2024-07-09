@@ -3,7 +3,7 @@ import gradio as gr
 from chain import *
 
 ui = gr.Interface(
-    fn=get_answer,
+    fn=main,
     inputs=[
         "text",
         gr.MultimodalTextbox(
@@ -18,6 +18,7 @@ ui = gr.Interface(
     ],
     outputs=[
         gr.Textbox(label="Output", show_copy_button=True),
+        gr.Textbox(label="Callback"),
     ],
     allow_flagging="never",
     submit_btn=gr.Button("Submit", visible=False),

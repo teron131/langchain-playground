@@ -55,15 +55,18 @@ def select_model(model_choice, **kwargs):
     model_params.update(kwargs)
 
     if model_choice == "OpenAI":
-        model = ChatOpenAI(**model_params)
+        return ChatOpenAI(**model_params)
     elif model_choice == "AzureOpenAI":
-        model = AzureChatOpenAI(**model_params)
+        return AzureChatOpenAI(**model_params)
     elif model_choice == "OpenRouter":
-        model = ChatOpenRouter(**model_params)
+        return ChatOpenRouter(**model_params)
     elif model_choice == "Together":
-        model = Together(**model_params)
-
-    return model
+        return Together(**model_params)
+    # For non Gradio use
+    elif model_choice is None:
+        return ChatOpenAI(**model_params)
+    else:
+        raise ValueError(f"Unsupported model choice: {model_choice}")
 
 
 def process_input(input):
@@ -124,21 +127,25 @@ def display_images(input_images):
         plt_img_base64(image_data)
 
 
-def get_answer(system_prompt, input, model_choice, **kwargs):
+def main(system_prompt, input, model_choice, **kwargs):
+    # Split input into text and images
     input_text, input_images = process_input(input)
+
     prompt = create_prompt(system_prompt, input_text, input_images)
+
+    # Choose model controlled by radio
     model = select_model(model_choice, **kwargs)
+
     chain = create_chain(prompt, model)
 
-    print(input_text)
+    # Invoke chain
     with get_openai_callback() as callback:
         response = chain.invoke({"text": input_text, "image_data": input_images})
-        print(callback, end="\n\n")
-    print(response)
 
+    # Save context
     input_str = input["text"] if isinstance(input, dict) else str(input)
     memory.save_context({"input": input_str}, {"output": response})
 
     display_images(input_images)
 
-    return response
+    return response, callback
