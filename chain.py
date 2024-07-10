@@ -76,7 +76,24 @@ def process_input(input):
     else:
         input_text = str(input)
         image_files = []
-    return input_text, [resize_base64_image(image) for image in image_files]
+
+    processed_images = []
+    for image in image_files:
+        if isinstance(image, dict):
+            if "url" in image:
+                image_data = resize_base64_image(image["url"])
+            elif "path" in image:
+                image_data = resize_base64_image(image["path"])
+            else:
+                continue  # Skip if neither URL nor path is provided
+        elif isinstance(image, str):
+            image_data = resize_base64_image(image)
+        else:
+            continue  # Skip if image is neither dict nor str
+
+        processed_images.append(image_data)
+
+    return input_text, processed_images
 
 
 def create_prompt(system_prompt, input_text, input_images):
@@ -127,7 +144,7 @@ def display_images(input_images):
         plt_img_base64(image_data)
 
 
-def main(system_prompt, input, model_choice, **kwargs):
+def get_answer(input, history, system_prompt, model_choice="OpenAI", **kwargs):
     # Split input into text and images
     input_text, input_images = process_input(input)
 
@@ -140,11 +157,10 @@ def main(system_prompt, input, model_choice, **kwargs):
 
     # Invoke chain
     with get_openai_callback() as callback:
-        response = chain.invoke({"text": input_text, "image_data": input_images})
+        response = chain.invoke({"text": input_text, "image_data": input_images, "chat_history": memory.chat_memory.messages})
 
     # Save context
-    input_str = input["text"] if isinstance(input, dict) else str(input)
-    memory.save_context({"input": input_str}, {"output": response})
+    memory.save_context({"input": input_text}, {"output": response})
 
     display_images(input_images)
 

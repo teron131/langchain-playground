@@ -3,9 +3,9 @@ import gradio as gr
 from chain import *
 
 ui = gr.Interface(
-    fn=main,
+    fn=get_answer,
     inputs=[
-        "text",
+        "text",  # system_prompt
         gr.MultimodalTextbox(
             file_types=["image"],
             file_count="multiple",
