@@ -1,10 +1,19 @@
 import gradio as gr
-
 from chain import *
 
 
 def chat_function(input, history, system_prompt, model_choice):
-    response, callback = get_answer(input, history=history, system_prompt=system_prompt, model_choice=model_choice)
+    # Convert history to the format expected by get_answer
+    formatted_history = [{"role": "user" if i % 2 == 0 else "assistant", "content": message} for conversation in history for i, message in enumerate(conversation) if message is not None]
+
+    response, callback = get_answer(
+        input,
+        history=formatted_history,
+        system_prompt=system_prompt,
+        model_choice=model_choice,
+    )
+
+    # Return only the response, as ChatInterface will handle updating the history
     return response
 
 
