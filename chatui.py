@@ -1,4 +1,5 @@
 import gradio as gr
+
 from chain import *
 
 
@@ -21,7 +22,7 @@ ui = gr.ChatInterface(
     fn=chat_function,
     multimodal=True,
     chatbot=gr.Chatbot(
-        height="700px",
+        height="500px",
         latex_delimiters=[
             {"left": "$$", "right": "$$", "display": True},
             {"left": "$", "right": "$", "display": False},

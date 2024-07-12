@@ -4,7 +4,6 @@ from typing import Optional
 
 import opencc
 from dotenv import load_dotenv
-from image_processing import plt_img_base64, resize_base64_image
 from langchain.memory import ConversationBufferMemory
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import StrOutputParser
@@ -13,6 +12,8 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
 from langchain_together.llms import Together
+
+from image_processing import plt_img_base64, resize_base64_image
 
 load_dotenv()
 
@@ -120,10 +121,7 @@ def create_prompt(system_prompt, input_text, input_images):
 
 def create_chain(prompt, model):
     chain = (
-        RunnablePassthrough.assign(
-            chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("chat_history"),
-        )
-        | prompt
+        prompt
         | model
         | StrOutputParser()
         | RunnableLambda(s2hk)
@@ -156,9 +154,7 @@ def get_answer(input, history, system_prompt, model_choice="OpenAI", **kwargs):
 
     # Invoke chain
     with get_openai_callback() as callback:
-        response = chain.invoke({"text": input_text, "image_data": input_images, "chat_history": history})  # Use the provided history
-
-    # No need to save context here, as it's managed by ChatInterface
+        response = chain.invoke({"text": input_text, "image_data": input_images, "chat_history": history})
 
     display_images(input_images)
 
