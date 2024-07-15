@@ -1,5 +1,4 @@
 import gradio as gr
-
 from chain import *
 
 ui = gr.Interface(
