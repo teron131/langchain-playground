@@ -119,8 +119,8 @@ def display_images(input_images: List[str]) -> None:
 
 def get_answer(
     input: Union[Dict, str],
-    history: List[Dict[str, str]],
-    system_prompt: str,
+    history: List[Dict[str, str]] = [],
+    system_prompt: str = "",
     model_provider: str = "OpenAI",
     model_name: str = "gpt-4o",
     **kwargs,
