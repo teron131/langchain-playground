@@ -1,19 +1,17 @@
 import os
-from operator import itemgetter
-from typing import Optional
+from typing import Any, Dict, List, Optional, Union
 
 import opencc
 from dotenv import load_dotenv
+from image_processing import plt_img_base64, resize_base64_image
 from langchain.memory import ConversationBufferMemory
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import RunnableLambda
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
 from langchain_together.llms import Together
-
-from image_processing import plt_img_base64, resize_base64_image
 
 load_dotenv()
 
@@ -39,40 +37,29 @@ class ChatOpenRouter(ChatOpenAI):
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 
-# Translate to Traditional Chinese
-def s2hk(content):
+def s2hk(content: str) -> str:
     converter = opencc.OpenCC("s2hk")
     return converter.convert(content)
 
 
-def select_model(model_choice, **kwargs):
-    # Use kwargs to override default parameters if provided
-    model_params = {
-        "model_name": "gpt-4o",
-        "temperature": 0.7,
-        "max_tokens": 4096,
-    }
-    model_params.update(kwargs)
+def select_model(model_provider: str, model_name: str, **kwargs) -> Any:
+    model_params = {"model_name": model_name, "temperature": 0.7, "max_tokens": 4096, **kwargs}
 
-    if model_choice == "OpenAI":
-        return ChatOpenAI(**model_params)
-    elif model_choice == "AzureOpenAI":
-        return AzureChatOpenAI(**model_params)
-    elif model_choice == "OpenRouter":
-        return ChatOpenRouter(**model_params)
-    elif model_choice == "Together":
-        return Together(**model_params)
-    # For non Gradio use
-    elif model_choice is None:
-        return ChatOpenAI(**model_params)
-    else:
-        raise ValueError(f"Unsupported model choice: {model_choice}")
+    model_map = {"OpenAI": ChatOpenAI, "AzureOpenAI": AzureChatOpenAI, "OpenRouter": ChatOpenRouter, "Together": Together, None: ChatOpenAI}
+
+    model_class = model_map.get(model_provider)
+    if model_class is None:
+        raise ValueError(f"Unsupported model choice: {model_provider}")
+
+    return model_class(**model_params)
 
 
-def process_input(input):
+def process_input(input: Any) -> tuple[str, List[str]]:
+    # For Gradio
     if isinstance(input, dict):
         input_text = input.get("text", "")
         image_files = input.get("files", [])
+    # For Python Notebook
     else:
         input_text = str(input)
         image_files = []
@@ -80,25 +67,19 @@ def process_input(input):
     processed_images = []
     for image in image_files:
         if isinstance(image, dict):
-            if "url" in image:
-                image_data = resize_base64_image(image["url"])
-            elif "path" in image:
-                image_data = resize_base64_image(image["path"])
-            else:
-                continue  # Skip if neither URL nor path is provided
+            image_data = resize_base64_image(image.get("url") or image.get("path", ""))
         elif isinstance(image, str):
             image_data = resize_base64_image(image)
         else:
-            continue  # Skip if image is neither dict nor str
-
+            continue
         processed_images.append(image_data)
 
     return input_text, processed_images
 
 
-def create_prompt(system_prompt, input_text, input_images):
+def create_prompt(system_prompt: str, input_text: str, input_images: List[str]) -> ChatPromptTemplate:
     prompt = ChatPromptTemplate.from_messages(
-        messages=[
+        [
             ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
             (
@@ -120,36 +101,33 @@ def create_prompt(system_prompt, input_text, input_images):
 
 
 def create_chain(prompt, model):
-    chain = (
-        prompt
-        | model
-        | StrOutputParser()
-        | RunnableLambda(s2hk)
-    )
+    chain = prompt | model | StrOutputParser() | RunnableLambda(s2hk)
     return chain
 
 
-def invoke_chain(chain, input_text, input_images):
+def invoke_chain(chain: Any, input_text: str, input_images: List[str]) -> str:
     with get_openai_callback() as callback:
         response = chain.invoke({"text": input_text, "image_data": input_images})
         print(callback, end="\n\n")
     return response
 
 
-def display_images(input_images):
+def display_images(input_images: List[str]) -> None:
     for image_data in input_images:
         plt_img_base64(image_data)
 
 
-def get_answer(input, history, system_prompt, model_choice="OpenAI", **kwargs):
-    # Split input into text and images
+def get_answer(
+    input: Union[Dict, str],
+    history: List[Dict[str, str]],
+    system_prompt: str,
+    model_provider: str = "OpenAI",
+    model_name: str = "gpt-4o",
+    **kwargs,
+) -> tuple[str, Any]:
     input_text, input_images = process_input(input)
-
     prompt = create_prompt(system_prompt, input_text, input_images)
-
-    # Choose model controlled by radio
-    model = select_model(model_choice, **kwargs)
-
+    model = select_model(model_provider, model_name, **kwargs)
     chain = create_chain(prompt, model)
 
     # Invoke chain
