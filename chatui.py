@@ -52,7 +52,7 @@ ui = gr.ChatInterface(
     additional_inputs=[
         gr.Textbox(label="System Prompt"),
         gr.Radio(
-            choices=["OpenAI", "AzureOpenAI", "OpenRouter", "Together"],
+            choices=["OpenAI", "AzureOpenAI", "Google", "OpenRouter", "Together"],
             value="OpenAI",
             label="Model Provider",
         ),
