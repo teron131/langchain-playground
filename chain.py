@@ -9,6 +9,7 @@ from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
 from langchain_together.llms import Together
@@ -45,11 +46,20 @@ def s2hk(content: str) -> str:
 def select_model(model_provider: str, model_name: str, **kwargs) -> Any:
     model_params = {"model_name": model_name, "temperature": 0.7, "max_tokens": 4096, **kwargs}
 
-    model_map = {"OpenAI": ChatOpenAI, "AzureOpenAI": AzureChatOpenAI, "OpenRouter": ChatOpenRouter, "Together": Together, None: ChatOpenAI}
+    model_map = {
+        "OpenAI": ChatOpenAI,
+        "AzureOpenAI": AzureChatOpenAI,
+        "OpenRouter": ChatOpenRouter,
+        "Together": Together,
+        "Google": ChatGoogleGenerativeAI,
+        None: ChatOpenAI,
+    }
 
     model_class = model_map.get(model_provider)
-    if model_class is None:
-        raise ValueError(f"Unsupported model choice: {model_provider}")
+
+    # Adjust model_params for Google
+    if model_provider == "Google":
+        model_params["model"] = f"models/{model_name}"
 
     return model_class(**model_params)
 
