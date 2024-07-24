@@ -1,4 +1,5 @@
 import gradio as gr
+
 from chain import get_answer
 
 
@@ -43,7 +44,8 @@ ui = gr.ChatInterface(
     fn=chat_function,
     multimodal=True,
     chatbot=gr.Chatbot(
-        height="500px",
+        height="400pt",
+        bubble_full_width=False,
         latex_delimiters=LATEX_DELIMITERS,
         render_markdown=True,
         show_copy_button=True,
@@ -63,6 +65,10 @@ ui = gr.ChatInterface(
     ],
     additional_inputs_accordion=gr.Accordion(open=True),
     autofocus=False,
+    css="""
+    .image-container img { max-width: 500px; max-height: 500px; object-fit: contain; }
+    .chatbot-container { max-width: 500px; margin: auto; }
+    """,
 )
 
 ui.launch(share=True)
