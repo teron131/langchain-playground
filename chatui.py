@@ -1,5 +1,4 @@
 import gradio as gr
-
 from chain import get_answer
 
 
@@ -59,7 +58,7 @@ ui = gr.ChatInterface(
             label="Model Provider",
         ),
         gr.Textbox(
-            value="gpt-4o",
+            value="gpt-4o-mini",
             label="Model Name",
         ),
     ],

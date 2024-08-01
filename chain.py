@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import opencc
 from dotenv import load_dotenv
+from image_processing import plt_img_base64, resize_base64_image
 from langchain.memory import ConversationBufferMemory
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import StrOutputParser
@@ -12,8 +13,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
 from langchain_together.llms import Together
-
-from image_processing import plt_img_base64, resize_base64_image
 
 load_dotenv()
 
@@ -133,7 +132,7 @@ def get_answer(
     history: List[Dict[str, str]] = [],
     system_prompt: str = "",
     model_provider: str = "OpenAI",
-    model_name: str = "gpt-4o",
+    model_name: str = "gpt-4o-mini",
     **kwargs,
 ) -> tuple[str, Any]:
     input_text, input_images = process_input(input)
