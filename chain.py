@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional, Union
 
 import opencc
 from dotenv import load_dotenv
-from image_processing import plt_img_base64, resize_base64_image
 from langchain.memory import ConversationBufferMemory
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import StrOutputParser
@@ -13,6 +12,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
 from langchain_together.llms import Together
+
+from image_processing import plt_img_base64, resize_base64_image
 
 load_dotenv()
 
@@ -110,11 +111,6 @@ def create_prompt(system_prompt: str, input_text: str, input_images: List[str]) 
     return prompt
 
 
-def create_chain(prompt, model):
-    chain = prompt | model | StrOutputParser() | RunnableLambda(s2hk)
-    return chain
-
-
 def invoke_chain(chain: Any, input_text: str, input_images: List[str]) -> str:
     with get_openai_callback() as callback:
         response = chain.invoke({"text": input_text, "image_data": input_images})
@@ -125,32 +121,3 @@ def invoke_chain(chain: Any, input_text: str, input_images: List[str]) -> str:
 def display_images(input_images: List[str]) -> None:
     for image_data in input_images:
         plt_img_base64(image_data)
-
-
-def get_answer(
-    input: Union[Dict, str],
-    history: List[Dict[str, str]] = [],
-    system_prompt: str = "",
-    model_provider: str = "OpenAI",
-    model_name: str = "gpt-4o-mini",
-    **kwargs,
-) -> tuple[str, Any]:
-    input_text, input_images = process_input(input)
-    prompt = create_prompt(system_prompt, input_text, input_images)
-    model = select_model(model_provider, model_name, **kwargs)
-    chain = create_chain(prompt, model)
-
-    # Invoke chain
-    with get_openai_callback() as callback:
-        response = chain.invoke(
-            {
-                "text": input_text,
-                "image_data": input_images,
-                "system_prompt": system_prompt,
-                "chat_history": history,
-            }
-        )
-
-    display_images(input_images)
-
-    return response, callback
