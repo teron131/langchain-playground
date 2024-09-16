@@ -4,37 +4,15 @@ from typing import Any, Dict, List, Optional, Union
 import gradio as gr
 import opencc
 from dotenv import load_dotenv
+from image_processing import plt_img_base64, resize_base64_image
+from langchain.chat_models import init_chat_model
 from langchain.memory import ConversationBufferMemory
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai.chat_models.azure import AzureChatOpenAI
-from langchain_openai.chat_models.base import ChatOpenAI
-from langchain_together.llms import Together
-
-from image_processing import plt_img_base64, resize_base64_image
 
 load_dotenv()
-
-
-# Use OpenRouter over OpenAI
-class ChatOpenRouter(ChatOpenAI):
-    def __init__(
-        self,
-        model_name: str,
-        openai_api_key: Optional[str] = None,
-        openai_api_base: str = "https://openrouter.ai/api/v1",
-        **kwargs,
-    ):
-        openai_api_key = openai_api_key or os.getenv("OPENROUTER_API_KEY")
-        super().__init__(
-            openai_api_base=openai_api_base,
-            openai_api_key=openai_api_key,
-            model_name=model_name,
-            **kwargs,
-        )
 
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -43,27 +21,6 @@ memory = ConversationBufferMemory(memory_key="chat_history", return_messages=Tru
 def s2hk(content: str) -> str:
     converter = opencc.OpenCC("s2hk")
     return converter.convert(content)
-
-
-def select_model(model_provider: str, model_name: str, **kwargs) -> Any:
-    model_params = {"model_name": model_name, "temperature": 0.7, "max_tokens": 4096, **kwargs}
-
-    model_map = {
-        "OpenAI": ChatOpenAI,
-        "AzureOpenAI": AzureChatOpenAI,
-        "OpenRouter": ChatOpenRouter,
-        "Together": Together,
-        "Google": ChatGoogleGenerativeAI,
-        None: ChatOpenAI,
-    }
-
-    model_class = model_map.get(model_provider)
-
-    # Adjust model_params for Google
-    if model_provider == "Google":
-        model_params["model"] = f"models/{model_name}"
-
-    return model_class(**model_params)
 
 
 def process_input(input: Any) -> tuple[str, List[str]]:
@@ -144,7 +101,7 @@ def create_chain(prompt, model):
 def get_answer(input, history, system_prompt, model_provider, model_name, **kwargs):
     input_text, input_images = process_input(input)
     prompt = create_prompt(system_prompt, input_text, input_images)
-    model = select_model(model_provider, model_name, **kwargs)
+    model = init_chat_model(model_name, model_provider=model_provider, **kwargs)
     chain = create_chain(prompt, model)
 
     with get_openai_callback() as callback:
@@ -201,8 +158,8 @@ ui = gr.ChatInterface(
     additional_inputs=[
         gr.Textbox(label="System Prompt"),
         gr.Radio(
-            choices=["OpenAI", "AzureOpenAI", "Google", "OpenRouter", "Together"],
-            value="OpenAI",
+            choices=["openai", "azureopenai", "google_genai", "together"],
+            value="openai",
             label="Model Provider",
         ),
         gr.Textbox(
