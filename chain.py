@@ -19,7 +19,6 @@ load_dotenv()
 
 
 class UniversalChain:
-
     class LLM:
         def __init__(self, model_name: str):
             self.llm_initializers = {
