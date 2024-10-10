@@ -1,5 +1,4 @@
 import os
-from typing import Generator, Iterator, Union
 
 import opencc
 from dotenv import load_dotenv
@@ -19,54 +18,37 @@ load_dotenv()
 
 
 class UniversalChain:
-    class LLM:
-        def __init__(self, model_name: str):
-            self.llm_initializers = {
-                "azure": self._init_azure_openai,
-                "gemini": self._init_gemini,
-                "claude": self._init_claude,
-                "gpt": self._init_openai,
-            }
-            try:
-                for key, initializer in self.llm_initializers.items():
-                    if key in model_name.lower():
-                        return initializer(model_name)
-                return init_chat_model(model=model_name)
-            except Exception as e:
-                print(f"Error initializing LLM: {e}")
-                raise e
-
-        @staticmethod
-        def _init_azure_openai(model_name: str):
-            return AzureChatOpenAI(
-                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-                azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
-                api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-            )
-
-        @staticmethod
-        def _init_gemini(model_name: str):
-            return ChatGoogleGenerativeAI(model=model_name, api_key=os.getenv("GEMINI_API_KEY"))
-
-        @staticmethod
-        def _init_claude(model_name: str):
-            return ChatOpenAI(
-                model=f"anthropic/{model_name}",
-                base_url="https://openrouter.ai/api/v1",
-                api_key=os.getenv("OPENROUTER_API_KEY"),
-            )
-
-        @staticmethod
-        def _init_openai(model_name: str):
-            return ChatOpenAI(model=model_name, api_key=os.getenv("OPENAI_API_KEY"))
-
     def __init__(self, model_name: str, use_history: bool = False):
-        self.llm = self.LLM(model_name)
+        self.llm = self.get_llm(model_name)
         self.tools = self.get_tools()
         self.use_history = use_history
         self.history = InMemoryChatMessageHistory(session_id="universal-chain-session")
         self.chain = self.create_chain()
+
+    def get_llm(self, model_id: str):
+        try:
+            if "azure" in model_id:
+                llm = AzureChatOpenAI(
+                    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                    azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+                    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+                )
+            elif "gemini" in model_id:
+                llm = ChatGoogleGenerativeAI(model=model_id, api_key=os.getenv("GEMINI_API_KEY"))
+            elif "claude" in model_id:
+                llm = ChatOpenAI(
+                    model=f"anthropic/{model_id}",  # Avoid making model_id with '/', otherwise it will mess up the FastAPI URL
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=os.getenv("OPENROUTER_API_KEY"),
+                )
+            elif "gpt" in model_id:
+                llm = ChatOpenAI(model=model_id, api_key=os.getenv("OPENAI_API_KEY"))
+            else:
+                llm = init_chat_model(model=model_id)
+        except Exception as e:
+            raise ValueError(f"Invalid model_id: {model_id}")
+        return llm
 
     def get_tools(self):
         @tool
@@ -104,30 +86,24 @@ class UniversalChain:
             )
         return agent_executor
 
-    def invoke(self, input_text: str):
+    def generate_response(self, input_text: str):
         config = {"configurable": {"session_id": "universal-chain-session"}}
-        return self.chain.invoke({"input": input_text}, config)
+        response = self.chain.invoke({"input": input_text}, config)
+        response = response["output"]
+        return self.s2hk(response)
 
     @staticmethod
     def s2hk(content: str) -> str:
         converter = opencc.OpenCC("s2hk")
         return converter.convert(content)
 
-    @staticmethod
-    def display_response(response: Union[str, Generator, Iterator], stream: bool = False) -> None:
-        response = response["output"]
-        response = UniversalChain.s2hk(response)
-        if stream:
-            for chunk in response:
-                print(chunk, end="")
-        else:
-            print(response)
-
 
 if __name__ == "__main__":
-    chain = UniversalChain("gpt-4o-mini", use_history=False)
-    response1 = chain.invoke("My name is Andy")
-    chain.display_response(response1, stream=True)
+    chain = UniversalChain("gpt-4o-mini", use_history=True)
+    response1 = chain.generate_response("My name is Andy")
+    print(response1)
+    # chain.display_response(response1)
     print("---")
-    response2 = chain.invoke("What is my name?")
-    chain.display_response(response2, stream=True)
+    response2 = chain.generate_response("Explain gradient descent")
+    print(response2)
+    # chain.display_response(response2)
