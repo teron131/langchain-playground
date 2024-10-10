@@ -1,11 +1,12 @@
 import os
+import re
 
 import opencc
 from dotenv import load_dotenv
-from langchain import hub
 from langchain.agents.agent import AgentExecutor
 from langchain.agents.tool_calling_agent.base import create_tool_calling_agent
 from langchain.chat_models.base import init_chat_model
+from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.prompts.chat import ChatPromptTemplate
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -52,16 +53,14 @@ class UniversalChain:
 
     def get_tools(self):
         @tool
-        def add(a: float, b: float) -> float:
-            """Adds a and b."""
-            return a + b
+        def webloader(url: str) -> str:
+            """Load the content of a website."""
+            docs = WebBaseLoader(url).load()
+            docs = [re.sub(r"\n{3,}", r"\n\n", doc.page_content) for doc in docs]
+            docs_string = f"Website: {url}" + "\n\n".join(docs)
+            return docs_string
 
-        @tool
-        def multiply(a: float, b: float) -> float:
-            """Multiplies a and b."""
-            return a * b
-
-        return [add, multiply]
+        return [webloader]
 
     def create_chain(self):
         tool_agent_prompt = ChatPromptTemplate.from_messages(
