@@ -100,10 +100,14 @@ class UniversalChain:
 
 if __name__ == "__main__":
     chain = UniversalChain("gpt-4o-mini", use_history=True)
-    response1 = chain.generate_response("My name is Andy")
-    print(response1)
-    # chain.display_response(response1)
-    print("---")
-    response2 = chain.generate_response("Explain gradient descent")
-    print(response2)
-    # chain.display_response(response2)
+    questions = [
+        "https://lilianweng.github.io/posts/2023-06-23-agent/ Can you read the content?",
+    ]
+    for i, question in enumerate(questions, 1):
+        print(f"Question {i}:\n{question}")
+        response = chain.generate_response(question)
+        print()
+        print(f"Response {i}:\n{response}")
+        # chain.display_response(response)
+        if i < len(questions):
+            print("---")
