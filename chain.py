@@ -1,8 +1,8 @@
 import os
 import re
+from typing import Generator, Iterator, List, Union
 
 import opencc
-from dotenv import load_dotenv
 from langchain.agents.agent import AgentExecutor
 from langchain.agents.tool_calling_agent.base import create_tool_calling_agent
 from langchain.chat_models.base import init_chat_model
@@ -14,8 +14,9 @@ from langchain_core.tools import tool
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
+from pytubefix import YouTube
 
-load_dotenv()
+from youtube_loader.youtube import url_to_subtitles
 
 
 class UniversalChain:
@@ -52,15 +53,23 @@ class UniversalChain:
         return llm
 
     def get_tools(self):
+
         @tool
         def webloader(url: str) -> str:
-            """Load the content of a website."""
+            """Load the content of a website from url to text."""
             docs = WebBaseLoader(url).load()
             docs = [re.sub(r"\n{3,}", r"\n\n", doc.page_content) for doc in docs]
             docs_string = f"Website: {url}" + "\n\n".join(docs)
             return docs_string
 
-        return [webloader]
+        @tool
+        def youtube_loader(url: str) -> str:
+            # https://github.com/JuanBindez/pytubefix/blob/main/pytubefix/__main__.py
+            """Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more."""
+            yt = YouTube(url)
+            return f"Answer the user's question based on the full content.\nTitle: {yt.title}\nAuthor: {yt.author}\nSubtitles:\n\n{url_to_subtitles(url)}"
+
+        return [webloader, youtube_loader]
 
     def create_chain(self):
         tool_agent_prompt = ChatPromptTemplate.from_messages(
@@ -85,28 +94,41 @@ class UniversalChain:
             )
         return agent_executor
 
-    def generate_response(self, input_text: str):
+    def generate_response(self, input_text: str, stream: bool = False):
         config = {"configurable": {"session_id": "universal-chain-session"}}
-        response = self.chain.invoke({"input": input_text}, config)
-        response = response["output"]
-        return self.s2hk(response)
+        if stream:
+            return self.chain.stream({"input": input_text}, config)
+        else:
+            return self.chain.invoke({"input": input_text}, config)
 
     @staticmethod
     def s2hk(content: str) -> str:
         converter = opencc.OpenCC("s2hk")
         return converter.convert(content)
 
+    @staticmethod
+    def display_response(response: Union[dict, Generator, Iterator]) -> None:
+        if isinstance(response, Generator):
+            for chunk in response:
+                if "output" in chunk:
+                    for c in chunk["output"]:
+                        print(c, end="")
+        elif isinstance(response, dict):
+            response = response["output"]
+            print(response)
+
 
 if __name__ == "__main__":
     chain = UniversalChain("gpt-4o-mini", use_history=True)
     questions = [
         "https://lilianweng.github.io/posts/2023-06-23-agent/ Can you read the content?",
+        "https://youtu.be/7J_Ugp8ZB4E Summarize",
     ]
     for i, question in enumerate(questions, 1):
         print(f"Question {i}:\n{question}")
         response = chain.generate_response(question)
         print()
-        print(f"Response {i}:\n{response}")
-        # chain.display_response(response)
+        print(f"Response {i}:")
+        chain.display_response(response)
         if i < len(questions):
             print("---")
