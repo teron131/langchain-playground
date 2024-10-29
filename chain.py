@@ -83,8 +83,10 @@ class UniversalChain:
             ]
         )
         agent = create_tool_calling_agent(self.llm, self.tools, tool_agent_prompt)
+
         react_prompt = hub.pull("hwchase17/react")
         agent = create_react_agent(self.llm, self.tools, react_prompt)
+
         agent_executor = AgentExecutor(agent=agent, tools=self.tools)
 
         if self.use_history:
@@ -96,6 +98,7 @@ class UniversalChain:
                 input_messages_key="input",
                 history_messages_key="chat_history",
             )
+
         return agent_executor
 
     def generate_response(self, input_text: str, stream: bool = False):
