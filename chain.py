@@ -3,7 +3,9 @@ import re
 from typing import Generator, Iterator, List, Union
 
 import opencc
+from langchain import hub
 from langchain.agents.agent import AgentExecutor
+from langchain.agents.react.agent import create_react_agent
 from langchain.agents.tool_calling_agent.base import create_tool_calling_agent
 from langchain.chat_models.base import init_chat_model
 from langchain_community.document_loaders import WebBaseLoader
@@ -49,7 +51,7 @@ class UniversalChain:
             else:
                 llm = init_chat_model(model=model_id)
         except Exception as e:
-            raise ValueError(f"Invalid model_id: {model_id}")
+            raise ValueError(f"Invalid model_id: {model_id}\n{e}")
         return llm
 
     def get_tools(self):
@@ -81,6 +83,8 @@ class UniversalChain:
             ]
         )
         agent = create_tool_calling_agent(self.llm, self.tools, tool_agent_prompt)
+        react_prompt = hub.pull("hwchase17/react")
+        agent = create_react_agent(self.llm, self.tools, react_prompt)
         agent_executor = AgentExecutor(agent=agent, tools=self.tools)
 
         if self.use_history:
@@ -102,11 +106,6 @@ class UniversalChain:
             return self.chain.invoke({"input": input_text}, config)
 
     @staticmethod
-    def s2hk(content: str) -> str:
-        converter = opencc.OpenCC("s2hk")
-        return converter.convert(content)
-
-    @staticmethod
     def display_response(response: Union[dict, Generator, Iterator]) -> None:
         if isinstance(response, Generator):
             for chunk in response:
@@ -116,6 +115,11 @@ class UniversalChain:
         elif isinstance(response, dict):
             response = response["output"]
             print(response)
+
+    @staticmethod
+    def s2hk(content: str) -> str:
+        converter = opencc.OpenCC("s2hk")
+        return converter.convert(content)
 
 
 if __name__ == "__main__":
