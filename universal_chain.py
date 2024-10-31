@@ -18,7 +18,7 @@ from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
 from pytubefix import YouTube
 
-from youtube_loader.youtube import url_to_subtitles
+from YouTubeLoader.youtube import url_to_subtitles
 
 
 class UniversalChain:
