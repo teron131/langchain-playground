@@ -1,0 +1,13 @@
+fal-client
+ipython
+more-itertools
+numpy
+openai-whisper
+opencc-python-reimplemented
+optimum
+pytubefix
+python-dotenv
+tiktoken
+torch
+transformers
+tqdm
