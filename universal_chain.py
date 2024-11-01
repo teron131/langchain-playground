@@ -101,25 +101,10 @@ class UniversalChain:
 
         return agent_executor
 
-    def generate_response(self, input_text: str, stream: bool = False):
+    def generate_response(self, input_text: str):
         config = {"configurable": {"session_id": "universal-chain-session"}}
-        if stream:
-            return self.chain.stream({"input": input_text}, config)
-        else:
-            return self.chain.invoke({"input": input_text}, config)
+        return self.chain.invoke({"input": input_text}, config)["output"]
 
-    @staticmethod
-    def display_response(response: Union[dict, Generator, Iterator]) -> None:
-        if isinstance(response, Generator):
-            for chunk in response:
-                if "output" in chunk:
-                    for c in chunk["output"]:
-                        print(c, end="")
-        elif isinstance(response, dict):
-            response = response["output"]
-            print(response)
-
-    @staticmethod
     def s2hk(content: str) -> str:
         converter = opencc.OpenCC("s2hk")
         return converter.convert(content)
@@ -136,6 +121,6 @@ if __name__ == "__main__":
         response = chain.generate_response(question)
         print()
         print(f"Response {i}:")
-        chain.display_response(response)
+        print(response)
         if i < len(questions):
             print("---")
