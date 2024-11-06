@@ -4,7 +4,8 @@ from typing import List, Optional
 
 import requests
 from pydantic import BaseModel
-from utils.pipelines.main import get_last_assistant_message
+
+# from utils.pipelines.main import get_last_assistant_message
 
 
 class Pipeline:
@@ -15,7 +16,7 @@ class Pipeline:
         pipelines: List[str] = os.getenv("TRANSLATE_FILTER_PIPELINES", "*").split(";")
         priority: int = 0
 
-        OPENAI_API_BASE_URL: str = os.getenv("OPENAI_API_BASE_URL")
+        OPENAI_API_BASE_URL: str = os.getenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1")
         OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
         TRANSLATE_MODEL: str = os.getenv("TRANSLATE_MODEL", "gpt-4o-mini")
 
@@ -52,6 +53,21 @@ class Pipeline:
 
     async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
         print(f"outlet:{__name__}")
+
+        def get_content_from_message(message: dict) -> Optional[str]:
+            if isinstance(message["content"], list):
+                for item in message["content"]:
+                    if item["type"] == "text":
+                        return item["text"]
+            else:
+                return message["content"]
+            return None
+
+        def get_last_assistant_message(messages: list[dict]) -> Optional[str]:
+            for message in reversed(messages):
+                if message["role"] == "assistant":
+                    return get_content_from_message(message)
+            return None
 
         # Check if this is a title response
         if "title" in body:
@@ -173,3 +189,30 @@ class Pipeline:
         result = re.sub(r"\n{3,}", r"\n\n", result)
 
         return result
+
+
+if __name__ == "__main__":
+
+    test_text = """
+# Heading 1
+## Heading 2
+### Heading 3
+
+Here's a **bold** and *italic* text example.
+
+1. First ordered item
+2. Second ordered item
+   - Nested unordered item
+   - Another nested item
+3. Third ordered item
+
+Here's a [link](https://example.com) and some `inline code`.
+
+And a code block with syntax highlighting:
+```python
+print("Hello, world!")
+```
+
+"""
+    translated = Pipeline().translate(test_text)
+    print(Pipeline().combine_messages(test_text, translated))

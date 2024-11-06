@@ -7,8 +7,7 @@ from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_core.prompts.chat import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_openai.chat_models.base import ChatOpenAI
-
-from .utils import data_to_table, format_query
+from utils import data_to_table, format_query
 
 
 def text_to_sql(user_message: str) -> str:

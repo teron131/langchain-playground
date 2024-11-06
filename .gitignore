@@ -4,3 +4,10 @@ __pycache__
 *.log
 images/*
 audio/*
+pdfs/*
+scratch/*
+*.png
+*.jpg
+*.pdf
+*.csv
+*.json
