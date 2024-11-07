@@ -8,7 +8,7 @@ from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_core.prompts.chat import ChatPromptTemplate
 from langchain_openai.chat_models.base import ChatOpenAI
 
-from .utils import data_to_table, format_query
+from TextToSQL.utils import data_to_table, format_query
 
 
 def text_to_sql_react(user_message: str) -> str:

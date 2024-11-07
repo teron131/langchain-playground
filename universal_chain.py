@@ -5,7 +5,6 @@ from typing import Generator, Iterator, List, Union
 import opencc
 from langchain import hub
 from langchain.agents.agent import AgentExecutor
-from langchain.agents.react.agent import create_react_agent
 from langchain.agents.tool_calling_agent.base import create_tool_calling_agent
 from langchain.chat_models.base import init_chat_model
 from langchain_community.document_loaders import WebBaseLoader
@@ -16,6 +15,7 @@ from langchain_core.tools import tool
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain_openai.chat_models.azure import AzureChatOpenAI
 from langchain_openai.chat_models.base import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 from pytubefix import YouTube
 
 from YouTubeLoader.youtube import url_to_subtitles
@@ -74,36 +74,23 @@ class UniversalChain:
         return [webloader, youtube_loader]
 
     def create_chain(self):
-        tool_agent_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", "You are a helpful assistant"),
-                ("placeholder", "{chat_history}"),
-                ("human", "{input}"),
-                ("placeholder", "{agent_scratchpad}"),
-            ]
-        )
-        agent = create_tool_calling_agent(self.llm, self.tools, tool_agent_prompt)
-
-        react_prompt = hub.pull("hwchase17/react")
-        agent = create_react_agent(self.llm, self.tools, react_prompt)
-
-        agent_executor = AgentExecutor(agent=agent, tools=self.tools)
+        agent = create_react_agent(self.llm, self.tools)
 
         if self.use_history:
             return RunnableWithMessageHistory(
-                agent_executor,
+                agent,
                 # This is needed because in most real world scenarios, a session id is needed
                 # It isn't really used here because we are using a simple in memory ChatMessageHistory
                 lambda session_id: self.history,
-                input_messages_key="input",
+                input_messages_key="messages",
                 history_messages_key="chat_history",
             )
 
-        return agent_executor
+        return agent
 
     def generate_response(self, input_text: str):
         config = {"configurable": {"session_id": "universal-chain-session"}}
-        return self.chain.invoke({"input": input_text}, config)["output"]
+        return self.chain.invoke({"messages": [("user", input_text)]}, config)["messages"][-1].content
 
     def s2hk(content: str) -> str:
         converter = opencc.OpenCC("s2hk")

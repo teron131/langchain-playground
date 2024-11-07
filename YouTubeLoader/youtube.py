@@ -9,8 +9,9 @@ from langchain_core.runnables import RunnableLambda
 from langchain_openai.chat_models.base import ChatOpenAI
 from opencc import OpenCC
 from pytubefix import YouTube
-from whisper_fal import whisper_fal_transcribe
-from whisper_hf import whisper_hf_transcribe
+
+from YouTubeLoader.whisper_fal import whisper_fal_transcribe
+from YouTubeLoader.whisper_hf import whisper_hf_transcribe
 
 load_dotenv()
 
