@@ -1,4 +1,4 @@
-from langchain.chains.sql_database import create_sql_query_chain
+from langchain.chains.sql_database.query import create_sql_query_chain
 from langchain_community.tools import QuerySQLCheckerTool, QuerySQLDataBaseTool
 from langchain_community.utilities import SQLDatabase
 from langchain_core.prompts import PromptTemplate
