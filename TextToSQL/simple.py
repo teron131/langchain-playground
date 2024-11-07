@@ -1,12 +1,10 @@
-from langchain.chains.sql_database.query import create_sql_query_chain
-from langchain_community.tools.sql_database.tool import (
-    QuerySQLCheckerTool,
-    QuerySQLDataBaseTool,
-)
-from langchain_community.utilities.sql_database import SQLDatabase
-from langchain_core.prompts.chat import PromptTemplate
+from langchain.chains.sql_database import create_sql_query_chain
+from langchain_community.tools import QuerySQLCheckerTool, QuerySQLDataBaseTool
+from langchain_community.utilities import SQLDatabase
+from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
-from langchain_openai.chat_models.base import ChatOpenAI
+from langchain_openai import ChatOpenAI
+
 from TextToSQL.utils import data_to_table, format_query
 
 

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from langchain import hub
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda
-from langchain_openai.chat_models.base import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from opencc import OpenCC
 from pytubefix import YouTube
 

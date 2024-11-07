@@ -3,18 +3,13 @@ import re
 from typing import Generator, Iterator, List, Union
 
 import opencc
-from langchain import hub
-from langchain.agents.agent import AgentExecutor
-from langchain.agents.tool_calling_agent.base import create_tool_calling_agent
-from langchain.chat_models.base import init_chat_model
+from langchain.chat_models import init_chat_model
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.chat_history import InMemoryChatMessageHistory
-from langchain_core.prompts.chat import ChatPromptTemplate
-from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_core.tools import tool
-from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from langchain_openai.chat_models.azure import AzureChatOpenAI
-from langchain_openai.chat_models.base import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from pytubefix import YouTube
 
