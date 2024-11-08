@@ -70,14 +70,14 @@ def text_to_sql_react(user_message: str) -> str:
         table_name = re.search(r"FROM\s+(\w+)", query, re.IGNORECASE).group(1) if not None else ""
 
         return f"""
-    {answer}
-    ```sql
-    {format_query(query)}
+{answer}
+```sql
+{format_query(query)}
 
-    {table_name}:
-    {data_to_table(query, data)}
-    ```
-    """
+{table_name}:
+{data_to_table(query, data)}
+```
+"""
 
     except Exception as e:
         return f"{e}"
