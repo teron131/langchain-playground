@@ -80,7 +80,7 @@ def text_to_sql_react(user_message: str) -> str:
 ```
 """
         else:
-            return f"{answer}"
+            return answer
 
     except Exception as e:
         return f"{e}"
