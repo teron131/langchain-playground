@@ -57,27 +57,27 @@ def text_to_sql_react(user_message: str) -> str:
         reversed_messages = reversed(response["messages"])
 
         answer_msg = next((msg for msg in reversed_messages if isinstance(msg, AIMessage)), None)
-        answer = answer_msg.content if not None else ""
+        answer = answer_msg.content if answer_msg else ""
 
         data_msg = next((msg for msg in reversed_messages if isinstance(msg, ToolMessage) and msg.name == "sql_db_query"), None)
-        data = data_msg.content if not None else ""
-        query_call_id = data_msg.tool_call_id if not None else ""
+        data = data_msg.content if data_msg else ""
+        query_call_id = data_msg.tool_call_id if data_msg else ""
 
         # Find the query execution matching the query call id
         query_msg = next((msg for msg in reversed_messages if isinstance(msg, AIMessage) and msg.tool_calls and any(call["id"] == query_call_id for call in msg.tool_calls)), None)
-        query = query_msg.tool_calls[0]["args"]["query"] if not None else ""
+        query = query_msg.tool_calls[0]["args"]["query"] if query_msg else ""
 
-        table_name = re.search(r"FROM\s+(\w+)", query, re.IGNORECASE).group(1) if not None else ""
+        table_name = re.search(r"FROM\s+(\w+)", query, re.IGNORECASE).group(1) if query else ""
 
         return f"""
-{answer}
-```sql
-{format_query(query)}
+    {answer}
+    ```sql
+    {format_query(query)}
 
-{table_name}:
-{data_to_table(query, data)}
-```
-"""
+    {table_name}:
+    {data_to_table(query, data)}
+    ```
+    """
 
     except Exception as e:
         return f"{e}"
