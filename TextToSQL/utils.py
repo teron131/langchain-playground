@@ -72,26 +72,3 @@ def data_to_table(query: str, data: str) -> str:
     data_list = ast.literal_eval(data) if (isinstance(data, str) and data.strip()) else []
 
     return tabulate(data_list, headers, tablefmt="pretty", showindex=True)
-
-
-if __name__ == "__main__":
-    # Test format_query
-    test_query = "select name, age from users where age > 21 order by name"
-    print("\nTesting format_query:")
-    print(format_query(test_query))
-
-    # Test data_to_table with empty inputs
-    print("\nTesting data_to_table with empty inputs:")
-    print(data_to_table("", ""))
-
-    # Test data_to_table with valid inputs
-    test_query = "SELECT FirstName as name, LastName as surname FROM Employee"
-    test_data = "[('John', 'Doe'), ('Jane', 'Smith')]"
-    print("\nTesting data_to_table with valid inputs:")
-    print(data_to_table(test_query, test_data))
-
-    # Test data_to_table with valid inputs
-    test_query = None
-    test_data = None
-    print("\nTesting data_to_table with valid inputs:")
-    print(data_to_table(test_query, test_data))
