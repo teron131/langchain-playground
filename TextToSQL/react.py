@@ -67,17 +67,20 @@ def text_to_sql_react(user_message: str) -> str:
         query_msg = next((msg for msg in reversed_messages if isinstance(msg, AIMessage) and msg.tool_calls and any(call["id"] == query_call_id for call in msg.tool_calls)), None)
         query = query_msg.tool_calls[0]["args"]["query"] if query_msg else ""
 
-        table_name = re.search(r"FROM\s+(\w+)", query, re.IGNORECASE).group(1) if query else ""
+        table_name = re.search(r"FROM\s+(\w+)", query, re.IGNORECASE).group(1) if query != "" else ""
 
-        return f"""
-    {answer}
-    ```sql
-    {format_query(query)}
+        if data and query:
+            return f"""
+{answer}
+```sql
+{format_query(query)}
 
-    {table_name}:
-    {data_to_table(query, data)}
-    ```
-    """
+{table_name}:
+{data_to_table(query, data)}
+```
+"""
+        else:
+            return f"{answer}"
 
     except Exception as e:
         return f"{e}"
