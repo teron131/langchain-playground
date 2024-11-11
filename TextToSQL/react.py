@@ -6,8 +6,7 @@ from langchain_community.utilities import SQLDatabase
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
-
-from TextToSQL.utils import data_to_table, format_query
+from utils import data_to_table, format_query
 
 
 def text_to_sql_react(user_message: str) -> str:
@@ -36,8 +35,10 @@ def text_to_sql_react(user_message: str) -> str:
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+    tools = toolkit.get_tools()
+    print(tools)
 
-    agent = create_react_agent(llm, toolkit.get_tools(), state_modifier=sql_system_prompt)
+    agent = create_react_agent(llm, tools, state_modifier=sql_system_prompt)
 
     config = {"configurable": {"session_id": "text-to-sql-react-chain-session"}}
     dialect = "SQLite"
@@ -84,3 +85,7 @@ def text_to_sql_react(user_message: str) -> str:
 
     except Exception as e:
         return f"{e}"
+
+
+if __name__ == "__main__":
+    print(text_to_sql_react("What is the name of the artist with the most albums?"))
