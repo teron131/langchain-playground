@@ -42,6 +42,16 @@ Response:
 
 
 class ReWOO(TypedDict):
+    """State dictionary for the ReWOO graph execution.
+
+    Attributes:
+        task (str): The input task or question to be solved
+        plan_string (str): Raw string output from the planner containing the full plan
+        steps (List): List of parsed plan steps, each containing plan text, evidence tag, tool name and input
+        results (dict): Dictionary mapping evidence tags to tool execution results
+        result (str): Final answer or solution to the task
+    """
+
     task: str
     plan_string: str
     steps: List
@@ -54,7 +64,25 @@ class ReWOOGraph:
         self.llm = ChatOpenAI(model=model_name)
         self.search = TavilySearchResults()
 
-    def get_plan(self, state: ReWOO) -> dict:
+    def plan(self, state: ReWOO) -> dict:
+        """Generate an execution plan for solving the given task.
+
+        Takes a ReWOO state dictionary and generates a structured plan by:
+        1. Prompting an LLM with the task to generate plan steps
+        2. Parsing the plan steps using regex to extract:
+           - Plan description
+           - Evidence tag (#E1, #E2, etc)
+           - Tool name (Google, LLM, etc)
+           - Tool input
+
+        Args:
+            state (ReWOO): State dictionary containing the task
+
+        Returns:
+            dict: Dictionary containing:
+                - steps: List of tuples with (plan, evidence_tag, tool, input) for each step
+                - plan_string: Raw plan output from the LLM
+        """
         prompt = ChatPromptTemplate.from_messages([("user", planner_prompt)])
         planner = prompt | self.llm
 
@@ -67,6 +95,17 @@ class ReWOOGraph:
         return {"steps": matches, "plan_string": result.content}
 
     def _get_current_task(self, state: ReWOO) -> Optional[int]:
+        """Get the index of the next task to execute in the plan.
+
+        Args:
+            state (ReWOO): Current state containing results and plan steps
+
+        Returns:
+            Optional[int]: Index of next task (1-based), or None if all tasks are complete
+                          Returns 1 if no results exist yet
+                          Returns None if all steps have results
+                          Otherwise returns next step number (len of results + 1)
+        """
         if "results" not in state or state["results"] is None:
             return 1
         if len(state["results"]) == len(state["steps"]):
@@ -74,7 +113,26 @@ class ReWOOGraph:
         return len(state["results"]) + 1
 
     def tool_execution(self, state: ReWOO) -> dict:
-        """Worker node that executes the tools of a given plan."""
+        """Execute the next tool in the plan based on the current state.
+
+        This worker node:
+        1. Gets the next task to execute from the plan
+        2. Extracts the tool name and input parameters
+        3. Replaces any references to previous results in the input
+        4. Executes either the Google search or LLM tool
+        5. Stores the result under the step's evidence tag
+
+        Args:
+            state (ReWOO): Current state containing:
+                - steps: List of plan steps
+                - results: Dict of previous results
+
+        Returns:
+            dict: Updated results dictionary with new tool output added
+
+        Raises:
+            ValueError: If an unknown tool type is specified
+        """
         step_num = self._get_current_task(state)
         _, step_name, tool, tool_input = state["steps"][step_num - 1]
 
@@ -93,6 +151,22 @@ class ReWOOGraph:
         return {"results": results}
 
     def solve(self, state: ReWOO) -> dict:
+        """Generate final answer by combining plan execution results.
+
+        This worker node:
+        1. Formats the executed plan steps with their results
+        2. Constructs a prompt combining the original task and executed plan
+        3. Has the LLM generate a final answer based on all evidence
+
+        Args:
+            state (ReWOO): Current state containing:
+                - task: Original user question
+                - steps: List of executed plan steps
+                - results: Dict mapping step names to tool outputs
+
+        Returns:
+            dict: Contains single key "result" mapping to LLM's final answer
+        """
         plan_steps = []
         for _plan, step_name, tool, tool_input in state["steps"]:
             results = (state["results"] or {}) if "results" in state else {}
@@ -116,7 +190,7 @@ class ReWOOGraph:
         graph = StateGraph(ReWOO)
 
         # Add nodes
-        graph.add_node("plan", self.get_plan)
+        graph.add_node("plan", self.plan)
         graph.add_node("tool", self.tool_execution)
         graph.add_node("solve", self.solve)
 
