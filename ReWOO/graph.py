@@ -134,6 +134,10 @@ class ReWOOGraph:
             ValueError: If an unknown tool type is specified
         """
         step_num = self._get_current_task(state)
+
+        if not state.get("steps") or step_num is None or step_num < 1 or step_num > len(state["steps"]):
+            return {"results": {}}
+
         _, step_name, tool, tool_input = state["steps"][step_num - 1]
 
         results = (state["results"] or {}) if "results" in state else {}
@@ -145,7 +149,8 @@ class ReWOOGraph:
         elif tool == "LLM":
             result = self.llm.invoke(tool_input)
         else:
-            raise ValueError(f"Unknown tool: {tool}")
+            # Default to LLM if unknown tool
+            result = self.llm.invoke(tool_input)
 
         results[step_name] = str(result)
         return {"results": results}
@@ -203,11 +208,12 @@ class ReWOOGraph:
         return graph.compile()
 
 
+def rewoo(task: str) -> str:
+    graph = ReWOOGraph().create_graph()
+    response = graph.invoke({"task": task})
+    return response["result"]
+
+
 if __name__ == "__main__":
     task = "what is the exact hometown of the 2024 mens australian open winner?"
-    rewoo = ReWOOGraph()
-    graph = rewoo.create_graph()
-    for s in graph.stream({"task": task}):
-        print(s)
-        print("---")
-    print(s["solve"]["result"])
+    print(rewoo(task))
