@@ -212,8 +212,3 @@ def rewoo(task: str) -> str:
     graph = ReWOOGraph().create_graph()
     response = graph.invoke({"task": task})
     return response["result"]
-
-
-if __name__ == "__main__":
-    task = "what is the exact hometown of the 2024 mens australian open winner?"
-    print(rewoo(task))
