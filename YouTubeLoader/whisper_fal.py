@@ -36,7 +36,8 @@ def whisper_fal_transcribe(audio_path: str, language: str = "en"):
 
     url = fal_client.upload_file(audio_path)
     result = fal_client.subscribe(
-        "fal-ai/wizper",
+        # "fal-ai/wizper",
+        "fal-ai/whisper",
         arguments={
             "audio_url": url,
             "task": "transcribe",
