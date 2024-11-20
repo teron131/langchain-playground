@@ -8,7 +8,7 @@ from notion_client import Client
 load_dotenv()
 
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
-PAGE_ID = "143bb2c6d13380459053f33d84fd6cdb"
+PAGE_ID = "144bb2c6d1338068befdfb9e08242891"
 
 
 class NotionAPI:
@@ -99,7 +99,7 @@ class BlockProcessor:
 
         Convert LaTeX equations in Notion blocks to Notion equation blocks.
 
-        Processes blocks containing LaTeX equations delimited by \(\), \[\], or $$ and converts them
+        Processes blocks containing LaTeX equations delimited by \(  \), \[  \], or $$  $$ and converts them
         into Notion's native equation format. Preserves text formatting and handles nested blocks.
 
         Args:
@@ -110,7 +110,7 @@ class BlockProcessor:
                        Preserves all original block structure and formatting.
 
         Example:
-            Input text: "A function \\(f(x)\\) is continuous"
+            Input text: "A function \(f(x)\) is continuous"
             Output: Two rich_text objects:
                 1. Text object with "A function "
                 2. Equation object with "f(x)"
@@ -126,7 +126,7 @@ class BlockProcessor:
 
             Takes a rich text object containing potential LaTeX equations and splits it into separate
             text and equation objects while preserving formatting. Equations are identified by LaTeX
-            delimiters (\\(\\), \\[\\], or $$) and converted to Notion's native equation format.
+            delimiters, \(  \), \[  \], or $$  $$, and converted to Notion's native equation format.
 
             Args:
                 rich_text (Dict): A Notion rich text object containing text content and formatting
@@ -137,7 +137,7 @@ class BlockProcessor:
                            the LaTeX expression.
 
             Example:
-                Input rich_text with content "x = \\(a + b\\) where a,b > 0"
+                Input rich_text with content "x = \(a + b\) where a,b > 0"
                 Returns: [
                     {type: "text", text: {content: "x = "}, ...},
                     {type: "equation", equation: {expression: "a + b"}, ...},
