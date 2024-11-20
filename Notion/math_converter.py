@@ -49,7 +49,8 @@ def convert_latex(blocks):
     for block in blocks:
         rich_text = block[block["type"]]["rich_text"]
         if rich_text:
-            return process_rich_text(rich_text)
+            block[block["type"]]["rich_text"] = process_rich_text(rich_text)
+    return blocks
 
 
 blocks = [
