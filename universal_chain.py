@@ -93,16 +93,11 @@ class UniversalChain:
 
 
 if __name__ == "__main__":
-    chain = UniversalChain("gpt-4o-mini", use_history=True)
-    questions = [
-        "https://lilianweng.github.io/posts/2023-06-23-agent/ Can you read the content?",
-        "https://youtu.be/7J_Ugp8ZB4E Summarize",
-    ]
-    for i, question in enumerate(questions, 1):
-        print(f"Question {i}:\n{question}")
-        response = chain.generate_response(question)
-        print()
-        print(f"Response {i}:")
-        print(response)
-        if i < len(questions):
-            print("---")
+    chain = UniversalChain("gpt-4o", use_history=True)
+    question = """
+Explain convex problem and how to solve it.
+"""
+    print(f"Question:\n{question}")
+    print()
+    print(f"Response:\n{chain.generate_response(question)}")
+    print()
