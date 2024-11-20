@@ -1,7 +1,6 @@
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
 import requests
 from dotenv import load_dotenv
 from notion_client import Client
@@ -10,21 +9,17 @@ load_dotenv()
 
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 PAGE_ID = "143bb2c6d13380459053f33d84fd6cdb"
-HEADERS = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
-notion = Client(auth=NOTION_TOKEN)
-
-LATEX_DELIMITERS = [("\\(", "\\)"), ("\\[", "\\]"), ("$$", "$$")]
 
 
 class NotionAPI:
     def __init__(self, TOKEN: str, PAGE_ID: str):
-        self.TOKEN = TOKEN
-        self.PAGE_ID = PAGE_ID
+        self.token = TOKEN
+        self.page_id = PAGE_ID
         self.HEADERS = {
-            "Authorization": f"Bearer {TOKEN}",
+            "Authorization": f"Bearer {self.token}",
             "Notion-Version": "2022-06-28",
         }
-        self.client = Client(auth=TOKEN)
+        self.client = Client(auth=self.token)
 
     def read_blocks(self, block_id: str) -> List[Dict]:
         """Recursively read all blocks including children from a page by ID"""
