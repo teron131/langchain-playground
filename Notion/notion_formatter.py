@@ -52,7 +52,7 @@ class NotionAPI:
 
     def write_blocks(self, blocks: List[Dict]) -> Dict:
         """Write blocks to Notion page"""
-        url = f"https://api.notion.com/v1/blocks/{self.PAGE_ID}/children"
+        url = f"https://api.notion.com/v1/blocks/{self.page_id}/children"
         payload = {"children": blocks}
         response = requests.patch(url, json=payload, headers=self.HEADERS)
         return response.json()
