@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -19,8 +20,8 @@ class NotionAPI:
             PAGE_ID (str): ID of the Notion page to interact with, from the last part (without title) of the page URL, e.g. https://www.notion.so/USERNAME/TITLE-PAGE_ID
         """
         self.token = os.getenv("NOTION_TOKEN")
-        self.page_id = os.getenv("PAGE_ID") if PAGE_ID is None else PAGE_ID
         self.headers = {"Authorization": f"Bearer {self.token}", "Notion-Version": "2022-06-28"}
+        self.page_id = os.getenv("PAGE_ID") if PAGE_ID is None else PAGE_ID
 
     def read_blocks(self, block_id: Optional[str] = None) -> List[Dict]:
         if block_id is None:
