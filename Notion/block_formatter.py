@@ -1,7 +1,35 @@
 import re
 from typing import Dict, List
 
-from rich_text import create_equation_part, create_text_part
+
+def text_to_text(rich_text: Dict, new_content: str) -> Dict:
+    """
+    Create a text rich_text content from content while preserving other rich_text properties.
+
+    Modifies only the content and type, keeping other properties from the original rich_text object.
+    """
+    return {
+        "type": "text",
+        "text": {"content": new_content, "link": rich_text["text"]["link"]},
+        "plain_text": new_content,
+        "annotations": rich_text["annotations"],
+        "href": rich_text["href"],
+    }
+
+
+def text_to_equation(rich_text: Dict, new_content: str) -> Dict:
+    """
+    Create an equation rich_text content from content while preserving other rich_text properties.
+
+    Modifies only the content and type, keeping other properties from the original rich_text object.
+    """
+    return {
+        "type": "equation",
+        "equation": {"expression": new_content.strip()},
+        "plain_text": new_content,
+        "annotations": rich_text["annotations"],
+        "href": rich_text["href"],
+    }
 
 
 def convert_latex_block(block: Dict) -> Dict:
@@ -25,7 +53,6 @@ def convert_latex_block(block: Dict) -> Dict:
             2. Equation object with "f(x)"
             3. Text object with " is continuous"
     """
-    LATEX_DELIMITERS = set([("\\(", "\\)"), ("\\[", "\\]"), ("$$", "$$")])
 
     def _convert_latex_rich_text(rich_text: Dict) -> List[Dict]:
         """
@@ -55,25 +82,32 @@ def convert_latex_block(block: Dict) -> Dict:
         """
         content = rich_text["text"]["content"]
         result = []
-        pattern = re.compile(r"(.*?)((\\\(|\\\[|\$\$)(.*?)(\\\)|\\\]|\$\$))")
 
-        for match in pattern.finditer(content):
-            before_text, _, start_delim, equation_content, end_delim = match.groups()
+        # Use a single regex pattern to match LaTeX equations and text
+        pattern = r"(.*?)(\\\(|\\\[|\$\$)(.*?)(\\\)|\\\]|\$\$)|(.+)$"
+
+        for match in re.finditer(pattern, content):
+            before_text, start_delim, equation_content, end_delim, remaining_text = match.groups()
+
+            # Add text before equation if exists
             if before_text:
-                result.append(create_text_part(rich_text, before_text))
-            result.append(create_equation_part(rich_text, equation_content))
+                result.append(text_to_text(rich_text, before_text))
 
-        # Add remaining text if any
-        remaining_text = pattern.sub("", content)
-        if remaining_text:
-            result.append(create_text_part(rich_text, remaining_text))
+            # Add equation part if exists
+            if equation_content:
+                result.append(text_to_equation(rich_text, equation_content))
+
+            # Add remaining text if exists
+            if remaining_text:
+                result.append(text_to_text(rich_text, remaining_text))
+                break
 
         return result
 
     rich_text_list = block.get(block["type"]).get("rich_text")
+    # Assume equations only exist in the block types that have rich_text
     if rich_text_list:
         result = []
-        # Assume equations only exist in the block types that have rich_text
         for rich_text in rich_text_list:
             if rich_text["type"] == "text":
                 result.extend(_convert_latex_rich_text(rich_text))
