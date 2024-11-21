@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -86,31 +86,55 @@ class NotionAPI:
         Returns:
             Dict: A paginated list of newly created first level children block objects.
         """
+        supported_blocks = []
+        for block in blocks:
+            # Skip link_preview blocks as they're not directly supported
+            if block.get(block["type"]).get("rich_text"):
+                supported_blocks.append(block)
+
         url = f"https://api.notion.com/v1/blocks/{self.page_id}/children"
-        payload = {"children": blocks}
+        payload = {"children": supported_blocks}
+        response = requests.patch(url, json=payload, headers=self.headers)
+        return response.json()
+
+    def update_block_rich_text(self, block: Dict, rich_text: List[Dict]) -> Dict:
+        """
+        Reference: https://developers.notion.com/reference/update-a-block
+
+        Updates the rich_text field of a block according to its type.
+
+        Args:
+            block (Dict): The block to update, containing 'id' and 'type' fields
+            rich_text (List[Dict]): The new rich_text content to set
+
+        Returns:
+            Dict: The updated block object.
+        """
+        block_id = block["id"]
+        block_type = block["type"]
+        url = f"https://api.notion.com/v1/blocks/{block_id}"
+        payload = {block_type: {"rich_text": rich_text}}
         response = requests.patch(url, json=payload, headers=self.headers)
         return response.json()
 
 
 class BlockProcessor:
-    def convert_latex(blocks):
+    def convert_latex_block(block: Dict) -> Dict:
         """
         Reference: https://developers.notion.com/reference/block
 
-        Convert LaTeX equations in Notion blocks to Notion equation blocks.
-
-        Processes blocks containing LaTeX equations delimited by \(  \), \[  \], or $$  $$ and converts them
-        into Notion's native equation format. Preserves text formatting and handles nested blocks.
+        Processes a block containing LaTeX equations delimited by \\( \\), \\[ \\], or $$ and converts them
+        into Notion's native equation format. Preserves text formatting.
 
         Args:
-            blocks (List[Dict]): List of Notion block objects containing rich text with LaTeX equations
+            block (Dict): A Notion block object containing rich text with LaTeX equations
 
         Returns:
-            List[Dict]: The processed blocks with LaTeX equations converted to Notion equation blocks.
-                       Preserves all original block structure and formatting.
+            Dict: The processed block with LaTeX equations converted to Notion equation blocks.
+                  Preserves original block structure and formatting.
 
         Example:
-            Input text: "A function \(f(x)\) is continuous"
+            Input text: "A function \\(f(x)\\) is continuous"
             Output: Two rich_text objects:
                 1. Text object with "A function "
                 2. Equation object with "f(x)"
@@ -118,7 +142,7 @@ class BlockProcessor:
         """
         LATEX_DELIMITERS = set([("\\(", "\\)"), ("\\[", "\\]"), ("$$", "$$")])
 
-        def process_text_content(rich_text):
+        def process_text_content(rich_text: Dict) -> List[Dict]:
             """
             Reference: https://developers.notion.com/reference/rich-text
 
@@ -126,7 +150,7 @@ class BlockProcessor:
 
             Takes a rich text object containing potential LaTeX equations and splits it into separate
             text and equation objects while preserving formatting. Equations are identified by LaTeX
-            delimiters, \(  \), \[  \], or $$  $$, and converted to Notion's native equation format.
+            delimiters (\\(\\), \\[\\], or $$) and converted to Notion's native equation format.
 
             Args:
                 rich_text (Dict): A Notion rich text object containing text content and formatting
@@ -137,7 +161,7 @@ class BlockProcessor:
                            the LaTeX expression.
 
             Example:
-                Input rich_text with content "x = \(a + b\) where a,b > 0"
+                Input rich_text with content "x = \\(a + b\\) where a,b > 0"
                 Returns: [
                     {type: "text", text: {content: "x = "}, ...},
                     {type: "equation", equation: {expression: "a + b"}, ...},
@@ -210,18 +234,21 @@ class BlockProcessor:
 
             return result
 
-        for block in blocks:
-            rich_text_list = block[block["type"]]["rich_text"]
-            if rich_text_list:
-                result = []
-                # Assume equations only exist in the block types that have rich_text
-                for rich_text in rich_text_list:
-                    if rich_text["type"] == "text":
-                        result.extend(process_text_content(rich_text))
-                    else:
-                        result.append(rich_text)
-                block[block["type"]]["rich_text"] = result
-        return blocks
+        rich_text_list = block.get(block["type"]).get("rich_text")
+        if rich_text_list:
+            result = []
+            # Assume equations only exist in the block types that have rich_text
+            for rich_text in rich_text_list:
+                if rich_text["type"] == "text":
+                    result.extend(process_text_content(rich_text))
+                else:
+                    result.append(rich_text)
+            block[block["type"]]["rich_text"] = result
+        return block
+
+    @staticmethod
+    def loop_all_blocks(blocks: List[Dict], func: Callable) -> List[Dict]:
+        return [func(block) for block in blocks]
 
 
 def main():
@@ -231,11 +258,18 @@ def main():
     page_content = notion_api.read_blocks(PAGE_ID)
     print(f"Retrieved {len(page_content)} blocks from Notion page")
 
-    converted_blocks = BlockProcessor.convert_latex(page_content)
-    print("Converted LaTeX equations to Notion equation blocks")
+    # Filter blocks that have rich_text
+    blocks_with_rich_text = [block for block in page_content if block.get(block["type"]).get("rich_text")]
+    print(f"Found {len(blocks_with_rich_text)} blocks with rich_text")
 
-    response = notion_api.write_blocks(converted_blocks)
-    print("Upload complete!")
+    # Convert and update each block with rich_text
+    for block in blocks_with_rich_text:
+        converted_block = BlockProcessor.convert_latex_block(block)
+        rich_text = converted_block[block["type"]]["rich_text"]
+        print(rich_text)
+        # Use the notion_api instance to call update_block_rich_text
+        response = notion_api.update_block_rich_text(block, rich_text)
+        print(f"Updated block {block['id']}")
 
 
 if __name__ == "__main__":
