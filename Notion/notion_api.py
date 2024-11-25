@@ -4,6 +4,8 @@ from typing import Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 
+from utils import blocks_to_str, is_rich_text_block
+
 load_dotenv()
 
 
@@ -64,6 +66,20 @@ class NotionAPI:
             start_cursor = data.get("start_cursor")
 
         return blocks
+
+    def read_blocks_str(self, block_id: Optional[str] = None) -> str:
+        """
+        Read all text content from a Notion page.
+
+        Returns:
+            str: A string containing the text content of the page.
+        """
+        if block_id is None:
+            block_id = self.page_id
+
+        blocks = self.read_blocks(block_id)
+
+        return blocks_to_str(blocks)
 
     def write_blocks(self, new_blocks: List[Dict]) -> Dict:
         """
