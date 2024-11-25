@@ -8,7 +8,7 @@ load_dotenv()
 
 
 class NotionAPI:
-    def __init__(self, PAGE_ID: str):
+    def __init__(self, PAGE_ID: str = None):
         """
         Initialize NotionAPI client with authentication token and page ID.
         Make sure to connect the page to the integration associated with the token.
