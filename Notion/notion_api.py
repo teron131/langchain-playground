@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 
-from utils import blocks_to_str, is_rich_text_block
+from utils import blocks_to_markdown, is_rich_text_block
 
 load_dotenv()
 
@@ -25,49 +25,37 @@ class NotionAPI:
         self.page_id = os.getenv("PAGE_ID") if PAGE_ID is None else PAGE_ID
 
     def read_blocks(self, block_id: Optional[str] = None) -> List[Dict]:
+        """
+        Recursively reads all blocks and their children from a Notion page using cursor-based pagination.
+        """
         if block_id is None:
             block_id = self.page_id
-        """
-        Reference: https://developers.notion.com/reference/get-block-children
 
-        Recursively read all blocks and their children from a Notion page.
-        Makes paginated API requests to fetch blocks from a Notion page, including all nested child blocks.
-        Uses cursor-based pagination to handle large pages.
-
-        Args:
-            block_id (str): The ID of the Notion block/page to read from
-
-        Returns:
-            List[Dict]: A paginated list of block objects.
-        """
         url = f"https://api.notion.com/v1/blocks/{block_id}/children"
         blocks = []
-        start_cursor = None
+        next_cursor = None
 
         while True:
-            params = {"start_cursor": start_cursor} if start_cursor else {}
+            params = {"start_cursor": next_cursor} if next_cursor else {}
             response = requests.get(url, headers=self.headers, params=params)
-
-            if response.status_code != 200:
-                print(f"Error fetching blocks: {response.status_code} - {response.text}")
-                return []
-
             data = response.json()
             results = data.get("results", [])
-            blocks.extend(results)
 
-            # Get child blocks recursively
-            child_blocks = [child_block for block in results if block.get("has_children") for child_block in self.read_blocks(block["id"])]
-            blocks.extend(child_blocks)
+            for block in results:
+                if block.get("has_children"):
+                    children = self.read_blocks(block["id"])
+                    if children:
+                        block["children"] = children
+                blocks.append(block)
 
             if not data.get("has_more"):
                 break
 
-            start_cursor = data.get("start_cursor")
+            next_cursor = data.get("next_cursor")
 
         return blocks
 
-    def read_blocks_str(self, block_id: Optional[str] = None) -> str:
+    def read_blocks_markdown(self, block_id: Optional[str] = None) -> str:
         """
         Read all text content from a Notion page.
 
@@ -79,7 +67,7 @@ class NotionAPI:
 
         blocks = self.read_blocks(block_id)
 
-        return blocks_to_str(blocks)
+        return blocks_to_markdown(blocks)
 
     def write_blocks(self, new_blocks: List[Dict]) -> Dict:
         """
@@ -89,8 +77,7 @@ class NotionAPI:
         Makes a PATCH request to append blocks as children of the specified page.
 
         Args:
-            blocks (List[Dict]): A list of block objects to write to the page.
-                               Each block should follow the Notion API block object format.
+            blocks (List[Dict]): A list of block objects to write to the page. Each block should follow the Notion API block object format.
 
         Returns:
             Dict: A paginated list of newly created first level children block objects.
