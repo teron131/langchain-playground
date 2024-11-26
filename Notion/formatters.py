@@ -10,16 +10,6 @@ from utils import is_rich_text_block
 
 
 def text_to_text(rich_text: Dict, new_content: str) -> Dict:
-    """
-    Create a text rich_text content from content while preserving other rich_text properties. Modifies only the content and type, keeping other properties from the original rich_text object.
-
-    Args:
-        rich_text (Dict): Original rich_text object containing text properties
-        new_content (str): New text content to replace the original content
-
-    Returns:
-        Dict: Modified rich_text object with new content and text type
-    """
     return {
         "type": "text",
         "text": {"content": new_content, "link": rich_text["text"]["link"]},
@@ -30,16 +20,6 @@ def text_to_text(rich_text: Dict, new_content: str) -> Dict:
 
 
 def text_to_equation(rich_text: Dict, new_content: str) -> Dict:
-    """
-    Create an equation rich_text content from content while preserving other rich_text properties. Modifies only the content and type, keeping other properties from the original rich_text object.
-
-    Args:
-        rich_text (Dict): Original rich_text object containing text properties
-        new_content (str): New equation content to replace the original content
-
-    Returns:
-        Dict: Modified rich_text object with new content and equation type
-    """
     return {
         "type": "equation",
         "equation": {"expression": new_content},
@@ -99,22 +79,17 @@ class BaseFormatter:
 
 
 class LatexFormatter(BaseFormatter):
-    LATEX_PATTERN = re.compile(r"(.*?)(\\\(|\\\[|\$\$)(.*?)(\\\)|\\\]|\$\$)|(.+)$")
+    def __init__(self, notionapi: NotionAPI):
+        super().__init__(notionapi)
+        self.inline_pattern = r"(.*?)(\\\(|\$)(.*?)(\\\)|\$)|(.+)$"
+        self.block_pattern = r"(.*?)(\\\[|\$\$)(.*?)(\\\]|\$\$)|(.+)$"
+        self.LATEX_PATTERN = re.compile(self.inline_pattern)
 
     @property
     def progress_description(self) -> str:
         return "Converting LaTeX equations"
 
     def process_rich_text(self, rich_text: Dict) -> List[Dict]:
-        """
-        Process rich text content to extract LaTeX equations and convert them to Notion equation blocks.
-
-        Args:
-            rich_text (Dict): A Notion rich text object containing text content and formatting
-
-        Returns:
-            List[Dict]: List of text and equation objects with preserved formatting
-        """
         content = rich_text["text"]["content"]
         result = []
 
@@ -165,10 +140,10 @@ class Rephraser(BaseFormatter):
         """
         content = rich_text["text"]["content"]
         rephrased_content = self.rephrase_text(content)
-        return [text_to_text(rich_text, rephrased_content)]
+        return [self.text_to_text(rich_text, rephrased_content)]
 
 
 if __name__ == "__main__":
     notion_api = NotionAPI()
     rephraser = Rephraser(notion_api)
-    rephraser.convert_blocks(notion_api.read_blocks())
+    rephraser.process_blocks(notion_api.read_blocks())

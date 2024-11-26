@@ -283,23 +283,14 @@ def markdown_to_blocks(markdown: str) -> List[Dict]:
         List[Dict]: List of Notion blocks
     """
     blocks = []
-    lines = markdown.split("\n")
-
-    i = 0
-    while i < len(lines):
-        line = lines[i]
+    for i, line in enumerate(markdown.split("\n")):
         if not line:
-            i += 1
             continue
 
-        if line == "\\[":
-            blocks.append(create_equation_block(lines, i))
-            while i < len(lines) and lines[i] != "\\]":
-                i += 1
-            i += 1
+        if line == "\\[" or line == "\\(":
+            blocks.append(create_equation_block(markdown.split("\n"), i))
             continue
 
         blocks.append(markdown_to_block(line))
-        i += 1
 
     return blocks
