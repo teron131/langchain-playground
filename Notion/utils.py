@@ -251,25 +251,48 @@ def markdown_to_block(line: str) -> Dict:
         line (str): A line of markdown text to parse
 
     Returns:
-        Dict: A Notion block object representing either a bulleted list item, numbered list item, or paragraph
+        Dict: A Notion block object representing a header (h1, h2, h3), bullet list item, numbered list item, or paragraph
     """
-    if line.startswith("- "):
-        content = line[2:]
-        return {
-            "type": "bulleted_list_item",
-            "bulleted_list_item": {"rich_text": markdown_to_rich_text(content), "color": "default"},
-        }
-    elif re.match(r"^\d+\.\s+(.+)$", line):
-        content = re.match(r"^\d+\.\s+(.+)$", line).group(1)
-        return {
-            "type": "numbered_list_item",
-            "numbered_list_item": {"rich_text": markdown_to_rich_text(content), "color": "default"},
-        }
-    else:
+    # Handle headers (### style)
+    header_match = re.match(r"^(#{1,3})\s+(.+)$", line)
+    if header_match:
+        level = len(header_match.group(1))
+        content = header_match.group(2)
+        # Ensure header level is between 1-3
+        if level <= 3:
+            return {
+                "type": f"heading_{level}",
+                f"heading_{level}": {"rich_text": markdown_to_rich_text(content), "color": "default", "is_toggleable": False},
+            }
+        # If header level > 3, treat as paragraph
         return {
             "type": "paragraph",
             "paragraph": {"rich_text": markdown_to_rich_text(line), "color": "default"},
         }
+
+    # Handle bullet points with proper indentation support
+    bullet_match = re.match(r"^(\s*)-\s+(.+)$", line)
+    if bullet_match:
+        content = bullet_match.group(2)
+        return {
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": markdown_to_rich_text(content), "color": "default"},
+        }
+
+    # Handle numbered lists with proper indentation support
+    number_match = re.match(r"^(\s*)\d+\.\s+(.+)$", line)
+    if number_match:
+        content = number_match.group(2)
+        return {
+            "type": "numbered_list_item",
+            "numbered_list_item": {"rich_text": markdown_to_rich_text(content), "color": "default"},
+        }
+
+    # Default to paragraph
+    return {
+        "type": "paragraph",
+        "paragraph": {"rich_text": markdown_to_rich_text(line), "color": "default"},
+    }
 
 
 def markdown_to_blocks(markdown: str) -> List[Dict]:
