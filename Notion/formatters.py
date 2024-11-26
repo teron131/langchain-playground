@@ -1,5 +1,6 @@
 import re
-from typing import Dict, List
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Protocol, TypedDict
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
@@ -9,33 +10,122 @@ from notion_api import NotionAPI
 from utils import is_rich_text_block, text_to_equation, text_to_text
 
 
-class LatexFormatter:
+@dataclass
+class Annotations:
+    """Represents text formatting annotations in Notion."""
+
+    bold: bool = False
+    italic: bool = False
+    strikethrough: bool = False
+    underline: bool = False
+    code: bool = False
+    color: str = "default"
+
+
+@dataclass
+class RichTextContent:
+    """Represents the content of a rich text block in Notion."""
+
+    content: str
+    link: Optional[str] = None
+
+
+@dataclass
+class RichText:
+    """Represents a rich text object in Notion."""
+
+    type: str
+    text: RichTextContent
+    annotations: Optional[Annotations] = None
+    plain_text: Optional[str] = None
+    href: Optional[str] = None
+
+
+class NotionBlock(TypedDict):
+    """Represents a block object in Notion."""
+
+    id: str
+    type: str
+    has_children: bool
+
+
+class BaseFormatter:
+    """Base class for Notion block formatters."""
+
+    def __init__(self, notionapi: NotionAPI):
+        """
+        Initialize the formatter with a Notion API instance.
+
+        Args:
+            notionapi (NotionAPI): Instance of NotionAPI for interacting with Notion
+        """
+        self.notionapi = notionapi
+
+    @property
+    def progress_description(self) -> str:
+        """
+        Returns the description to be shown in the progress bar.
+
+        Returns:
+            str: Progress bar description
+        """
+        raise NotImplementedError("Subclasses must implement progress_description")
+
+    def process_block(self, block: NotionBlock) -> NotionBlock:
+        """
+        Process a single block.
+
+        Args:
+            block (NotionBlock): The block to process
+
+        Returns:
+            NotionBlock: The processed block
+        """
+        raise NotImplementedError("Subclasses must implement process_block")
+
+    def process_blocks(self, blocks: List[NotionBlock]) -> None:
+        """
+        Process multiple blocks and update them in Notion.
+
+        Args:
+            blocks (List[NotionBlock]): List of blocks to process
+        """
+        with tqdm(blocks, desc=self.progress_description) as pbar:
+            for block in pbar:
+                block_type = block["type"]
+                if is_rich_text_block(block_type):
+                    processed_block = self.process_block(block)
+                    new_rich_text = processed_block[block_type]["rich_text"]
+                    self.notionapi.update_block_rich_text(block, new_rich_text)
+
+
+class LatexFormatter(BaseFormatter):
+    """Formatter for converting LaTeX equations in Notion blocks to native equation blocks."""
+
     LATEX_PATTERN = re.compile(r"(.*?)(\\\(|\\\[|\$\$)(.*?)(\\\)|\\\]|\$\$)|(.+)$")
 
     def __init__(self, notionapi: NotionAPI):
-        self.notionapi = notionapi
-
-    def _convert_rich_text(self, rich_text: Dict) -> List[Dict]:
         """
-        Reference: https://developers.notion.com/reference/rich-text
-
-        Process rich text content to extract LaTeX equations and convert them to Notion equation blocks.
-
-        Takes a rich text object containing potential LaTeX equations and splits it into separate text and equation objects while preserving formatting. Equations are identified by LaTeX delimiters (\\(\\), \\[\\], or $$) and converted to Notion's native equation format.
+        Initialize the LaTeX formatter.
 
         Args:
-            rich_text (Dict): A Notion rich text object containing text content and formatting
+            notionapi (NotionAPI): Instance of NotionAPI for interacting with Notion
+        """
+        super().__init__(notionapi)
+
+    @property
+    def progress_description(self) -> str:
+        return "Converting LaTeX equations"
+
+    def _convert_rich_text(self, rich_text: RichText) -> List[RichText]:
+        """
+        Process rich text content to extract LaTeX equations and convert them to Notion equation blocks.
+
+        Args:
+            rich_text (RichText): A Notion rich text object containing text content and formatting
 
         Returns:
-            List[Dict]: List of text and equation objects with preserved formatting. Each object is either a text object containing regular text or an equation object containing the LaTeX expression.
-
-        Example:
-            Input: rich_text with text "x = \\(a + b\\) where a,b > 0"
-            Returns: [
-                {type: "text", text: {content: "x = "}, ...},
-                {type: "equation", equation: {expression: "a + b"}, ...},
-                {type: "text", text: {content: " where a,b > 0"}, ...}
-            ]
+            List[RichText]: List of text and equation objects with preserved formatting
         """
         content = rich_text["text"]["content"]
         result = []
@@ -52,17 +142,17 @@ class LatexFormatter:
 
         return result
 
-    def convert_block(self, block: Dict) -> Dict:
+    def process_block(self, block: NotionBlock) -> NotionBlock:
         """
         Reference: https://developers.notion.com/reference/block
 
         Processes a block containing LaTeX equations delimited by \\( \\), \\[ \\], or $$ and converts them into Notion's native equation format. Preserves text formatting.
 
         Args:
-            block (Dict): A Notion block object that may contain LaTeX equations in its rich text content.
+            block (NotionBlock): A Notion block object that may contain LaTeX equations in its rich text content.
 
         Returns:
-            Dict: The block with any LaTeX equations converted to Notion's native equation format.
+            NotionBlock: The block with any LaTeX equations converted to Notion's native equation format.
         """
         block_type = block["type"]
         if not is_rich_text_block(block_type):
@@ -81,26 +171,17 @@ class LatexFormatter:
 
         return block
 
-    def convert_blocks(self, blocks: List[Dict]) -> None:
-        """
-        Convert LaTeX equations in blocks and update them in Notion.
 
-        Args:
-            blocks (List[Dict]): A list of Notion blocks that may contain LaTeX equations.
-        """
-        with tqdm(blocks, desc="Converting LaTeX equations") as pbar:
-            for block in pbar:
-                block_type = block["type"]
-                if is_rich_text_block(block_type):
-                    converted_block = self.convert_block(block)
-                    new_rich_text = converted_block[block_type]["rich_text"]
-                    self.notionapi.update_block_rich_text(block, new_rich_text)
+class Rephraser(BaseFormatter):
+    """Formatter for rephrasing text content in Notion blocks."""
 
-
-class Rephraser:
     def __init__(self, notionapi: NotionAPI):
-        self.notionapi = notionapi
+        super().__init__(notionapi)
         self.chain = self.create_chain()
+
+    @property
+    def progress_description(self) -> str:
+        return "Rephrasing blocks"
 
     def create_chain(self):
         prompt = ChatPromptTemplate.from_messages(
@@ -113,17 +194,26 @@ class Rephraser:
         return prompt | model
 
     def rephrase_text(self, text: str) -> str:
-        return self.chain.invoke({"text": text}).content
-
-    def rephrase_block(self, block: Dict) -> Dict:
         """
-        Rephrases the content of a block using a language model while preserving the block structure and formatting.
+        Rephrase the given text using the language model.
 
         Args:
-            block (Dict): A Notion block object containing text content to be rephrased
+            text (str): Text to rephrase
 
         Returns:
-            Dict: The block with rephrased content while preserving the original structure
+            str: Rephrased text
+        """
+        return self.chain.invoke({"text": text}).content
+
+    def process_block(self, block: NotionBlock) -> NotionBlock:
+        """
+        Rephrase the content of a block using a language model.
+
+        Args:
+            block (NotionBlock): A Notion block object containing text to be rephrased
+
+        Returns:
+            NotionBlock: The block with rephrased content
         """
         block_type = block["type"]
         if not is_rich_text_block(block_type):
@@ -144,23 +234,8 @@ class Rephraser:
         block[block_type]["rich_text"] = new_rich_text_list
         return block
 
-    def rephrase_blocks(self, blocks: List[Dict]) -> None:
-        """
-        Rephrases content in blocks and updates them in Notion.
-
-        Args:
-            blocks (List[Dict]): A list of Notion blocks to be rephrased
-        """
-        with tqdm(blocks, desc="Rephrasing blocks") as pbar:
-            for block in pbar:
-                block_type = block["type"]
-                if is_rich_text_block(block_type):
-                    rephrased_block = self.rephrase_block(block)
-                    new_rich_text = rephrased_block[block_type]["rich_text"]
-                    self.notionapi.update_block_rich_text(block, new_rich_text)
-
 
 if __name__ == "__main__":
     notion_api = NotionAPI()
     rephraser = Rephraser(notion_api)
-    rephraser.rephrase_blocks(notion_api.read_blocks())
+    rephraser.process_blocks(notion_api.read_blocks())
