@@ -4,7 +4,8 @@ from typing import Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 
-from utils import blocks_to_markdown, is_rich_text_block
+from markdown import blocks_to_markdown
+from utils import is_rich_text_block
 
 load_dotenv()
 
