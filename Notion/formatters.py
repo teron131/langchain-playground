@@ -6,7 +6,47 @@ from langchain_openai import ChatOpenAI
 from tqdm import tqdm
 
 from notion_api import NotionAPI
-from utils import is_rich_text_block, text_to_equation, text_to_text
+from utils import is_rich_text_block
+
+
+def text_to_text(rich_text: Dict, new_content: str) -> Dict:
+    """
+    Create a text rich_text content from content while preserving other rich_text properties. Modifies only the content and type, keeping other properties from the original rich_text object.
+
+    Args:
+        rich_text (Dict): Original rich_text object containing text properties
+        new_content (str): New text content to replace the original content
+
+    Returns:
+        Dict: Modified rich_text object with new content and text type
+    """
+    return {
+        "type": "text",
+        "text": {"content": new_content, "link": rich_text["text"]["link"]},
+        "plain_text": new_content,
+        "annotations": rich_text["annotations"],
+        "href": rich_text["href"],
+    }
+
+
+def text_to_equation(rich_text: Dict, new_content: str) -> Dict:
+    """
+    Create an equation rich_text content from content while preserving other rich_text properties. Modifies only the content and type, keeping other properties from the original rich_text object.
+
+    Args:
+        rich_text (Dict): Original rich_text object containing text properties
+        new_content (str): New equation content to replace the original content
+
+    Returns:
+        Dict: Modified rich_text object with new content and equation type
+    """
+    return {
+        "type": "equation",
+        "equation": {"expression": new_content},
+        "plain_text": new_content,
+        "annotations": rich_text["annotations"],
+        "href": rich_text["href"],
+    }
 
 
 class BaseFormatter:
