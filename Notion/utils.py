@@ -17,9 +17,14 @@ def is_rich_text_block(block_type: str) -> bool:
 
 def text_to_text(rich_text: Dict, new_content: str) -> Dict:
     """
-    Create a text rich_text content from content while preserving other rich_text properties.
+    Create a text rich_text content from content while preserving other rich_text properties. Modifies only the content and type, keeping other properties from the original rich_text object.
 
-    Modifies only the content and type, keeping other properties from the original rich_text object.
+    Args:
+        rich_text (Dict): Original rich_text object containing text properties
+        new_content (str): New text content to replace the original content
+
+    Returns:
+        Dict: Modified rich_text object with new content and text type
     """
     return {
         "type": "text",
@@ -32,9 +37,14 @@ def text_to_text(rich_text: Dict, new_content: str) -> Dict:
 
 def text_to_equation(rich_text: Dict, new_content: str) -> Dict:
     """
-    Create an equation rich_text content from content while preserving other rich_text properties.
+    Create an equation rich_text content from content while preserving other rich_text properties. Modifies only the content and type, keeping other properties from the original rich_text object.
 
-    Modifies only the content and type, keeping other properties from the original rich_text object.
+    Args:
+        rich_text (Dict): Original rich_text object containing text properties
+        new_content (str): New equation content to replace the original content
+
+    Returns:
+        Dict: Modified rich_text object with new content and equation type
     """
     return {
         "type": "equation",

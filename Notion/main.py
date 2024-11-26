@@ -1,7 +1,8 @@
-from formatters import LatexFormatter
+from formatters import LatexFormatter, Rephraser
 from notion_api import NotionAPI
 
 if __name__ == "__main__":
     notion_api = NotionAPI()
-    content = notion_api.read_blocks_markdown()
-    print(content)
+    blocks = notion_api.read_blocks()
+    rephraser = Rephraser(notion_api)
+    rephraser.rephrase_blocks(blocks)

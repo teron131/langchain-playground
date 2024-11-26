@@ -1,6 +1,8 @@
 import re
 from typing import Dict, List
 
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from tqdm import tqdm
 
 from notion_api import NotionAPI
@@ -93,3 +95,72 @@ class LatexFormatter:
                     converted_block = self.convert_block(block)
                     new_rich_text = converted_block[block_type]["rich_text"]
                     self.notionapi.update_block_rich_text(block, new_rich_text)
+
+
+class Rephraser:
+    def __init__(self, notionapi: NotionAPI):
+        self.notionapi = notionapi
+        self.chain = self.create_chain()
+
+    def create_chain(self):
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "Rephrase the following text, primarily on grammar and clarity. Do not change the specific terms.Do not change if it is already good."),
+                ("human", "{text}"),
+            ]
+        )
+        model = ChatOpenAI(model="gpt-4o-mini")
+        return prompt | model
+
+    def rephrase_text(self, text: str) -> str:
+        return self.chain.invoke({"text": text}).content
+
+    def rephrase_block(self, block: Dict) -> Dict:
+        """
+        Rephrases the content of a block using a language model while preserving the block structure and formatting.
+
+        Args:
+            block (Dict): A Notion block object containing text content to be rephrased
+
+        Returns:
+            Dict: The block with rephrased content while preserving the original structure
+        """
+        block_type = block["type"]
+        if not is_rich_text_block(block_type):
+            return block
+
+        rich_text_list = block[block_type].get("rich_text", [])
+        new_rich_text_list = []
+
+        for rich_text in rich_text_list:
+            if rich_text["type"] == "text":
+                content = rich_text["text"]["content"]
+                rephrased_content = self.rephrase_text(content)
+                new_rich_text = text_to_text(rich_text, rephrased_content)
+                new_rich_text_list.append(new_rich_text)
+            else:
+                new_rich_text_list.append(rich_text)
+
+        block[block_type]["rich_text"] = new_rich_text_list
+        return block
+
+    def rephrase_blocks(self, blocks: List[Dict]) -> None:
+        """
+        Rephrases content in blocks and updates them in Notion.
+
+        Args:
+            blocks (List[Dict]): A list of Notion blocks to be rephrased
+        """
+        with tqdm(blocks, desc="Rephrasing blocks") as pbar:
+            for block in pbar:
+                block_type = block["type"]
+                if is_rich_text_block(block_type):
+                    rephrased_block = self.rephrase_block(block)
+                    new_rich_text = rephrased_block[block_type]["rich_text"]
+                    self.notionapi.update_block_rich_text(block, new_rich_text)
+
+
+if __name__ == "__main__":
+    notion_api = NotionAPI()
+    rephraser = Rephraser(notion_api)
+    rephraser.rephrase_blocks(notion_api.read_blocks())
