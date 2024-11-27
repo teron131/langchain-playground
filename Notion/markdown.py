@@ -70,59 +70,75 @@ class MathParser:
     """Handles parsing and processing of mathematical expressions in text."""
 
     def __init__(self):
-        self.inline_math_pattern = r"\\\((.*?)\\\)|\$([^$\n]+?)\$"
-        self.block_math_pattern = r"\\\[(.*?)\\\]|\$\$([^$\n]+?)\$\$"
-        self._math_pattern = f"({self.inline_math_pattern}|{self.block_math_pattern})"
+        # Escape the backslashes properly and use non-capturing groups
+        self.inline_math_pattern = r"(?:\\\(.*?\\\)|\$[^$\n]+?\$)"
+        self.block_math_pattern = r"(?:\\\[.*?\\\]|\$\$.*?\$\$)"
+        self.env_pattern = r"\\begin\{[^}]+\}.*?\\end\{[^}]+\}"
+        self._math_pattern = f"{self.inline_math_pattern}|{self.block_math_pattern}|{self.env_pattern}"
 
     def split_text(self, text: str) -> List[str]:
         """Split text by math expressions."""
-        return re.split(f"({self._math_pattern})", text)
+        return re.split(f"({self._math_pattern})", text, flags=re.DOTALL)
 
     def is_math_expression(self, text: str) -> bool:
         """Check if text is a math expression."""
-        return bool(re.match(self.inline_math_pattern, text) or re.match(self.block_math_pattern, text))
+        return bool(re.match(f"^(?:{self._math_pattern})$", text, re.DOTALL))
 
     def extract_expression(self, text: str) -> str:
         """Extract the math expression from text."""
-        match = re.match(self.inline_math_pattern, text) or re.match(self.block_math_pattern, text)
-        return next((g for g in match.groups() if g is not None), "") if match else ""
+        # Extract content between delimiters
+        if text.startswith("\\begin{"):
+            match = re.match(r"\\begin\{([^}]+)\}(.*?)\\end\{\1\}", text, re.DOTALL)
+            return match.group(2).strip() if match else ""
+        elif text.startswith("\\(") and text.endswith("\\)"):
+            return text[2:-2].strip()
+        elif text.startswith("\\[") and text.endswith("\\]"):
+            return text[2:-2].strip()
+        elif text.startswith("$") and text.endswith("$"):
+            if text.startswith("$$") and text.endswith("$$"):
+                return text[2:-2].strip()
+            return text[1:-1].strip()
+        return ""
+
+    def is_math_environment(self, text: str) -> bool:
+        """Check if text contains a math environment."""
+        return bool(re.match(r"\\begin\{[^}]+\}.*?\\end\{[^}]+\}", text, re.DOTALL))
 
 
-# Rich text creation helpers
-def create_rich_text(content: str, annotations: Dict = None) -> Dict:
-    if annotations is None:
-        annotations = {
-            "bold": False,
-            "italic": False,
-            "strikethrough": False,
-            "underline": False,
-            "code": False,
-            "color": "default",
+class RichTextAnnotator:
+    """Handles rich text annotation processing and creation."""
+
+    DEFAULT_ANNOTATIONS = {
+        "bold": False,
+        "italic": False,
+        "strikethrough": False,
+        "underline": False,
+        "code": False,
+        "color": "default",
+    }
+
+    ANNOTATION_MARKERS = [("`", "code", 1), ("*", "italic", 1), ("~~", "strikethrough", 2), ("__", "underline", 2)]
+
+    @classmethod
+    def create_text(cls, content: str, annotations: Dict = None) -> Dict:
+        """Create a rich text object with given content and annotations."""
+        return {
+            "type": "text",
+            "text": {"content": content, "link": None},
+            "plain_text": content,
+            "annotations": annotations or cls.DEFAULT_ANNOTATIONS.copy(),
+            "href": None,
         }
 
-    return {
-        "type": "text",
-        "text": {"content": content, "link": None},
-        "plain_text": content,
-        "annotations": annotations,
-        "href": None,
-    }
-
-
-def create_rich_text_equation(expr: str) -> Dict:
-    return {
-        "type": "equation",
-        "equation": {"expression": expr},
-        "annotations": {
-            "bold": False,
-            "italic": False,
-            "strikethrough": False,
-            "underline": False,
-            "code": False,
-            "color": "default",
-        },
-        "href": None,
-    }
+    @classmethod
+    def create_equation(cls, expr: str) -> Dict:
+        """Create a rich text equation object."""
+        return {
+            "type": "equation",
+            "equation": {"expression": expr},
+            "annotations": cls.DEFAULT_ANNOTATIONS.copy(),
+            "href": None,
+        }
 
 
 def create_equation_block(lines: List[str], start_index: int) -> Dict:
@@ -135,7 +151,7 @@ def create_equation_block(lines: List[str], start_index: int) -> Dict:
     return {
         "type": "paragraph",
         "paragraph": {
-            "rich_text": [create_rich_text_equation(expression)],
+            "rich_text": [RichTextAnnotator.create_equation(expression)],
             "color": "default",
         },
     }
@@ -162,7 +178,7 @@ def annotate_text(text: str, added_equations: set) -> List[Dict]:
 
         if bold_part.startswith("**") and bold_part.endswith("**"):
             text_content = bold_part[2:-2]
-            rich_text_list.append(create_rich_text(text_content, {"bold": True}))
+            rich_text_list.append(RichTextAnnotator.create_text(text_content, {"bold": True}))
             continue
 
         # Handle other annotations
@@ -182,7 +198,7 @@ def annotate_text(text: str, added_equations: set) -> List[Dict]:
                 annotations[format_type] = True
 
         if current_text and current_text not in added_equations:
-            rich_text_list.append(create_rich_text(current_text, annotations))
+            rich_text_list.append(RichTextAnnotator.create_text(current_text, annotations))
 
     return rich_text_list
 
@@ -208,9 +224,13 @@ def markdown_to_rich_text(text: str) -> List[Dict]:
             continue
 
         if math_parser.is_math_expression(part):
+            if math_parser.is_math_environment(part):
+                # Skip environment processing here as it will be handled at block level
+                continue
+
             expr = math_parser.extract_expression(part)
             if expr and expr not in added_equations:
-                rich_text_list.append(create_rich_text_equation(expr))
+                rich_text_list.append(RichTextAnnotator.create_equation(expr))
                 added_equations.add(expr)
             continue
 
@@ -246,6 +266,34 @@ class EquationBlockParser:
     """Handles equation block parsing and conversion."""
 
     @staticmethod
+    def parse_math_environment(text: str) -> List[Dict]:
+        """
+        Parse a LaTeX math environment and convert it to equation blocks.
+
+        Args:
+            text (str): The text containing the math environment
+
+        Returns:
+            List[Dict]: List of equation blocks, one for each line
+        """
+        math_parser = MathParser()
+        if not math_parser.is_math_environment(text):
+            return []
+
+        # Extract the content between \begin and \end
+        content = math_parser.extract_expression(text)
+
+        # Split into lines and clean up
+        equations = [eq.strip() for eq in content.split("\\\\") if eq.strip()]
+
+        # Create equation blocks
+        blocks = []
+        for eq in equations:
+            blocks.append({"type": "equation", "equation": {"expression": eq, "color": "default"}})
+
+        return blocks
+
+    @staticmethod
     def parse_equation_block(lines: List[str], start_index: int) -> Tuple[Optional[Dict], int]:
         """
         Parse an equation block from the given lines starting at start_index.
@@ -259,6 +307,23 @@ class EquationBlockParser:
         """
         if start_index >= len(lines):
             return None, start_index
+
+        # Check for math environment
+        current_line = lines[start_index]
+        if current_line.strip().startswith("\\begin{"):
+            # Collect all lines until \end
+            env_lines = []
+            i = start_index
+            while i < len(lines) and "\\end{" not in lines[i]:
+                env_lines.append(lines[i])
+                i += 1
+            if i < len(lines):
+                env_lines.append(lines[i])  # Include the \end line
+
+            full_env = "\n".join(env_lines)
+            equation_blocks = EquationBlockParser.parse_math_environment(full_env)
+            if equation_blocks:
+                return equation_blocks[0], i + 1  # Return first block and remaining will be processed later
 
         start_line = lines[start_index].strip()
         if not EquationDelimiters.is_start_delimiter(start_line):
@@ -292,7 +357,7 @@ class EquationBlockParser:
         return {
             "type": "paragraph",
             "paragraph": {
-                "rich_text": [create_rich_text_equation(expression)],
+                "rich_text": [RichTextAnnotator.create_equation(expression)],
                 "color": "default",
             },
         }, current_index + 1
@@ -391,6 +456,21 @@ def markdown_to_blocks(markdown: str) -> List[Dict]:
         if not lines[i].strip():
             i += 1
             continue
+
+        # Check for math environment
+        if lines[i].strip().startswith("\\begin{"):
+            env_lines = []
+            start_i = i
+            while i < len(lines) and "\\end{" not in lines[i]:
+                env_lines.append(lines[i])
+                i += 1
+            if i < len(lines):
+                env_lines.append(lines[i])
+                full_env = "\n".join(env_lines)
+                equation_blocks = EquationBlockParser.parse_math_environment(full_env)
+                blocks.extend(equation_blocks)
+                i += 1
+                continue
 
         # Try parsing as equation block first
         equation_block, next_index = EquationBlockParser.parse_equation_block(lines, i)
