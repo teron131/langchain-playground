@@ -69,22 +69,24 @@ def blocks_to_markdown(blocks: List[Dict], level: int = 0, number_stack: List[in
 class MathParser:
     """Handles parsing and processing of mathematical expressions in text."""
 
-    def __init__(self):
-        # Escape the backslashes properly and use non-capturing groups
-        self.inline_math_pattern = r"(?:\\\(.*?\\\)|\$[^$\n]+?\$)"
-        self.block_math_pattern = r"(?:\\\[.*?\\\]|\$\$.*?\$\$)"
-        self.env_pattern = r"\\begin\{[^}]+\}.*?\\end\{[^}]+\}"
-        self._math_pattern = f"{self.inline_math_pattern}|{self.block_math_pattern}|{self.env_pattern}"
+    # Class level patterns
+    INLINE_MATH_PATTERN = r"(?:\\\(.*?\\\)|\$[^$\n]+?\$)"
+    BLOCK_MATH_PATTERN = r"(?:\\\[.*?\\\]|\$\$.*?\$\$)"
+    ENV_PATTERN = r"\\begin\{[^}]+\}.*?\\end\{[^}]+\}"
+    _MATH_PATTERN = f"{INLINE_MATH_PATTERN}|{BLOCK_MATH_PATTERN}|{ENV_PATTERN}"
 
-    def split_text(self, text: str) -> List[str]:
+    @classmethod
+    def split_text(cls, text: str) -> List[str]:
         """Split text by math expressions."""
-        return re.split(f"({self._math_pattern})", text, flags=re.DOTALL)
+        return re.split(f"({cls._MATH_PATTERN})", text, flags=re.DOTALL)
 
-    def is_math_expression(self, text: str) -> bool:
+    @classmethod
+    def is_math_expression(cls, text: str) -> bool:
         """Check if text is a math expression."""
-        return bool(re.match(f"^(?:{self._math_pattern})$", text, re.DOTALL))
+        return bool(re.match(f"^(?:{cls._MATH_PATTERN})$", text, re.DOTALL))
 
-    def extract_expression(self, text: str) -> str:
+    @classmethod
+    def extract_expression(cls, text: str) -> str:
         """Extract the math expression from text."""
         # Extract content between delimiters
         if text.startswith("\\begin{"):
@@ -100,7 +102,8 @@ class MathParser:
             return text[1:-1].strip()
         return ""
 
-    def is_math_environment(self, text: str) -> bool:
+    @classmethod
+    def is_math_environment(cls, text: str) -> bool:
         """Check if text contains a math environment."""
         return bool(re.match(r"\\begin\{[^}]+\}.*?\\end\{[^}]+\}", text, re.DOTALL))
 
@@ -215,20 +218,19 @@ def markdown_to_rich_text(text: str) -> List[Dict]:
     """
     rich_text_list = []
     added_equations = set()
-    math_parser = MathParser()
 
-    parts = math_parser.split_text(text)
+    parts = MathParser.split_text(text)
 
     for part in parts:
         if not part:
             continue
 
-        if math_parser.is_math_expression(part):
-            if math_parser.is_math_environment(part):
+        if MathParser.is_math_expression(part):
+            if MathParser.is_math_environment(part):
                 # Skip environment processing here as it will be handled at block level
                 continue
 
-            expr = math_parser.extract_expression(part)
+            expr = MathParser.extract_expression(part)
             if expr and expr not in added_equations:
                 rich_text_list.append(RichTextAnnotator.create_equation(expr))
                 added_equations.add(expr)

@@ -3,8 +3,8 @@ from typing import List
 from IPython.display import display
 
 from formatters import BaseFormatter, LatexFormatter, Rephraser
-from notion_api import NotionAPI
 from markdown import blocks_to_markdown, markdown_to_blocks
+from notion_api import NotionAPI
 
 
 def process_with_formatters(blocks: List[dict], formatters: List[BaseFormatter]) -> None:
@@ -21,13 +21,9 @@ def process_with_formatters(blocks: List[dict], formatters: List[BaseFormatter])
 
 if __name__ == "__main__":
     notion_api = NotionAPI()
-    # blocks = notion_api.read_blocks()
-
-    markdown = """
-\[ x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}. \)
-"""
-    display(markdown)
-    # markdown = notion_api.read_blocks_markdown()
-    blocks = markdown_to_blocks(markdown)
-    print(blocks)
-    notion_api.write_blocks(blocks)
+    rephraser = Rephraser(notion_api)
+    blocks = notion_api.read_blocks()
+    markdown = blocks_to_markdown(blocks)
+    rephrased_markdown = rephraser.rephrase_text(markdown)
+    rephrased_blocks = markdown_to_blocks(rephrased_markdown)
+    notion_api.write_blocks(rephrased_blocks)

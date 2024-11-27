@@ -140,7 +140,7 @@ class Rephraser(BaseFormatter):
         """
         content = rich_text["text"]["content"]
         rephrased_content = self.rephrase_text(content)
-        return [self.text_to_text(rich_text, rephrased_content)]
+        return [text_to_text(rich_text, rephrased_content)]
 
 
 if __name__ == "__main__":
