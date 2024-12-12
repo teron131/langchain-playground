@@ -1,10 +1,12 @@
+from typing import Dict
+
 import fal_client
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
-def whisper_fal_transcribe(audio_path: str, language: str = "en"):
+def whisper_fal_transcribe(audio_path: str, language: str = "en") -> dict:
     """
     Transcribe an audio file using fal-ai/wizper model.
 

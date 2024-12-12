@@ -1,4 +1,5 @@
 import warnings
+from typing import Dict
 
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
@@ -6,7 +7,7 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 warnings.filterwarnings("ignore")
 
 
-def whisper_hf_transcribe(audio_path: str):
+def whisper_hf_transcribe(audio_path: str) -> dict:
     """
     Transcribe audio file using whisper-large-v3-turbo model with Hugging Face optimization.
 
