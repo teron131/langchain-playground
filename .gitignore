@@ -10,5 +10,4 @@ scratch/*
 *.png
 *.jpg
 *.pdf
-*.csv
 *.json
