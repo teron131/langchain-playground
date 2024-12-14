@@ -2210,3 +2210,369 @@ Musk is also a prolific philanthropist, and has donated to various causes, inclu
 Elon Musk's impact on the world has been significant, and his vision for the future has inspired a generation of entrepreneurs, inventors, and innovators. His companies have disrupted multiple industries, including software, aerospace, energy, and transportation, and have created new opportunities for sustainable growth and development.
 
 Musk's legacy will be remembered for generations to come, and his contributions to humanity will continue to shape the world we live in today. As he once said, ""When something's important enough, you do it even if the odds are against you.""",1104,38.11413884162903,28.965628859865227
+Cerebras,Llama-3.3-70B,cloud,Explain gradient descent in 1000 words,"
+**Introduction to Gradient Descent**
+=====================================
+
+Gradient descent is a fundamental algorithm in machine learning and optimization, used to minimize the loss function of a model by iteratively adjusting its parameters. It's a first-order optimization algorithm that uses the gradient of the loss function to update the model's parameters in a direction that reduces the loss. In this explanation, we'll delve into the details of gradient descent, its types, and its applications.
+
+**What is Gradient Descent?**
+---------------------------
+
+Gradient descent is an optimization algorithm that aims to find the minimum of a loss function, which measures the difference between the model's predictions and the actual outputs. The algorithm starts with an initial set of model parameters and iteratively updates them to minimize the loss function. The update rule is based on the gradient of the loss function with respect to the model parameters.
+
+The gradient of a function is a vector that points in the direction of the steepest ascent. In the context of gradient descent, we're interested in the direction of the steepest descent, which is the opposite of the gradient. By moving in the direction of the negative gradient, we can reduce the loss function.
+
+**How Gradient Descent Works**
+-----------------------------
+
+The gradient descent algorithm can be broken down into the following steps:
+
+1. **Initialize the model parameters**: Choose an initial set of model parameters, often randomly.
+2. **Compute the loss function**: Calculate the loss function for the current model parameters.
+3. **Compute the gradient**: Calculate the gradient of the loss function with respect to the model parameters.
+4. **Update the model parameters**: Update the model parameters using the gradient and a learning rate.
+5. **Repeat**: Repeat steps 2-4 until convergence or a stopping criterion is reached.
+
+The update rule for gradient descent is as follows:
+
+`w = w - α * ∇L(w)`
+
+where `w` is the model parameter, `α` is the learning rate, and `∇L(w)` is the gradient of the loss function with respect to the model parameter.
+
+**Types of Gradient Descent**
+-----------------------------
+
+There are several types of gradient descent algorithms, each with its strengths and weaknesses:
+
+1. **Batch Gradient Descent**: This type of gradient descent uses the entire training dataset to compute the gradient of the loss function. It's computationally expensive but provides a more accurate estimate of the gradient.
+2. **Stochastic Gradient Descent (SGD)**: This type of gradient descent uses a single example from the training dataset to compute the gradient of the loss function. It's faster than batch gradient descent but provides a noisier estimate of the gradient.
+3. **Mini-Batch Gradient Descent**: This type of gradient descent uses a small batch of examples from the training dataset to compute the gradient of the loss function. It's a compromise between batch gradient descent and SGD.
+
+**Advantages and Disadvantages of Gradient Descent**
+---------------------------------------------------
+
+**Advantages:**
+
+1. **Simple to implement**: Gradient descent is a simple algorithm to implement, especially for small datasets.
+2. **Fast convergence**: Gradient descent can converge quickly to the optimal solution, especially for convex loss functions.
+3. **Flexible**: Gradient descent can be used with various loss functions and models.
+
+**Disadvantages:**
+
+1. **Sensitive to hyperparameters**: Gradient descent is sensitive to the choice of hyperparameters, such as the learning rate and batch size.
+2. **May get stuck in local minima**: Gradient descent may get stuck in local minima, especially for non-convex loss functions.
+3. **Computationally expensive**: Gradient descent can be computationally expensive, especially for large datasets.
+
+**Applications of Gradient Descent**
+------------------------------------
+
+Gradient descent has numerous applications in machine learning and optimization, including:
+
+1. **Linear regression**: Gradient descent is used to optimize the parameters of a linear regression model.
+2. **Logistic regression**: Gradient descent is used to optimize the parameters of a logistic regression model.
+3. **Neural networks**: Gradient descent is used to optimize the parameters of a neural network.
+4. **Deep learning**: Gradient descent is used to optimize the parameters of deep learning models, such as convolutional neural networks and recurrent neural networks.
+
+**Conclusion**
+==============
+
+Gradient descent is a fundamental algorithm in machine learning and optimization, used to minimize the loss function of a model by iteratively adjusting its parameters. It's a simple algorithm to implement, but it can be sensitive to hyperparameters and may get stuck in local minima. Despite its limitations, gradient descent has numerous applications in machine learning and optimization, and it remains a widely used algorithm in the field.
+
+**Example Code**
+---------------
+
+Here's an example code in Python using the scikit-learn library to implement gradient descent for linear regression:
+```python
+import numpy as np
+from sklearn.linear_model import SGDRegressor
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+
+# Generate a random regression dataset
+X, y = make_regression(n_samples=100, n_features=10, noise=0.1)
+
+# Split the dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Create an SGDRegressor object with a learning rate of 0.01
+sgd_reg = SGDRegressor(eta0=0.01, max_iter=1000, tol=1e-3, random_state=42)
+
+# Train the model on the training set
+sgd_reg.fit(X_train, y_train)
+
+# Evaluate the model on the testing set
+y_pred = sgd_reg.predict(X_test)
+print(""Mean squared error:"", np.mean((y_pred - y_test) ** 2))
+```
+This code generates a random regression dataset, splits it into training and testing sets, and trains an SGDRegressor model on the training set using gradient descent. The model is then evaluated on the testing set using the mean squared error metric.
+",1225,0.51,2420
+Cerebras,Llama-3.3-70B,cloud,"
+A bird in the hand is worth two in the bush
+
+Definition: It's better to have a small, secured advantage than the possibility of a bigger one. It's better to stick with what you have than risk it for something greater.
+
+If the idiom “A bird in hand is worth two in the bush” is true, human beings is risk adverse. Is this true or false or uncertain?
+","
+This statement is TRUE.
+
+The idiom ""A bird in the hand is worth two in the bush"" suggests that people tend to prefer a certain, smaller gain over a potentially larger gain that is uncertain or risky. This preference for certainty over uncertainty is a key characteristic of risk aversion.
+
+In economics and psychology, risk aversion refers to the tendency for people to prefer avoiding losses to acquiring gains, and to prefer certain outcomes over uncertain ones. The idiom's message aligns with this concept, implying that humans are indeed risk-averse, as they would rather hold onto a smaller, guaranteed advantage (the ""bird in hand"") than take a chance on a potentially larger one (the ""two in the bush"").
+
+So, based on the idiom's message, it can be inferred that human beings are indeed risk-averse.
+",168,0.13,1272
+Cerebras,Llama-3.3-70B,cloud,"
+Explain the application of Kalman Filter in the field of algorithmic trading.
+","
+The Kalman Filter is a mathematical algorithm used for estimating the state of a system from noisy measurements. In the field of algorithmic trading, the Kalman Filter has numerous applications, including:
+
+1. **State Estimation**: The Kalman Filter can be used to estimate the underlying state of a financial system, such as the volatility of an asset or the parameters of a trading model. This is particularly useful in high-frequency trading, where the state of the market can change rapidly.
+2. **Noise Reduction**: Financial data is often noisy, and the Kalman Filter can be used to reduce the noise and extract the underlying signal. This can help improve the accuracy of trading models and reduce the risk of false signals.
+3. **Predicting Asset Prices**: The Kalman Filter can be used to predict asset prices by estimating the underlying state of the market. This can be done by modeling the price of an asset as a function of its past values and other relevant factors, such as economic indicators or market sentiment.
+4. **Portfolio Optimization**: The Kalman Filter can be used to optimize portfolio performance by estimating the covariance matrix of asset returns. This can help traders to identify the optimal portfolio allocation and minimize risk.
+5. **Risk Management**: The Kalman Filter can be used to estimate the risk of a portfolio by modeling the volatility of asset returns. This can help traders to set stop-loss levels and limit their exposure to potential losses.
+
+**How Kalman Filter Works in Algorithmic Trading**
+
+The Kalman Filter works by using a combination of prediction and correction steps to estimate the state of a system. The process can be broken down into the following steps:
+
+1. **Prediction**: The Kalman Filter predicts the state of the system at the next time step based on the current state and the system dynamics.
+2. **Measurement**: The Kalman Filter receives a measurement of the system state, which is typically noisy.
+3. **Correction**: The Kalman Filter updates the predicted state based on the measurement, using a weighted average of the predicted state and the measurement.
+4. **Repeat**: The process is repeated at each time step, with the Kalman Filter continuously updating its estimate of the system state.
+
+**Example of Kalman Filter in Algorithmic Trading**
+
+Suppose we want to use the Kalman Filter to predict the price of a stock based on its past values. We can model the price of the stock as a function of its past values and other relevant factors, such as economic indicators or market sentiment. The Kalman Filter can be used to estimate the parameters of this model, such as the coefficients of the autoregressive terms.
+
+For example, let's say we have a simple autoregressive model of the form:
+
+`price(t) = beta0 + beta1 * price(t-1) + epsilon(t)`
+
+where `price(t)` is the price of the stock at time `t`, `beta0` and `beta1` are the model parameters, and `epsilon(t)` is the error term.
+
+The Kalman Filter can be used to estimate the parameters `beta0` and `beta1` by minimizing the mean squared error between the predicted price and the actual price. The filter can be implemented using the following equations:
+
+`beta0(t) = beta0(t-1) + K(t) * (price(t) - beta0(t-1) - beta1(t-1) * price(t-1))`
+`beta1(t) = beta1(t-1) + K(t) * (price(t) - beta0(t-1) - beta1(t-1) * price(t-1)) * price(t-1)`
+
+where `K(t)` is the Kalman gain, which is a function of the covariance matrix of the error term.
+
+**Advantages of Kalman Filter in Algorithmic Trading**
+
+The Kalman Filter has several advantages in algorithmic trading, including:
+
+1. **Improved accuracy**: The Kalman Filter can improve the accuracy of trading models by reducing the noise in the data and extracting the underlying signal.
+2. **Flexibility**: The Kalman Filter can be used with a wide range of trading models, from simple autoregressive models to complex machine learning models.
+3. **Robustness**: The Kalman Filter is robust to outliers and non-normality in the data, making it a reliable choice for trading applications.
+4. **Real-time estimation**: The Kalman Filter can be used for real-time estimation, making it suitable for high-frequency trading applications.
+
+**Conclusion**
+
+The Kalman Filter is a powerful algorithm that can be used in algorithmic trading to improve the accuracy of trading models, reduce noise, and optimize portfolio performance. Its ability to estimate the state of a system from noisy measurements makes it a valuable tool for traders, and its flexibility and robustness make it a reliable choice for a wide range of trading applications.
+",991,0.48,2060
+Cerebras,Llama-3.3-70B,cloud,"
+Write a biography of Elon Musk across different time periods and fields he involed the most significantly.
+","
+**Early Life and Education (1971-1995)**
+
+Elon Reeve Musk was born on June 28, 1971, in Pretoria, South Africa. Growing up, Musk was an introverted and bookish child who developed a passion for reading and learning. He taught himself computer programming at the age of 12 and, by 17, had moved to Canada to attend college. Musk transferred to the University of Pennsylvania two years later, where he graduated with a degree in economics and physics in 1995.
+
+**Entrepreneurial Beginnings (1995-2000)**
+
+After college, Musk moved to California to pursue a career in technology and entrepreneurship. In 1995, he co-founded his first company, Zip2, which provided online content publishing software for news organizations. In 1999, Compaq acquired Zip2 for $307 million, with Musk making $22 million from the sale. He then co-founded X.com, which later became PayPal, an online payment system that was acquired by eBay for $1.5 billion in 2002.
+
+**Space Exploration (2002-Present)**
+
+In 2002, Musk founded SpaceX, with the ambitious goal of reducing space transportation costs and enabling the colonization of Mars. SpaceX has since become a leading player in the private space industry, with numerous successful launches and a contract with NASA to transport astronauts to the International Space Station. In 2018, SpaceX launched the Falcon Heavy, the most powerful operational rocket in the world, and in 2020, it became the first private company to send astronauts to the ISS.
+
+**Electric Cars and Energy (2004-Present)**
+
+In 2004, Musk co-founded Tesla, Inc., which has become one of the leading electric vehicle (EV) manufacturers in the world. Tesla's mission is to accelerate the world's transition to sustainable energy through the production of EVs, solar power systems, and energy storage products. Under Musk's leadership, Tesla has disrupted the automotive industry and played a significant role in popularizing EVs. In 2016, Tesla acquired SolarCity, a solar panel manufacturing company co-founded by Musk, and has since integrated its solar products into Tesla's energy offerings.
+
+**Neuralink and The Boring Company (2016-Present)**
+
+In 2016, Musk founded Neuralink, a neurotechnology company that aims to develop implantable brain–machine interfaces (BMIs) that could potentially treat a wide range of medical conditions. Neuralink's goal is to integrate the human brain with computers, effectively merging human and artificial intelligence. The same year, Musk also founded The Boring Company, which aims to reduce traffic congestion in cities by building high-speed transportation tunnels. The company has already completed several projects, including a test tunnel in Los Angeles.
+
+**Twitter and Public Persona (2009-Present)**
+
+Musk has been an active Twitter user since 2009 and has become known for his unfiltered and often provocative tweets. He has used the platform to share his thoughts on a wide range of topics, from space exploration and sustainable energy to politics and economics. Musk's Twitter presence has also been the subject of controversy, with some critics accusing him of using the platform to manipulate the stock market and spread misinformation.
+
+**Challenges and Controversies (2018-Present)**
+
+In recent years, Musk has faced several challenges and controversies, including a highly publicized feud with the Securities and Exchange Commission (SEC) over his tweets about Tesla's stock price. In 2018, Musk was forced to step down as Tesla's chairman after the SEC sued him for allegedly misleading investors. He has also faced criticism for his handling of worker safety and labor issues at Tesla and SpaceX, as well as his involvement in several high-profile accidents and incidents, including a fatal crash involving a Tesla Model S in Autopilot mode.
+
+Despite these challenges, Musk remains one of the most innovative and influential entrepreneurs of our time, with a net worth of over $200 billion and a reputation for pushing the boundaries of what is possible. His vision for a sustainable energy future, a human settlement on Mars, and a world where humans and machines are integrated has inspired a generation of entrepreneurs, engineers, and scientists to work towards a better future.
+",866,0.43,1997
+Cerebras,Llama-3.3-70B,cloud,"
+Give me 50 cringy dad jokes.
+","
+You want to groan and laugh at the same time, huh? Here are 50 cringy dad jokes for you:
+
+1. Why did the scarecrow win an award? Because he was outstanding in his field!
+2. I told my wife she was drawing her eyebrows too high. She looked surprised.
+3. Why do chicken coops only have two doors? Because if they had four, they would be a sedan.
+4. What do you call a fake noodle? An impasta.
+5. Why did the mushroom go to the party? Because he was a fun-gi.
+6. Why did the cat join a band? Because he wanted to be the purr-cussionist.
+7. I'm reading a book about anti-gravity. It's impossible to put down.
+8. Why did the banana go to the doctor? He wasn't peeling well.
+9. Why did the astronaut break up with his girlfriend? Because he needed space.
+10. What do you call a can opener that doesn't work? A can't opener.
+11. I'm not a morning person. I'm not a night person. I'm a ""whenever the coffee kicks in"" person.
+12. Why did the bicycle fall over? Because it was two-tired.
+13. Why did the chicken go to the gym? To get some egg-cellent abs.
+14. What do you call a group of cows playing instruments? A moo-sical band.
+15. Why did the baker go to the bank? He needed dough.
+16. Why did the turkey join the band? He was a drumstick.
+17. Why did the orange stop in the middle of the road? Because it ran out of juice.
+18. What do you call a bear with no socks on? Barefoot.
+19. Why did the computer go to the doctor? It had a virus.
+20. Why did the kid bring a ladder to school? He wanted to reach his full potential.
+21. Why did the rabbit go to the doctor? He had hare-loss.
+22. What do you call a dog that does magic tricks? A labracadabrador.
+23. Why did the kid become a baker? Because he kneaded the dough.
+24. Why did the sun go to therapy? It had a burning issue.
+25. Why did the egg go to therapy? It was cracking under the pressure.
+26. What do you call a fish with no eyes? A fsh.
+27. Why did the kid bring a magnet to school? He wanted to attract attention.
+28. Why did the cat take a selfie? To capture its purr-fect side.
+29. Why did the banana split? Because it wasn't peeling well under the pressure.
+30. What do you call a cow with no legs? Ground beef.
+31. Why did the chicken go to the doctor? It had fowl breath.
+32. Why did the kid become a master baker? Because he was egg-straordinary.
+33. Why did the orange juice carton go to therapy? It was feeling a little crushed.
+34. What do you call a dog that's a good listener? A retriever.
+35. Why did the kid bring a compass to school? He wanted to navigate his way to success.
+36. Why did the scarecrow win a prize? Because he was a-maize-ing.
+37. Why did the chicken go to the gym? To get some egg-cellent biceps.
+38. What do you call a group of chickens playing instruments? A fowl orchestra.
+39. Why did the kid become a scientist? Because he wanted to experiment with his career.
+40. Why did the sun go to the party? Because it was a hot ticket.
+41. Why did the cat join a book club? To purr-use the latest novels.
+42. What do you call a dog that's a great dancer? A paw-fect dancer.
+43. Why did the kid bring a flashlight to school? He wanted to shed some light on the subject.
+44. Why did the banana go to the doctor? He wasn't peeling well, and it was a fruit-less effort.
+45. Why did the chicken go to the beauty parlor? To get a beak trim.
+46. What do you call a cow that does magic tricks? A moo-gician.
+47. Why did the kid become a chef? Because he wanted to whip up a career.
+48. Why did the turkey go to the doctor? He had a fowl cough.
+49. Why did the cat take a nap? To paws for a moment.
+50. Why did the kid bring a magnet to the party? Because he wanted to attract some friends.
+
+I hope these cringy dad jokes made you laugh, groan, or both!
+",985,0.37,2636
+Cerebras,Llama-3.3-70B,cloud,"
+Right now, some nation-states and individual actors are intercepting and storing lots of encrypted data, like passwords, bank details, and social security numbers. But they can't open these files. So, why are they doing it? 
+
+Well, because they believe that within the next 10 to 20 years, they will have access to a quantum computer that can break the encryption in minutes. This procedure is known as Store Now, Decrypt Later, or SNDL. It works because there is information available today that will still be valuable in a decade. 
+
+Things like industrial and pharmaceutical research, and top-secret government intelligence, are all at risk, and everyone is aware of this threat. The National Security Administration says that a sufficiently large quantum computer, if built, would be capable of undermining all widely deployed public key algorithms. 
+
+You know, in a five to ten year timeframe, quantum computing will break encryption as we know it today. 
+
+Even though sufficiently powerful quantum computers are still years away...They're already a threat because of Store Now, Decrypt Later, which is why the US Congress just passed legislation mandating all agencies start transitioning right now to new methods of cryptography that can't be broken by quantum computers.
+
+You know, our current encryption schemes have been remarkably successful, working effectively for over 40 years. Up until the 1970s, if you wanted to exchange private information with someone, you would first have to meet up in person and share a secret key. This same key would be used to encrypt and decrypt messages, so it's known as a symmetric key algorithm. As long as no one else gets their hands on the key, your messages are safe.
+
+But now, what if you want to send information to someone you've never met, and it's too hard to arrange an in-person meeting? You can't share a key over an unsecured channel like a phone line or the mail, because it could be intercepted. 
+
+This is what, in 1977, led three scientists—Rivest, Shamir, and Adleman—to develop a new approach.to come up with an encryption breakthrough. 
+
+Today, it's known by their initials, RSA, and it works something like this: 
+
+Every person has two really big prime numbers, all their own, which they keep secret. They multiply these numbers together to get an even bigger number, which they make public for everyone to see. 
+
+Now, if I want to send someone a private message, I use their big public number to garble my message. I garble it in such a way that it is impossible to ungarble without knowing the two prime factors that made that number. 
+
+This is an asymmetric key system, since different keys are used to encrypt and decrypt the message. So, it's easy for my intended recipient to decode, but impossible for everyone else, unless they can factor that large public number. 
+
+Now, someone could try to factor it using a supercomputer. In the best-known factoring algorithm, the General Number Field Sieve, modern cryptography uses prime numbers that are around 313 digits long. Factoring a product of...If two primes are this big, even with a supercomputer, it would take around 16 million years. But not on a quantum computer.
+
+In 2012, it was estimated that it would take a billion physical qubits to break RSA encryption, but by five years later, that number had dropped to 230 million. 
+
+And in 2019, after more tech...Technological breakthroughs have led to significant advancements in quantum computing. 
+
+That estimate plummeted to just 20 million physical qubits. 
+
+So, how many qubits do we have today? 
+
+Well, if we look at the state of IBM's quantum computers, we are nowhere near that number of qubits, but progress looks to be exponential. 
+
+So now it's just a question of when these two curves will collide before all our existing public key encryption can be broken. 
+
+Because we've long known this threat is coming, scientists have been looking for new ways to encrypt data that can withstand attacks from both normal and quantum computers. 
+
+In 2016, the National Institute of Standards and Technology, or NIST, launched a competition to find new encryption algorithms that aren't vulnerable to quantum computers. 
+
+Cryptographers from all over the world submitted 82 different proposals, which were rigorously tested; some were broken. 
+
+Then, on July 5th, 2022, NIST selected four of the algorithms to be part of their post-quantum cryptographic standard. 
+
+So, how do they work? We...Well, three of the algorithms are based on the mathematics of lattices. 
+
+So, let's do a simple example in the 2D plane. Take two vectors, r1 and r2. By adding together different integer combinations of these vectors, say three times r1 and one time r2, you can get two different points. All the points you can get by combining these two vectors in different ways is what is called a lattice. 
+
+Now, I will also give you the point C, and your task is to tell me which combination of r1 and r2 will bring me to the lattice point closest to C. It's pretty easy to see that we can get there by going in the direction of r2 twice and in the negative direction of r1 twice. Simple enough. 
+
+But those vectors, r1 and r2, are not the only vectors that can give you this lattice. Take b1 and b2, for example. These vectors also build up the same lattice. 
+
+Now, if I ask you the same question again, can you tell me the combination of b1 and b2 that gets you to the lattice point closest to C? This has become a...lot harder, but why is that? 
+
+Each time we're taking a step, we're trying to get closer in either the X or Y direction. However, with the b vectors, each time we take a step in the right direction with one vector, it puts us off in the other direction. That's why these vectors are a lot harder to work with. 
+
+In the end, it takes us a combination of eight times b1 and negative six times b2 to get to the closest lattice point. That is a lot harder than before, but it's still a relatively easy problem to solve. 
+
+If we extend it to three dimensions, this already becomes a lot harder, especially because you're not given the collection of all lattice points. You're only given the vectors that make it up. So, when you find a lattice point close to the target, you must still find all the other lattice points near it to make sure yours is indeed the closest. 
+
+Let's take a circle of radius r in two dimensions. The number of lattice points inside the circle is proportional to r squared. Add a third...The dimension and the number of points in the sphere is proportional to \( r^3 \). 
+
+So, just watch how the number of lattice points grows as we increase the number of dimensions. 
+
+Solving the closest vector problem is a piece of cake for your computer in three dimensions. Even a hundred dimensions should be manageable. 
+
+But in proposed future encryption schemes, we'll use around a thousand dimensions. Take one step in the right direction on one of those dimensions, and you could potentially be taking a wrong step in the other 999 dimensions. You win some, you lose everything else. 
+
+With that many dimensions, it becomes extremely hard to find the closest point, even for the most powerful computers. That is, unless you know a good set of vectors. 
+
+So, how do we use that to encrypt data? Well, let's go back to our two-dimensional example. Each person has a good set of vectors that describes a lattice, but they keep these vectors secret, and they only share their lattice publicly using a set of vectors.That is hard to work with. 
+
+Now, if I want to send someone a message, I pick a point on their lattice. For example, say this point corresponds to the number seven. So, if I want to send the number seven, I can take that point but then add some random noise to it. 
+
+The message I send is not precisely at that point, but close to it. Now, to decode the message, my recipient must figure out which lattice point is closest to the message point. In a thousand dimensions, this will be extremely hard to do unless you have the nice set of vectors, which my recipient does. 
+
+So, it's easy for the recipient, who has the good vectors, but hard for everyone else. As far as we know, this problem is extremely difficult to solve for both normal and quantum computers. 
+
+Behind the scenes, there's an army of researchers, mathematicians, and cryptographers who are going to make sure your secret data stays secret. These are some of the unsung heroes that will keep us safe moving forward, avoiding mass surveillance.by governments, keeping critical infrastructure protected and allowing you to live as if quantum computers were never invented in the first place. 
+
+Summarize the article in 1000 words.
+","
+The advent of quantum computing poses a significant threat to current encryption methods, which have been successful for over 40 years. Nation-states and individual actors are already intercepting and storing encrypted data, such as passwords, bank details, and social security numbers, in anticipation of developing a quantum computer that can break the encryption in minutes. This procedure is known as Store Now, Decrypt Later (SNDL), and it takes advantage of the fact that information available today will still be valuable in a decade.
+
+The current encryption schemes, including public key algorithms, are vulnerable to quantum computer attacks. The National Security Administration has warned that a sufficiently large quantum computer could undermine all widely deployed public key algorithms. As a result, the US Congress has passed legislation mandating all agencies to transition to new methods of cryptography that can withstand quantum computer attacks.
+
+The current encryption methods, such as RSA, rely on asymmetric key systems, where different keys are used to encrypt and decrypt messages. RSA works by using two large prime numbers, which are multiplied together to get an even bigger number that is made public. The recipient can decode the message using their private key, but it is impossible for others to do so without factoring the large public number. However, quantum computers can factor large numbers much faster than classical computers, making RSA vulnerable to attacks.
+
+In 2012, it was estimated that it would take a billion physical qubits to break RSA encryption, but by 2017, that number had dropped to 230 million. With technological advancements, the estimate plummeted to just 20 million physical qubits in 2019. While we are still far from achieving this number of qubits, progress in quantum computing is exponential, and it is only a matter of time before we reach this milestone.
+
+To address this threat, scientists have been working on developing new encryption algorithms that can withstand attacks from both classical and quantum computers. In 2016, the National Institute of Standards and Technology (NIST) launched a competition to find new encryption algorithms that are resistant to quantum computer attacks. Cryptographers from around the world submitted 82 different proposals, which were rigorously tested, and some were broken. In 2022, NIST selected four algorithms to be part of their post-quantum cryptographic standard.
+
+Three of the selected algorithms are based on the mathematics of lattices. Lattices are created by combining vectors in different ways, and the goal is to find the closest lattice point to a given point. This problem is easy to solve in low dimensions but becomes extremely hard in high dimensions, even for the most powerful computers. The idea behind lattice-based encryption is to use a lattice with a large number of dimensions, making it difficult for attackers to find the closest lattice point without knowing the secret vectors.
+
+In a lattice-based encryption scheme, each person has a secret set of vectors that describes a lattice, but they only share their lattice publicly using a set of vectors that are hard to work with. To send a message, the sender picks a point on the recipient's lattice and adds some random noise to it. The recipient must then figure out which lattice point is closest to the message point, which is easy for them to do because they have the secret vectors, but hard for everyone else.
+
+The lattice-based encryption algorithms are designed to be secure against both classical and quantum computer attacks. They are based on the hardness of problems such as the closest vector problem, which is believed to be difficult to solve even for quantum computers. While it is impossible to prove that these algorithms are secure, they have been extensively tested and are considered to be the most promising candidates for post-quantum cryptography.
+
+The development of post-quantum cryptography is an ongoing effort, and researchers are working to improve the efficiency and security of these algorithms. The transition to post-quantum cryptography will require significant changes to the way we encrypt and decrypt data, and it will take time and effort to implement these changes. However, it is essential to start this process now, as the threat of quantum computer attacks is real and imminent.
+
+In conclusion, the advent of quantum computing poses a significant threat to current encryption methods, and it is essential to develop new encryption algorithms that can withstand attacks from both classical and quantum computers. The lattice-based encryption algorithms selected by NIST are promising candidates for post-quantum cryptography, and researchers are working to improve their efficiency and security. The transition to post-quantum cryptography will require significant changes, but it is essential to start this process now to ensure the security of our data in the future.
+
+The work of researchers, mathematicians, and cryptographers in developing post-quantum cryptography is crucial to keeping our data secure. These unsung heroes are working behind the scenes to ensure that our secret data stays secret, and their efforts will have a significant impact on our daily lives. The development of post-quantum cryptography is a complex and challenging task, but it is essential to protect our critical infrastructure, prevent mass surveillance, and ensure that our data remains secure.
+
+In the future, quantum computers will have a significant impact on many areas of our lives, from finance to healthcare. They will enable us to solve complex problems that are currently unsolvable, and they will have the potential to revolutionize many industries. However, they also pose a significant threat to our data security, and it is essential to develop new encryption algorithms that can withstand their attacks.
+
+The development of post-quantum cryptography is an ongoing effort, and it will require significant investment and research. However, it is essential to start this process now, as the threat of quantum computer attacks is real and imminent. By working together, we can ensure that our data remains secure, and we can harness the power of quantum computers to improve our lives without compromising our security.
+
+In the end, the development of post-quantum cryptography is a complex and challenging task, but it is essential to protect our data security. The work of researchers, mathematicians, and cryptographers in this area is crucial, and their efforts will have a significant impact on our daily lives. As we move forward in this new era of quantum computing, it is essential to prioritize data security and to develop new encryption algorithms that can withstand the attacks of quantum computers. By doing so, we can ensure that our data remains secure, and we can harness the power of quantum computers to improve our lives without compromising our security.
+",1290,0.68,1909
