@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
-
 from markdown import blocks_to_markdown
 from utils import is_rich_text_block
 
