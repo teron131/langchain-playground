@@ -13,7 +13,7 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from pytubefix import YouTube
 
-from YouTubeLoader.youtube import url_to_subtitles
+from YouTubeLoader import url_to_subtitles
 
 
 class UniversalChain:

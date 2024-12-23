@@ -10,8 +10,8 @@ from langchain_openai import ChatOpenAI
 from opencc import OpenCC
 from pytubefix import YouTube
 
-from YouTubeLoader.whisper_fal import whisper_fal_transcribe
-from YouTubeLoader.whisper_hf import whisper_hf_transcribe
+from .whisper_fal import whisper_fal_transcribe
+from .whisper_hf import whisper_hf_transcribe
 
 load_dotenv()
 

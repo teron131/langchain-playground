@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from TextToSQL.utils import data_to_table, format_query
+from .utils import data_to_table, format_query
 
 
 def text_to_sql_react(user_message: str) -> str:
