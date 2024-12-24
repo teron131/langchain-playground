@@ -3,8 +3,8 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from langchain_openai import ChatOpenAI
-from markdown import markdown_to_blocks
-from notion_api import NotionAPI
+from .markdown import markdown_to_blocks
+from .notion_api import NotionAPI
 
 if __name__ == "__main__":
     notion_api = NotionAPI()

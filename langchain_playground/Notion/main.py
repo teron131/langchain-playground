@@ -1,9 +1,9 @@
 from typing import List
 
-from formatters import BaseFormatter, LatexFormatter, Rephraser
+from .formatters import BaseFormatter, LatexFormatter, Rephraser
 from IPython.display import display
-from markdown import blocks_to_markdown, markdown_to_blocks
-from notion_api import NotionAPI
+from .markdown import blocks_to_markdown, markdown_to_blocks
+from .notion_api import NotionAPI
 
 
 def process_with_formatters(blocks: List[dict], formatters: List[BaseFormatter]) -> None:
