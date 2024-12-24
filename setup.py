@@ -21,9 +21,7 @@ setup(
             "images",
             "audio",
             "pdfs",
-            "scratch",
             "databases",
-            "exports",
             "standalone-GUI",
         ]
     ),
@@ -34,6 +32,7 @@ setup(
             "!*.jpg",
             "!*.pdf",
             "!*.json",
+            "!*.ipynb",
             "!.env",
             "!.cache",
         ],
@@ -44,10 +43,8 @@ setup(
         "langchain-community",
         "langchain-openai",
         "langchain-together",
-        
         # UI and Interface
         "gradio",
-        
         # YouTubeLoader dependencies
         "fal-client",
         "ipython",

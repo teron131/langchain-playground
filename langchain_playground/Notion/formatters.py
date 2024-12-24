@@ -3,8 +3,9 @@ from typing import Dict, List
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from .notion_api import NotionAPI
 from tqdm import tqdm
+
+from .notion_api import NotionAPI
 from .utils import is_rich_text_block
 
 

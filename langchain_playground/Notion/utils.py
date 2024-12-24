@@ -1,4 +1,17 @@
-RICH_TEXT_BLOCKS = frozenset({"paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item", "to_do", "toggle", "quote", "callout"})
+RICH_TEXT_BLOCKS = frozenset(
+    {
+        "paragraph",
+        "heading_1",
+        "heading_2",
+        "heading_3",
+        "bulleted_list_item",
+        "numbered_list_item",
+        "to_do",
+        "toggle",
+        "quote",
+        "callout",
+    }
+)
 
 
 def is_rich_text_block(block_type: str) -> bool:

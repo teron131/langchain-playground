@@ -1,7 +1,8 @@
 from typing import List
 
-from .formatters import BaseFormatter, LatexFormatter, Rephraser
 from IPython.display import display
+
+from .formatters import BaseFormatter, LatexFormatter, Rephraser
 from .markdown import blocks_to_markdown, markdown_to_blocks
 from .notion_api import NotionAPI
 
