@@ -22,6 +22,9 @@ setup(
             "audio",
             "pdfs",
             "scratch",
+            "databases",
+            "exports",
+            "standalone-GUI",
         ]
     ),
     package_data={
@@ -36,15 +39,36 @@ setup(
         ],
     },
     install_requires=[
+        # Core LangChain dependencies
         "langchain",
         "langchain-community",
         "langchain-openai",
         "langchain-together",
+        
+        # UI and Interface
         "gradio",
+        
+        # YouTubeLoader dependencies
+        "fal-client",
+        "ipython",
+        "more-itertools",
+        "numpy",
+        "openai-whisper",
+        "opencc-python-reimplemented",
+        "optimum",
+        "pytubefix",
+        "python-dotenv",
+        "tiktoken",
+        "torch",
+        "transformers",
+        "tqdm",
     ],
     python_requires=">=3.9",
     classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
