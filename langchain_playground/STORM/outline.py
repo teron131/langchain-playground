@@ -1,6 +1,5 @@
 from langchain_community.retrievers.wikipedia import WikipediaRetriever
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables import chain as as_runnable
 
 from .config import fast_llm, long_context_llm

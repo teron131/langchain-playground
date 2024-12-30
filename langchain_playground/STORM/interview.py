@@ -1,13 +1,16 @@
+import asyncio
 import json
+import os
+import time
 from typing import Annotated, List, Optional
 
 from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_community.utilities.duckduckgo_search import DuckDuckGoSearchAPIWrapper
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables import chain as as_runnable
 from langchain_core.tools import tool
+from langchain_google_community import GoogleSearchAPIWrapper
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import RetryPolicy
 from typing_extensions import TypedDict
@@ -128,8 +131,10 @@ gen_answer_prompt = ChatPromptTemplate.from_messages(
             """
 You are an expert who can use information effectively. You are chatting with a Wikipedia writer who wants to write a Wikipedia page on the topic you know. You have gathered the related information and will now use the information to form a response.
 
-Make your response as informative as possible and make sure every sentence is supported by the gathered information.
-Each response must be backed up by a citation from a reliable source, formatted as a footnote, reproducing the URLS after your response.
+Make your response as informative as possible. When specific sources are available, make sure every sentence is supported by the gathered information and include citations.
+If no specific sources are found (indicated by a "no_results" key), provide a general response based on your knowledge while maintaining factual accuracy. In this case, you can omit citations but should still provide valuable insights.
+
+When sources are available, back up each claim with a citation from a reliable source, formatted as a footnote, reproducing the URLs after your response.
 """,
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
@@ -150,14 +155,49 @@ async def search_engine_tool(query: str):
     return [{"content": r["content"], "url": r["url"]} for r in results]
 '''
 
-search_engine = DuckDuckGoSearchAPIWrapper()
+
+# Use Google Search API
+search_engine = GoogleSearchAPIWrapper(
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    google_cse_id=os.getenv("GOOGLE_CSE_ID"),
+)
+
+
+# Track last query time for rate limiting
+last_query_time = 0
+RATE_LIMIT_DELAY = 2  # Delay in seconds between queries
 
 
 @tool
-async def search_engine(query: str):
+async def search_engine_tool(query: str):
     """Search engine to the internet."""
-    results = DuckDuckGoSearchAPIWrapper()._ddgs_text(query)
-    return [{"content": r["body"], "url": r["href"]} for r in results]
+    global last_query_time
+
+    # Add delay if needed to respect rate limits
+    current_time = time.time()
+    time_since_last_query = current_time - last_query_time
+    if time_since_last_query < RATE_LIMIT_DELAY:
+        delay = RATE_LIMIT_DELAY - time_since_last_query
+        await asyncio.sleep(delay)
+
+    try:
+        results = search_engine.results(query, num_results=4)
+        last_query_time = time.time()
+        return [{"content": r["snippet"], "url": r["link"]} for r in results]
+    except Exception as e:
+        if "429" in str(e):
+            print(f"Rate limit exceeded, waiting {RATE_LIMIT_DELAY} seconds before retry...")
+            await asyncio.sleep(RATE_LIMIT_DELAY)
+            try:
+                results = search_engine.results(query, num_results=4)
+                last_query_time = time.time()
+                return [{"content": r["snippet"], "url": r["link"]} for r in results]
+            except Exception as retry_e:
+                print(f"Search error after retry: {str(retry_e)}")
+                return []
+        else:
+            print(f"Search error: {str(e)}")
+            return []
 
 
 async def gen_answer(
@@ -171,9 +211,14 @@ async def gen_answer(
     queries = await gen_queries_chain.ainvoke(swapped_state)
     print(f"🌐 Searching web for {len(queries['parsed'].queries)} queries...")
     query_results = await search_engine_tool.abatch(queries["parsed"].queries, config, return_exceptions=True)
-    successful_results = [res for res in query_results if not isinstance(res, Exception)]
+    successful_results = [res for res in query_results if not isinstance(res, Exception) and res]  # Filter out empty results
     all_query_results = {res["url"]: res["content"] for results in successful_results for res in results}
     print(f"✅ Found {len(all_query_results)} relevant sources")
+
+    # Handle case when no results are found
+    if not all_query_results:
+        all_query_results = {"no_results": "No specific sources found. Providing a general response based on existing knowledge."}
+
     # We could be more precise about handling max token length if we wanted to here
     dumped = json.dumps(all_query_results)[:max_str_len]
     ai_message: AIMessage = queries["raw"]
