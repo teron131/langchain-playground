@@ -2,6 +2,7 @@ import json
 from typing import Annotated, List, Optional
 
 from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.utilities.duckduckgo_search import DuckDuckGoSearchAPIWrapper
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda
@@ -49,18 +50,20 @@ gen_qn_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """You are an experienced Wikipedia writer and want to edit a specific page. \
-Besides your identity as a Wikipedia writer, you have a specific focus when researching the topic. \
+            """
+You are an experienced Wikipedia writer and want to edit a specific page.
+Besides your identity as a Wikipedia writer, you have a specific focus when researching the topic.
 Now, you are chatting with an expert to get information. Ask good questions to get more useful information.
 
-When you have no more questions to ask, say "Thank you so much for your help!" to end the conversation.\
-Please only ask one question at a time and don't ask what you have asked before.\
+When you have no more questions to ask, say "Thank you so much for your help!" to end the conversation.
+Please only ask one question at a time and don't ask what you have asked before.
 Your questions should be related to the topic you want to write.
-Be comprehensive and curious, gaining as much unique insight from the expert as possible.\
+Be comprehensive and curious, gaining as much unique insight from the expert as possible.
 
 Stay true to your specific perspective:
 
-{persona}""",
+{persona}
+""",
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
     ]
@@ -122,11 +125,12 @@ gen_answer_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """You are an expert who can use information effectively. You are chatting with a Wikipedia writer who wants\
- to write a Wikipedia page on the topic you know. You have gathered the related information and will now use the information to form a response.
+            """
+You are an expert who can use information effectively. You are chatting with a Wikipedia writer who wants to write a Wikipedia page on the topic you know. You have gathered the related information and will now use the information to form a response.
 
 Make your response as informative as possible and make sure every sentence is supported by the gathered information.
-Each response must be backed up by a citation from a reliable source, formatted as a footnote, reproducing the URLS after your response.""",
+Each response must be backed up by a citation from a reliable source, formatted as a footnote, reproducing the URLS after your response.
+""",
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
     ]
@@ -135,7 +139,8 @@ Each response must be backed up by a citation from a reliable source, formatted 
 gen_answer_chain = gen_answer_prompt | fast_llm.with_structured_output(AnswerWithCitations, include_raw=True).with_config(run_name="GenerateAnswer")
 
 # Tavily is typically a better search engine, but your free queries are limited
-search_engine = TavilySearchResults(max_results=4)
+# search_engine = TavilySearchResults(max_results=4)
+search_engine = DuckDuckGoSearchAPIWrapper()
 
 
 @tool

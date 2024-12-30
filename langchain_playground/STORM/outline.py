@@ -29,7 +29,8 @@ async def get_initial_outline(topic: str):
 
 # Expand Topics
 gen_related_topics_prompt = ChatPromptTemplate.from_template(
-    """I'm writing a Wikipedia page for a topic mentioned below. Please identify and recommend some Wikipedia pages on closely related subjects. I'm looking for examples that provide insights into interesting aspects commonly associated with this topic, or examples that help me understand the typical content and structure included in Wikipedia pages for similar topics.
+    """
+I'm writing a Wikipedia page for a topic mentioned below. Please identify and recommend some Wikipedia pages on closely related subjects. I'm looking for examples that provide insights into interesting aspects commonly associated with this topic, or examples that help me understand the typical content and structure included in Wikipedia pages for similar topics.
 
 Please list the as many subjects and urls as you can.
 
@@ -52,16 +53,18 @@ gen_perspectives_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """You need to select a diverse (and distinct) group of Wikipedia editors who will work together to create a comprehensive article on the topic. Each of them represents a different perspective, role, or affiliation related to this topic.\
-    You can use other Wikipedia pages of related topics for inspiration. For each editor, add a description of what they will focus on.
+            """
+You need to select a diverse (and distinct) group of Wikipedia editors who will work together to create a comprehensive article on the topic. Each of them represents a different perspective, role, or affiliation related to this topic.
+You can use other Wikipedia pages of related topics for inspiration. For each editor, add a description of what they will focus on.
 
-    IMPORTANT: Editor names must:
-    - Only contain letters, numbers, underscores, and hyphens (no spaces or periods)
-    - Use underscores or hyphens instead of spaces (e.g., 'jonathan_ross' or 'jensen-huang')
-    - Be between 1 and 64 characters long
+IMPORTANT: Editor names must:
+- Only contain letters, numbers, underscores, and hyphens (no spaces or periods)
+- Use underscores or hyphens instead of spaces (e.g., 'jonathan_ross' or 'jensen-huang')
+- Be between 1 and 64 characters long
 
-    Wiki page outlines of related topics for inspiration:
-    {examples}""",
+Wiki page outlines of related topics for inspiration:
+{examples}
+""",
         ),
         ("user", "Topic of interest: {topic}"),
     ]
@@ -106,13 +109,15 @@ refine_outline_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """You are a Wikipedia writer. You have gathered information from experts and search engines. Now, you are refining the outline of the Wikipedia page. \
-You need to make sure that the outline is comprehensive and specific. \
+            """
+You are a Wikipedia writer. You have gathered information from experts and search engines. Now, you are refining the outline of the Wikipedia page.
+You need to make sure that the outline is comprehensive and specific.
 Topic you are writing about: {topic} 
 
 Old outline:
 
-{old_outline}""",
+{old_outline}
+""",
         ),
         (
             "user",
