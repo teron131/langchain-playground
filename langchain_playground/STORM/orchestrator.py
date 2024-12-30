@@ -1,13 +1,13 @@
 import asyncio
 from typing import List, TypedDict
 
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from langchain_core.messages import AIMessage, HumanMessage
 
-from .models import Editor, Outline, WikiSection
-from .outline import get_initial_outline, survey_subjects, refine_outline_chain
 from .interview import interview_graph
+from .models import Editor, Outline, WikiSection
+from .outline import get_initial_outline, refine_outline_chain, survey_subjects
 from .writer import initialize_vectorstore, section_writer, writer
 
 
@@ -72,7 +72,7 @@ def format_conversation(interview_state):
                 messages.append(AIMessage(content=m["content"], name=m["name"]))
             elif m["type"] == "human":
                 messages.append(HumanMessage(content=m["content"]))
-    
+
     convo = "\n".join(f"{m.name if hasattr(m, 'name') else 'User'}: {m.content}" for m in messages)
     return f'Conversation with {interview_state["editor"].name}\n\n' + convo
 
@@ -177,4 +177,4 @@ def generate_article(topic: str) -> str:
 
     article = asyncio.run(_generate())
     print("\n🎉 STORM pipeline complete!")
-    return article
+    return str(article)
