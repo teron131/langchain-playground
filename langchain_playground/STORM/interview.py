@@ -138,9 +138,9 @@ Each response must be backed up by a citation from a reliable source, formatted 
 
 gen_answer_chain = gen_answer_prompt | fast_llm.with_structured_output(AnswerWithCitations, include_raw=True).with_config(run_name="GenerateAnswer")
 
+'''
 # Tavily is typically a better search engine, but your free queries are limited
-# search_engine = TavilySearchResults(max_results=4)
-search_engine = DuckDuckGoSearchAPIWrapper()
+search_engine = TavilySearchResults(max_results=4)
 
 
 @tool
@@ -148,6 +148,16 @@ async def search_engine_tool(query: str):
     """Search engine to the internet."""
     results = search_engine.invoke(query)
     return [{"content": r["content"], "url": r["url"]} for r in results]
+'''
+
+search_engine = DuckDuckGoSearchAPIWrapper()
+
+
+@tool
+async def search_engine(query: str):
+    """Search engine to the internet."""
+    results = DuckDuckGoSearchAPIWrapper()._ddgs_text(query)
+    return [{"content": r["body"], "url": r["href"]} for r in results]
 
 
 async def gen_answer(
