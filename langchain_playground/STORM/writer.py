@@ -1,3 +1,6 @@
+import asyncio
+
+import openai
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -6,6 +9,9 @@ from langchain_openai import OpenAIEmbeddings
 
 from .config import long_context_llm
 from .models import WikiSection
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2
 
 # Initialize embeddings and vectorstore
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -87,7 +93,27 @@ Strictly follow Wikipedia format guidelines.
     ]
 )
 
+
+async def retry_on_timeout(func, *args, **kwargs):
+    """Retry function on connection timeout with exponential backoff."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return await func(*args, **kwargs)
+        except openai.APIConnectionError as e:
+            if attempt == MAX_RETRIES - 1:
+                raise
+            delay = RETRY_DELAY * (2**attempt)
+            print(f"\n⚠️ OpenAI API connection error, retrying in {delay} seconds...")
+            await asyncio.sleep(delay)
+        except Exception as e:
+            raise
+
+
 writer = writer_prompt | long_context_llm | StrOutputParser()
+
+# Wrap the writer's ainvoke with retry logic
+original_ainvoke = writer.ainvoke
+writer.ainvoke = lambda *args, **kwargs: retry_on_timeout(original_ainvoke, *args, **kwargs)
 
 
 async def stream_writer(topic, section):
