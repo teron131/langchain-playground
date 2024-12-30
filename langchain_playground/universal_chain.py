@@ -34,7 +34,7 @@ class UniversalChain:
                     api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
                 )
             elif "gemini" in model_id:
-                llm = ChatGoogleGenerativeAI(model=model_id, api_key=os.getenv("GEMINI_API_KEY"))
+                llm = ChatGoogleGenerativeAI(model=model_id, api_key=os.getenv("GOOGLE_API_KEY"))
             elif "claude" in model_id:
                 llm = ChatOpenAI(
                     model=f"anthropic/{model_id}",  # Avoid making model_id with '/', otherwise it will mess up the FastAPI URL
