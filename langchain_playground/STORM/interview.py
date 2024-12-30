@@ -84,8 +84,10 @@ def swap_roles(state: InterviewState, name: str):
 @as_runnable
 async def generate_question(state: InterviewState):
     editor = state["editor"]
+    print(f"\n💭 {editor.name} is thinking of a question...")
     gn_chain = RunnableLambda(swap_roles).bind(name=editor.name) | gen_qn_prompt.partial(persona=editor.persona) | fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
     result = await gn_chain.ainvoke(state)
+    print(f"❓ {editor.name} asked: {result.content[:100]}...")
     return {"messages": [result]}
 
 
@@ -149,11 +151,14 @@ async def gen_answer(
     name: str = "expert_bot",
     max_str_len: int = 15000,
 ):
+    print("\n🔍 Expert is researching the answer...")
     swapped_state = swap_roles(state, name)  # Convert all other AI messages
     queries = await gen_queries_chain.ainvoke(swapped_state)
+    print(f"🌐 Searching web for {len(queries['parsed'].queries)} queries...")
     query_results = await search_engine_tool.abatch(queries["parsed"].queries, config, return_exceptions=True)
     successful_results = [res for res in query_results if not isinstance(res, Exception)]
     all_query_results = {res["url"]: res["content"] for results in successful_results for res in results}
+    print(f"✅ Found {len(all_query_results)} relevant sources")
     # We could be more precise about handling max token length if we wanted to here
     dumped = json.dumps(all_query_results)[:max_str_len]
     ai_message: AIMessage = queries["raw"]
@@ -161,6 +166,7 @@ async def gen_answer(
     tool_id = tool_call["id"]
     tool_message = ToolMessage(tool_call_id=tool_id, content=dumped)
     swapped_state["messages"].extend([ai_message, tool_message])
+    print("\n💭 Expert is formulating response...")
     # Only update the shared state with the final answer to avoid
     # polluting the dialogue history with intermediate messages
     generated = await gen_answer_chain.ainvoke(swapped_state)
@@ -168,6 +174,7 @@ async def gen_answer(
     # Save the retrieved information to a the shared state for future reference
     cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
     formatted_message = AIMessage(name=name, content=generated["parsed"].as_str)
+    print(f"💬 Expert responded with {len(formatted_message.content)} characters")
     return {"messages": [formatted_message], "references": cited_references}
 
 
@@ -183,9 +190,11 @@ def route_messages(state: InterviewState, name: str = "expert_bot"):
     messages = state["messages"]
     num_responses = len([m for m in messages if isinstance(m, AIMessage) and m.name == name])
     if num_responses >= max_num_turns:
+        print("\n⏰ Maximum turns reached, ending conversation")
         return END
     last_question = messages[-2]
     if last_question.content.endswith("Thank you so much for your help!"):
+        print("\n👋 Editor thanked expert, ending conversation")
         return END
     return "ask_question"
 
@@ -202,6 +211,7 @@ interview_graph = builder.compile(checkpointer=False).with_config(run_name="Cond
 
 
 async def run_interview(topic, editor):
+    print(f"\n🎭 Starting interview with editor {editor.name}...")
     final_step = None
     initial_state = {
         "editor": editor,
@@ -214,8 +224,8 @@ async def run_interview(topic, editor):
     }
     async for step in interview_graph.astream(initial_state):
         name = next(iter(step))
-        print(name)
-        print("-- ", str(step[name]["messages"])[:300])
+        print(f"📍 Current step: {name}")
         final_step = step
 
+    print(f"✅ Completed interview with {editor.name}")
     return next(iter(final_step.values()))

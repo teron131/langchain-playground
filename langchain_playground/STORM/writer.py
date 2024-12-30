@@ -16,8 +16,10 @@ retriever = vectorstore.as_retriever(k=3)
 
 
 async def initialize_vectorstore(references: dict):
+    print("\n📚 Initializing vector store with references...")
     reference_docs = [Document(page_content=v, metadata={"source": k}) for k, v in references.items()]
     await vectorstore.aadd_documents(reference_docs)
+    print(f"✅ Added {len(reference_docs)} documents to vector store")
 
 
 async def test_retriever():
@@ -37,8 +39,10 @@ section_writer_prompt = ChatPromptTemplate.from_messages(
 
 
 async def retrieve(inputs: dict):
+    print(f"\n🔍 Retrieving relevant documents for section: {inputs['section']}")
     docs = await retriever.ainvoke(inputs["topic"] + ": " + inputs["section"])
     formatted = "\n".join([f'<Document href="{doc.metadata["source"]}"/>\n{doc.page_content}\n</Document>' for doc in docs])
+    print(f"✅ Found {len(docs)} relevant documents")
     return {"docs": formatted, **inputs}
 
 
@@ -46,13 +50,16 @@ section_writer = retrieve | section_writer_prompt | long_context_llm.with_struct
 
 
 async def write_section(outline, section_title, topic):
-    return await section_writer.ainvoke(
+    print(f"\n📝 Writing section: {section_title}")
+    section = await section_writer.ainvoke(
         {
             "outline": outline.as_str,
             "section": section_title,
             "topic": topic,
         }
     )
+    print(f"✅ Completed section ({len(section.content)} chars)")
+    return section
 
 
 # Generate final article
@@ -73,5 +80,7 @@ writer = writer_prompt | long_context_llm | StrOutputParser()
 
 
 async def stream_writer(topic, section):
+    print("\n📖 Generating final article...")
     async for tok in writer.astream({"topic": topic, "draft": section.as_str}):
         print(tok, end="")
+    print("\n✅ Article generation complete")

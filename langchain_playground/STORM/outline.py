@@ -1,4 +1,4 @@
-from langchain_community.retrievers import WikipediaRetriever
+from langchain_community.retrievers.wikipedia import WikipediaRetriever
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables import chain as as_runnable
@@ -21,7 +21,10 @@ generate_outline_direct = direct_gen_outline_prompt | fast_llm.with_structured_o
 
 
 async def get_initial_outline(topic: str):
-    return await generate_outline_direct.ainvoke({"topic": topic})
+    print("\n🔍 Generating initial outline...")
+    outline = await generate_outline_direct.ainvoke({"topic": topic})
+    print("✅ Initial outline generated")
+    return outline
 
 
 # Expand Topics
@@ -38,7 +41,10 @@ expand_chain = gen_related_topics_prompt | fast_llm.with_structured_output(Relat
 
 
 async def get_related_subjects(topic):
-    return await expand_chain.ainvoke({"topic": topic})
+    print("\n🔍 Finding related topics...")
+    subjects = await expand_chain.ainvoke({"topic": topic})
+    print(f"✅ Found {len(subjects.topics)} related topics")
+    return subjects
 
 
 # Generate Perspectives
@@ -78,15 +84,21 @@ def format_docs(docs):
 
 @as_runnable
 async def survey_subjects(topic: str):
+    print("\n🔍 Surveying Wikipedia for related content...")
     related_subjects = await expand_chain.ainvoke({"topic": topic})
+    print(f"📚 Retrieving {len(related_subjects.topics)} Wikipedia articles...")
     retrieved_docs = await wikipedia_retriever.abatch(related_subjects.topics, return_exceptions=True)
     all_docs = []
     for docs in retrieved_docs:
         if isinstance(docs, BaseException):
             continue
         all_docs.extend(docs)
+    print(f"✅ Retrieved {len(all_docs)} articles successfully")
     formatted = format_docs(all_docs)
-    return await gen_perspectives_chain.ainvoke({"examples": formatted, "topic": topic})
+    print("\n🤔 Generating editor perspectives...")
+    perspectives = await gen_perspectives_chain.ainvoke({"examples": formatted, "topic": topic})
+    print(f"✅ Generated {len(perspectives.editors)} editor perspectives")
+    return perspectives
 
 
 # Refine Outline
@@ -113,10 +125,13 @@ refine_outline_chain = refine_outline_prompt | long_context_llm.with_structured_
 
 
 async def get_refined_outline(topic, initial_outline, final_state):
-    return await refine_outline_chain.ainvoke(
+    print("\n📝 Refining outline based on expert interviews...")
+    refined = await refine_outline_chain.ainvoke(
         {
             "topic": topic,
             "old_outline": initial_outline.as_str,
             "conversations": "\n\n".join(f"### {m.name}\n\n{m.content}" for m in final_state["messages"]),
         }
     )
+    print("✅ Outline refinement complete")
+    return refined

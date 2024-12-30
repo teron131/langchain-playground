@@ -3,10 +3,11 @@ from typing import List, TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langchain_core.messages import AIMessage, HumanMessage
 
-from .interview import interview_graph
 from .models import Editor, Outline, WikiSection
-from .outline import get_initial_outline, refine_outline_chain, survey_subjects
+from .outline import get_initial_outline, survey_subjects, refine_outline_chain
+from .interview import interview_graph
 from .writer import initialize_vectorstore, section_writer, writer
 
 
@@ -21,11 +22,13 @@ class ResearchState(TypedDict):
 
 async def initialize_research(state: ResearchState):
     topic = state["topic"]
+    print("\n🚀 Starting research process for topic:", topic)
     coros = (
         get_initial_outline(topic),
         survey_subjects.ainvoke(topic),
     )
     results = await asyncio.gather(*coros)
+    print("\n✅ Initial research phase complete")
     return {
         **state,
         "outline": results[0],
@@ -35,21 +38,22 @@ async def initialize_research(state: ResearchState):
 
 async def conduct_interviews(state: ResearchState):
     topic = state["topic"]
+    print(f"\n👥 Starting interviews with {len(state['editors'])} editors...")
     initial_states = [
         {
             "editor": editor,
             "messages": [
-                {
-                    "type": "ai",
-                    "content": f"So you said you were writing an article on {topic}?",
-                    "name": "expert_bot",
-                }
+                AIMessage(
+                    content=f"So you said you were writing an article on {topic}?",
+                    name="expert_bot",
+                )
             ],
         }
         for editor in state["editors"]
     ]
     # We call in to the sub-graph here to parallelize the interviews
     interview_results = await interview_graph.abatch(initial_states)
+    print("\n✅ All interviews completed")
 
     return {
         **state,
@@ -58,8 +62,18 @@ async def conduct_interviews(state: ResearchState):
 
 
 def format_conversation(interview_state):
-    messages = interview_state["messages"]
-    convo = "\n".join(f"{m.name}: {m.content}" for m in messages)
+    messages = []
+    for m in interview_state["messages"]:
+        if isinstance(m, (AIMessage, HumanMessage)):
+            messages.append(m)
+        else:
+            # Convert dict to appropriate Message object
+            if m["type"] == "ai":
+                messages.append(AIMessage(content=m["content"], name=m["name"]))
+            elif m["type"] == "human":
+                messages.append(HumanMessage(content=m["content"]))
+    
+    convo = "\n".join(f"{m.name if hasattr(m, 'name') else 'User'}: {m.content}" for m in messages)
     return f'Conversation with {interview_state["editor"].name}\n\n' + convo
 
 
@@ -77,14 +91,17 @@ async def refine_outline(state: ResearchState):
 
 
 async def index_references(state: ResearchState):
+    print("\n📚 Indexing references from all interviews...")
     all_docs = {}
     for interview_state in state["interview_results"]:
         all_docs.update(interview_state["references"])
     await initialize_vectorstore(all_docs)
+    print(f"✅ Indexed {len(all_docs)} total references")
     return state
 
 
 async def write_sections(state: ResearchState):
+    print("\n📝 Writing article sections...")
     outline = state["outline"]
     sections = await section_writer.abatch(
         [
@@ -96,6 +113,7 @@ async def write_sections(state: ResearchState):
             for section in outline.sections
         ]
     )
+    print(f"\n✅ Completed {len(sections)} sections")
     return {
         **state,
         "sections": sections,
@@ -103,10 +121,12 @@ async def write_sections(state: ResearchState):
 
 
 async def write_article(state: ResearchState):
+    print("\n📖 Generating final article...")
     topic = state["topic"]
     sections = state["sections"]
     draft = "\n\n".join([section.as_str for section in sections])
     article = await writer.ainvoke({"topic": topic, "draft": draft})
+    print("\n✅ Article generation complete")
     return {
         **state,
         "article": article,
@@ -146,6 +166,7 @@ def generate_article(topic: str) -> str:
     Returns:
         str: The generated Wikipedia-style article
     """
+    print("\n🌟 Starting STORM pipeline for topic:", topic)
     config = {"configurable": {"thread_id": "my-thread"}}
 
     async def _generate():
@@ -154,4 +175,6 @@ def generate_article(topic: str) -> str:
         checkpoint = storm.get_state(config)
         return checkpoint.values["article"]
 
-    return asyncio.run(_generate())
+    article = asyncio.run(_generate())
+    print("\n🎉 STORM pipeline complete!")
+    return article
