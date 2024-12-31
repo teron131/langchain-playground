@@ -1,6 +1,5 @@
 """Interview module for the STORM pipeline."""
 
-import asyncio
 import json
 from typing import Annotated, List, Optional
 
@@ -17,7 +16,7 @@ from typing_extensions import TypedDict
 
 from .config import config
 from .models import AnswerWithCitations, Editor, Queries
-from .utils import RetryError, format_conversation, with_retries, with_fallback
+from .utils import RetryError, with_retries
 
 
 # Interview State
@@ -111,12 +110,7 @@ async def generate_question(state: InterviewState):
     print(f"\n💭 {editor.name} is thinking of a question...")
 
     async def _generate_with_prompt(prompt):
-        gen_question_chain = (
-            RunnableLambda(swap_roles).bind(name=editor.name) |
-            prompt |
-            config.fast_llm |
-            RunnableLambda(tag_with_name).bind(name=editor.name)
-        )
+        gen_question_chain = RunnableLambda(swap_roles).bind(name=editor.name) | prompt | config.fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
         return await gen_question_chain.ainvoke(state)
 
     try:
@@ -184,10 +178,7 @@ async def get_queries(question_content: str):
             error_message="Failed to generate search queries",
         )
     except RetryError:
-        return {
-            "parsed": Queries(queries=[f"What is {question_content}?"]),
-            "raw": AIMessage(content=f"Searching for: {question_content}")
-        }
+        return {"parsed": Queries(queries=[f"What is {question_content}?"]), "raw": AIMessage(content=f"Searching for: {question_content}")}
 
 
 gen_answer_prompt = ChatPromptTemplate.from_messages(
@@ -208,10 +199,7 @@ Present information in a clear, organized manner that the writer can easily inco
     ]
 )
 
-gen_answer_chain = (
-    gen_answer_prompt |
-    config.fast_llm.with_structured_output(AnswerWithCitations, include_raw=True)
-).with_config(run_name="GenerateAnswer")
+gen_answer_chain = (gen_answer_prompt | config.fast_llm.with_structured_output(AnswerWithCitations, include_raw=True)).with_config(run_name="GenerateAnswer")
 
 
 # Initialize search engine
@@ -224,18 +212,13 @@ search_engine = GoogleSearchAPIWrapper(
 @tool
 async def search_engine_tool(query: str):
     """Search engine to the internet."""
+
     async def _search():
         results = search_engine.results(query, num_results=config.max_search_results)
         return [{"content": r["snippet"], "url": r["link"]} for r in results]
-    
+
     try:
-        return await with_retries(
-            _search,
-            max_retries=config.max_retries,
-            initial_delay=config.search_rate_limit_delay,
-            error_message=f"Search failed for query: {query}",
-            success_message=f"Search completed for: {query}"
-        )
+        return await with_retries(_search, max_retries=config.max_retries, initial_delay=config.search_rate_limit_delay, error_message=f"Search failed for query: {query}", success_message=f"Search completed for: {query}")
     except RetryError:
         return []  # Return empty results after all retries fail
 
@@ -259,10 +242,7 @@ async def gen_answer(
             error_message="Failed to generate queries",
         )
     except RetryError:
-        return {
-            "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble processing your question. Could you please rephrase it?")],
-            "references": {}
-        }
+        return {"messages": [AIMessage(name=name, content="I apologize, but I'm having trouble processing your question. Could you please rephrase it?")], "references": {}}
 
     # Search for answers
     print(f"🌐 Searching web for {len(queries['parsed'].queries)} queries...")
@@ -292,17 +272,14 @@ async def gen_answer(
             initial_delay=config.initial_retry_delay,
             error_message="Failed to generate answer",
         )
-        
+
         cited_urls = set(generated["parsed"].cited_urls)
         cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
         formatted_message = AIMessage(name=name, content=generated["parsed"].as_str)
         print(f"💬 Expert responded with {len(formatted_message.content)} characters")
         return {"messages": [formatted_message], "references": cited_references}
     except RetryError:
-        return {
-            "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble formulating a detailed response. Here's what I found in my search: " + "\n\n".join(all_query_results.values()))],
-            "references": all_query_results
-        }
+        return {"messages": [AIMessage(name=name, content="I apologize, but I'm having trouble formulating a detailed response. Here's what I found in my search: " + "\n\n".join(all_query_results.values()))], "references": all_query_results}
 
 
 async def get_example_answer(question_content: str):

@@ -1,7 +1,6 @@
 """Writer module for the STORM pipeline."""
 
 import asyncio
-from typing import List
 
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
@@ -18,7 +17,7 @@ from .utils import ProgressTracker, RetryError, with_retries
 embeddings = OpenAIEmbeddings(
     model=config.embedding_model,
     openai_api_key=config.openai_api_key,
-    timeout=config.request_timeout
+    timeout=config.request_timeout,
 )
 vectorstore = InMemoryVectorStore(embeddings)
 retriever = vectorstore.as_retriever(k=config.vector_store_k)
@@ -28,11 +27,11 @@ async def initialize_vectorstore(references: dict):
     """Initialize the vector store with reference documents."""
     print("\n📚 Initializing vector store with references...")
     reference_docs = [Document(page_content=v, metadata={"source": k}) for k, v in references.items()]
-    
+
     # Process documents in batches to avoid timeouts
     batch_size = config.max_concurrent_requests
     for i in range(0, len(reference_docs), batch_size):
-        batch = reference_docs[i:i + batch_size]
+        batch = reference_docs[i : i + batch_size]
         try:
             await with_retries(
                 vectorstore.aadd_documents,
@@ -40,7 +39,7 @@ async def initialize_vectorstore(references: dict):
                 max_retries=config.max_retries,
                 initial_delay=config.initial_retry_delay,
                 error_message=f"Failed to add document batch {i//batch_size + 1}",
-                success_message=f"Added batch {i//batch_size + 1} ({len(batch)} documents)"
+                success_message=f"Added batch {i//batch_size + 1} ({len(batch)} documents)",
             )
         except RetryError:
             print(f"\n⚠️ Failed to add batch {i//batch_size + 1}. Some documents may be missing.")
@@ -120,7 +119,7 @@ async def write_section(outline, section_title: str, topic: str):
         return WikiSection(
             section_title=section_title,
             content=f"Content generation failed for this section (timeout/error). Please refer to the outline:\n\n{outline.as_str}",
-            citations=[]
+            citations=[],
         )
 
 
@@ -129,10 +128,10 @@ async def write_sections(state):
     print("\n📝 Writing article sections...")
     outline = state["outline"]
     topic = state["topic"]
-    
+
     # Initialize progress tracker
     progress = ProgressTracker(len(outline.sections), "Section Writing")
-    
+
     # Prepare inputs for all sections
     section_inputs = [
         {
@@ -142,13 +141,13 @@ async def write_sections(state):
         }
         for section in outline.sections
     ]
-    
+
     try:
         # Process sections in batches to avoid overwhelming the API
         sections = []
         batch_size = config.max_concurrent_requests
         for i in range(0, len(section_inputs), batch_size):
-            batch = section_inputs[i:i + batch_size]
+            batch = section_inputs[i : i + batch_size]
             try:
                 async with asyncio.timeout(config.request_timeout * 2):  # Double timeout for batch processing
                     batch_results = await section_writer.abatch(batch)
@@ -158,15 +157,17 @@ async def write_sections(state):
             except asyncio.TimeoutError:
                 print(f"\n⚠️ Batch {i//batch_size + 1} timed out, using fallback sections")
                 # Add fallback sections for the batch
-                sections.extend([
-                    WikiSection(
-                        section_title=input["section"],
-                        content=f"Content generation timed out. Original outline:\n\n{input['outline']}",
-                        citations=[]
-                    )
-                    for input in batch
-                ])
-        
+                sections.extend(
+                    [
+                        WikiSection(
+                            section_title=input["section"],
+                            content=f"Content generation timed out. Original outline:\n\n{input['outline']}",
+                            citations=[],
+                        )
+                        for input in batch
+                    ]
+                )
+
         print(f"\n✅ Completed {len(sections)} sections")
         return {**state, "sections": sections}
     except Exception as e:
@@ -178,10 +179,10 @@ async def write_sections(state):
                 WikiSection(
                     section_title=section.section_title,
                     content=f"Content generation failed. Original description: {section.description}",
-                    citations=[]
+                    citations=[],
                 )
                 for section in outline.sections
-            ]
+            ],
         }
 
 
@@ -228,6 +229,7 @@ Keep the content brief but informative.
 
 async def generate_with_fallback(inputs: dict) -> str:
     """Generate article with fallback to simpler format if needed."""
+
     async def attempt_generation(prompt, attempt_num=1):
         chain = prompt | config.long_context_llm | StrOutputParser()
         try:

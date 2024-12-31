@@ -37,14 +37,7 @@ async def get_initial_outline(topic: str):
     """Generate initial outline for the article."""
     print("\n🔍 Generating initial outline...")
     try:
-        outline = await with_retries(
-            generate_outline_direct.ainvoke,
-            {"topic": topic},
-            max_retries=config.max_retries,
-            initial_delay=config.initial_retry_delay,
-            error_message="Failed to generate initial outline",
-            success_message="Initial outline generated"
-        )
+        outline = await with_retries(generate_outline_direct.ainvoke, {"topic": topic}, max_retries=config.max_retries, initial_delay=config.initial_retry_delay, error_message="Failed to generate initial outline", success_message="Initial outline generated")
         return outline
     except RetryError:
         # Return a basic outline as fallback
@@ -71,7 +64,7 @@ async def get_initial_outline(topic: str):
                     "section_title": "See also",
                     "description": "Related topics and further reading",
                 },
-            ]
+            ],
         )
 
 
@@ -98,14 +91,7 @@ async def get_related_subjects(topic: str):
     """Get related subjects for research."""
     print("\n🔍 Finding related topics...")
     try:
-        subjects = await with_retries(
-            expand_chain.ainvoke,
-            {"topic": topic},
-            max_retries=config.max_retries,
-            initial_delay=config.initial_retry_delay,
-            error_message="Failed to find related topics",
-            success_message=lambda result: f"Found {len(result.topics)} related topics"
-        )
+        subjects = await with_retries(expand_chain.ainvoke, {"topic": topic}, max_retries=config.max_retries, initial_delay=config.initial_retry_delay, error_message="Failed to find related topics", success_message=lambda result: f"Found {len(result.topics)} related topics")
         return subjects
     except RetryError:
         # Return minimal related subjects as fallback
@@ -170,7 +156,7 @@ async def survey_subjects(topic: str):
     try:
         related_subjects = await get_related_subjects(topic)
         print(f"📚 Retrieving {len(related_subjects.topics)} Wikipedia articles...")
-        
+
         retrieved_docs = await with_retries(
             wikipedia_retriever.abatch,
             related_subjects.topics,
@@ -179,33 +165,21 @@ async def survey_subjects(topic: str):
             initial_delay=config.initial_retry_delay,
             error_message="Failed to retrieve Wikipedia articles",
         )
-        
+
         all_docs = []
         for docs in retrieved_docs:
             if not isinstance(docs, BaseException):
                 all_docs.extend(docs)
-        
+
         print(f"✅ Retrieved {len(all_docs)} articles successfully")
         formatted = format_docs(all_docs)
-        
+
         print("\n🤔 Generating editor perspectives...")
-        perspectives = await with_retries(
-            gen_perspectives_chain.ainvoke,
-            {"examples": formatted, "topic": topic},
-            max_retries=config.max_retries,
-            initial_delay=config.initial_retry_delay,
-            error_message="Failed to generate editor perspectives",
-            success_message=lambda result: f"Generated {len(result.editors)} editor perspectives"
-        )
+        perspectives = await with_retries(gen_perspectives_chain.ainvoke, {"examples": formatted, "topic": topic}, max_retries=config.max_retries, initial_delay=config.initial_retry_delay, error_message="Failed to generate editor perspectives", success_message=lambda result: f"Generated {len(result.editors)} editor perspectives")
         return perspectives
     except RetryError:
         # Return minimal perspectives as fallback
-        return Perspectives(editors=[{
-            "name": "general_editor",
-            "affiliation": "Wikipedia",
-            "role": "General Editor",
-            "description": "Focuses on creating a balanced, comprehensive article."
-        }])
+        return Perspectives(editors=[{"name": "general_editor", "affiliation": "Wikipedia", "role": "General Editor", "description": "Focuses on creating a balanced, comprehensive article."}])
 
 
 # Refine Outline
@@ -266,7 +240,7 @@ async def get_refined_outline(topic: str, initial_outline: Outline, final_state:
             max_retries=config.max_retries,
             initial_delay=config.initial_retry_delay,
             error_message="Failed to refine outline",
-            success_message="Outline refinement complete"
+            success_message="Outline refinement complete",
         )
         return refined
     except RetryError:
