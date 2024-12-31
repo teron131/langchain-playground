@@ -1,7 +1,7 @@
+"""Interview module for the STORM pipeline."""
+
 import asyncio
 import json
-import os
-import time
 from typing import Annotated, List, Optional
 
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -15,8 +15,9 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import RetryPolicy
 from typing_extensions import TypedDict
 
-from .config import fast_llm
+from .config import config
 from .models import AnswerWithCitations, Editor, Queries
+from .utils import RetryError, format_conversation, with_retries, with_fallback
 
 
 # Interview State
@@ -108,72 +109,56 @@ def swap_roles(state: InterviewState, name: str):
 async def generate_question(state: InterviewState):
     editor = state["editor"]
     print(f"\n💭 {editor.name} is thinking of a question...")
-    max_retries = 3
-    retry_delay = 5  # seconds
 
-    for attempt in range(max_retries):
+    async def _generate_with_prompt(prompt):
+        gen_question_chain = (
+            RunnableLambda(swap_roles).bind(name=editor.name) |
+            prompt |
+            config.fast_llm |
+            RunnableLambda(tag_with_name).bind(name=editor.name)
+        )
+        return await gen_question_chain.ainvoke(state)
+
+    try:
+        # First try with full persona-based prompt
+        result = await with_retries(
+            _generate_with_prompt,
+            gen_question_prompt.partial(persona=editor.persona),
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate question with persona",
+        )
+    except RetryError:
+        print("\n⚠️ Using simplified prompt due to failures...")
         try:
-            # First try with the full persona-based prompt
-            try:
-                gen_question_chain = RunnableLambda(swap_roles).bind(name=editor.name) | gen_question_prompt.partial(persona=editor.persona) | fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
-                result = await gen_question_chain.ainvoke(state)
-            except Exception as e:
-                if "model produced invalid content" in str(e) or "InternalServerError" in str(e):
-                    print("\n⚠️ Using simplified prompt due to model error...")
-                    # Fallback to a simpler prompt without complex persona
-                    simple_question_prompt = ChatPromptTemplate.from_messages(
-                        [
-                            (
-                                "system",
-                                """You are researching for a Wikipedia article. Ask a relevant question about the topic.
-When you have no more questions, say "Thank you so much for your help!"
-Keep questions focused and specific.""",
-                            ),
-                            MessagesPlaceholder(variable_name="messages", optional=True),
-                        ]
-                    )
-                    gen_question_chain = RunnableLambda(swap_roles).bind(name=editor.name) | simple_question_prompt | fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
-                    result = await gen_question_chain.ainvoke(state)
-                else:
-                    raise
-
-            print(f"❓ {editor.name} asked: {result.content[:100]}...")
-            return {"messages": [result]}
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"\n⚠️ Question generation attempt {attempt + 1} failed: {str(e)}")
-                print(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-            else:
-                print("\n❌ Failed to generate question")
-                # Return a basic question as fallback
-                return {"messages": [AIMessage(name=editor.name, content="Could you provide more information about this topic?")]}
-
-
-async def get_initial_question(topic, editor):
-    max_retries = 3
-    retry_delay = 5  # seconds
-
-    for attempt in range(max_retries):
-        try:
-            messages = [HumanMessage(f"So you said you were writing an article on {topic}?")]
-            return await generate_question.ainvoke(
-                {
-                    "editor": editor,
-                    "messages": messages,
-                }
+            # Fallback to simpler prompt
+            result = await with_retries(
+                _generate_with_prompt,
+                simple_question_prompt,
+                max_retries=config.max_retries,
+                initial_delay=config.initial_retry_delay,
+                error_message="Failed to generate question with simple prompt",
             )
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"\n⚠️ Initial question generation attempt {attempt + 1} failed: {str(e)}")
-                print(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-            else:
-                print("\n❌ Failed to generate initial question")
-                # Return a basic question as fallback
-                return {"messages": [AIMessage(name=editor.name, content=f"Could you tell me more about {topic}?")]}
+        except RetryError:
+            # Final fallback
+            return {"messages": [AIMessage(name=editor.name, content="Could you provide more information about this topic?")]}
+
+    print(f"❓ {editor.name} asked: {result.content[:100]}...")
+    return {"messages": [result]}
+
+
+async def get_initial_question(topic: str, editor: Editor):
+    messages = [HumanMessage(f"So you said you were writing an article on {topic}?")]
+    try:
+        return await with_retries(
+            generate_question.ainvoke,
+            {"editor": editor, "messages": messages},
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate initial question",
+        )
+    except RetryError:
+        return {"messages": [AIMessage(name=editor.name, content=f"Could you tell me more about {topic}?")]}
 
 
 # Answer questions
@@ -186,26 +171,23 @@ gen_queries_prompt = ChatPromptTemplate.from_messages(
         MessagesPlaceholder(variable_name="messages", optional=True),
     ]
 )
-gen_queries_chain = gen_queries_prompt | fast_llm.with_structured_output(Queries, include_raw=True)
+gen_queries_chain = gen_queries_prompt | config.fast_llm.with_structured_output(Queries, include_raw=True)
 
 
-async def get_queries(question_content):
-    max_retries = 3
-    retry_delay = 5  # seconds
-
-    for attempt in range(max_retries):
-        try:
-            return await gen_queries_chain.ainvoke({"messages": [HumanMessage(content=question_content)]})
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"\n⚠️ Query generation attempt {attempt + 1} failed: {str(e)}")
-                print(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-            else:
-                print("\n❌ Failed to generate queries")
-                # Return a basic query as fallback
-                return {"parsed": Queries(queries=[f"What is {question_content}?"]), "raw": AIMessage(content=f"Searching for: {question_content}")}
+async def get_queries(question_content: str):
+    try:
+        return await with_retries(
+            gen_queries_chain.ainvoke,
+            {"messages": [HumanMessage(content=question_content)]},
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate search queries",
+        )
+    except RetryError:
+        return {
+            "parsed": Queries(queries=[f"What is {question_content}?"]),
+            "raw": AIMessage(content=f"Searching for: {question_content}")
+        }
 
 
 gen_answer_prompt = ChatPromptTemplate.from_messages(
@@ -226,155 +208,112 @@ Present information in a clear, organized manner that the writer can easily inco
     ]
 )
 
-gen_answer_chain = gen_answer_prompt | fast_llm.with_structured_output(AnswerWithCitations, include_raw=True).with_config(run_name="GenerateAnswer")
-
-'''
-# Tavily is typically a better search engine, but your free queries are limited
-search_engine = TavilySearchResults(max_results=4)
-
-
-@tool
-async def search_engine_tool(query: str):
-    """Search engine to the internet."""
-    results = search_engine.invoke(query)
-    return [{"content": r["content"], "url": r["url"]} for r in results]
-'''
+gen_answer_chain = (
+    gen_answer_prompt |
+    config.fast_llm.with_structured_output(AnswerWithCitations, include_raw=True)
+).with_config(run_name="GenerateAnswer")
 
 
-# Use Google Search API
+# Initialize search engine
 search_engine = GoogleSearchAPIWrapper(
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
-    google_cse_id=os.getenv("GOOGLE_CSE_ID"),
+    google_api_key=config.google_api_key,
+    google_cse_id=config.google_cse_id,
 )
 
 
-# Track last query time for rate limiting
-last_query_time = 0
-RATE_LIMIT_DELAY = 2  # Delay in seconds between queries
-
-
 @tool
 async def search_engine_tool(query: str):
     """Search engine to the internet."""
-    global last_query_time
-
-    # Add delay if needed to respect rate limits
-    current_time = time.time()
-    time_since_last_query = current_time - last_query_time
-    if time_since_last_query < RATE_LIMIT_DELAY:
-        delay = RATE_LIMIT_DELAY - time_since_last_query
-        await asyncio.sleep(delay)
-
-    try:
-        results = search_engine.results(query, num_results=4)
-        last_query_time = time.time()
+    async def _search():
+        results = search_engine.results(query, num_results=config.max_search_results)
         return [{"content": r["snippet"], "url": r["link"]} for r in results]
-    except Exception as e:
-        if "429" in str(e):
-            print(f"Rate limit exceeded, waiting {RATE_LIMIT_DELAY} seconds before retry...")
-            await asyncio.sleep(RATE_LIMIT_DELAY)
-            try:
-                results = search_engine.results(query, num_results=4)
-                last_query_time = time.time()
-                return [{"content": r["snippet"], "url": r["link"]} for r in results]
-            except Exception as retry_e:
-                print(f"Search error after retry: {str(retry_e)}")
-                return []
-        else:
-            print(f"Search error: {str(e)}")
-            return []
+    
+    try:
+        return await with_retries(
+            _search,
+            max_retries=config.max_retries,
+            initial_delay=config.search_rate_limit_delay,
+            error_message=f"Search failed for query: {query}",
+            success_message=f"Search completed for: {query}"
+        )
+    except RetryError:
+        return []  # Return empty results after all retries fail
 
 
 async def gen_answer(
     state: InterviewState,
-    config: Optional[dict] = None,
+    config_dict: Optional[dict] = None,
     name: str = "expert_bot",
     max_str_len: int = 15000,
 ):
     print("\n🔍 Expert is researching the answer...")
-    max_retries = 3
-    retry_delay = 5  # seconds
+    swapped_state = swap_roles(state, name)
 
-    swapped_state = swap_roles(state, name)  # Convert all other AI messages
+    try:
+        # Generate queries
+        queries = await with_retries(
+            gen_queries_chain.ainvoke,
+            swapped_state,
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate queries",
+        )
+    except RetryError:
+        return {
+            "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble processing your question. Could you please rephrase it?")],
+            "references": {}
+        }
 
-    # Generate queries with retry
-    for attempt in range(max_retries):
-        try:
-            queries = await gen_queries_chain.ainvoke(swapped_state)
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"\n⚠️ Query generation attempt {attempt + 1} failed: {str(e)}")
-                print(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-            else:
-                print("\n❌ Failed to generate queries")
-                # Return a basic response as fallback
-                return {
-                    "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble processing your question. Could you please rephrase it?")],
-                    "references": {}
-                }
-
+    # Search for answers
     print(f"🌐 Searching web for {len(queries['parsed'].queries)} queries...")
-    query_results = await search_engine_tool.abatch(queries["parsed"].queries, config, return_exceptions=True)
-    successful_results = [res for res in query_results if not isinstance(res, Exception) and res]  # Filter out empty results
+    query_results = await search_engine_tool.abatch(queries["parsed"].queries, config_dict, return_exceptions=True)
+    successful_results = [res for res in query_results if not isinstance(res, Exception) and res]
     all_query_results = {res["url"]: res["content"] for results in successful_results for res in results}
     print(f"✅ Found {len(all_query_results)} relevant sources")
 
-    # Handle case when no results are found
     if not all_query_results:
         all_query_results = {"no_results": "No specific sources found. Providing a general response based on existing knowledge."}
 
-    # We could be more precise about handling max token length if we wanted to here
+    # Prepare state for answer generation
     dumped = json.dumps(all_query_results)[:max_str_len]
     ai_message: AIMessage = queries["raw"]
     tool_call = queries["raw"].tool_calls[0]
     tool_id = tool_call["id"]
     tool_message = ToolMessage(tool_call_id=tool_id, content=dumped)
     swapped_state["messages"].extend([ai_message, tool_message])
-    
-    # Generate answer with retry
-    print("\n💭 Expert is formulating response...")
-    retry_delay = 5  # Reset delay for new operation
-    for attempt in range(max_retries):
-        try:
-            # Only update the shared state with the final answer to avoid
-            # polluting the dialogue history with intermediate messages
-            generated = await gen_answer_chain.ainvoke(swapped_state)
-            cited_urls = set(generated["parsed"].cited_urls)
-            # Save the retrieved information to a the shared state for future reference
-            cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
-            formatted_message = AIMessage(name=name, content=generated["parsed"].as_str)
-            print(f"💬 Expert responded with {len(formatted_message.content)} characters")
-            return {"messages": [formatted_message], "references": cited_references}
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"\n⚠️ Answer generation attempt {attempt + 1} failed: {str(e)}")
-                print(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-            else:
-                print("\n❌ Failed to generate answer")
-                # Return a basic response as fallback
-                return {
-                    "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble formulating a detailed response. Here's what I found in my search: " + "\n\n".join(all_query_results.values()))],
-                    "references": all_query_results
-                }
+
+    try:
+        # Generate answer
+        print("\n💭 Expert is formulating response...")
+        generated = await with_retries(
+            gen_answer_chain.ainvoke,
+            swapped_state,
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate answer",
+        )
+        
+        cited_urls = set(generated["parsed"].cited_urls)
+        cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
+        formatted_message = AIMessage(name=name, content=generated["parsed"].as_str)
+        print(f"💬 Expert responded with {len(formatted_message.content)} characters")
+        return {"messages": [formatted_message], "references": cited_references}
+    except RetryError:
+        return {
+            "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble formulating a detailed response. Here's what I found in my search: " + "\n\n".join(all_query_results.values()))],
+            "references": all_query_results
+        }
 
 
-async def get_example_answer(question_content):
+async def get_example_answer(question_content: str):
     return await gen_answer({"messages": [HumanMessage(content=question_content)]})
 
 
 # Construct the Interview Graph
-max_num_turns = 5
-
-
 def route_messages(state: InterviewState, name: str = "expert_bot"):
     messages = state["messages"]
     num_responses = len([m for m in messages if isinstance(m, AIMessage) and m.name == name])
-    if num_responses >= max_num_turns:
+    if num_responses >= config.max_interview_turns:
         print("\n⏰ Maximum turns reached, ending conversation")
         return END
     last_question = messages[-2]
@@ -395,7 +334,7 @@ builder.add_edge(START, "ask_question")
 interview_graph = builder.compile(checkpointer=False).with_config(run_name="Conduct Interviews")
 
 
-async def run_interview(topic, editor):
+async def run_interview(topic: str, editor: Editor):
     print(f"\n🎭 Starting interview with editor {editor.name}...")
     final_step = None
     initial_state = {

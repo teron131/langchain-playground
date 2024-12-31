@@ -1,9 +1,12 @@
+"""Outline generation module for the STORM pipeline."""
+
 from langchain_community.retrievers.wikipedia import WikipediaRetriever
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import chain as as_runnable
 
-from .config import fast_llm, long_context_llm
+from .config import config
 from .models import Outline, Perspectives, RelatedSubjects
+from .utils import RetryError, with_retries
 
 # Generate Initial Outline
 direct_gen_outline_prompt = ChatPromptTemplate.from_messages(
@@ -27,14 +30,49 @@ Focus on creating a comprehensive yet well-organized structure that will guide t
     ]
 )
 
-generate_outline_direct = direct_gen_outline_prompt | fast_llm.with_structured_output(Outline)
+generate_outline_direct = direct_gen_outline_prompt | config.fast_llm.with_structured_output(Outline)
 
 
 async def get_initial_outline(topic: str):
+    """Generate initial outline for the article."""
     print("\n🔍 Generating initial outline...")
-    outline = await generate_outline_direct.ainvoke({"topic": topic})
-    print("✅ Initial outline generated")
-    return outline
+    try:
+        outline = await with_retries(
+            generate_outline_direct.ainvoke,
+            {"topic": topic},
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate initial outline",
+            success_message="Initial outline generated"
+        )
+        return outline
+    except RetryError:
+        # Return a basic outline as fallback
+        return Outline(
+            page_title=topic,
+            sections=[
+                {
+                    "section_title": "Introduction",
+                    "description": "Overview of the topic",
+                },
+                {
+                    "section_title": "Background",
+                    "description": "Historical context and development",
+                },
+                {
+                    "section_title": "Key Concepts",
+                    "description": "Main ideas and principles",
+                },
+                {
+                    "section_title": "Applications",
+                    "description": "Real-world uses and implementations",
+                },
+                {
+                    "section_title": "See also",
+                    "description": "Related topics and further reading",
+                },
+            ]
+        )
 
 
 # Expand Topics
@@ -53,14 +91,25 @@ Topic: {topic}
 """
 )
 
-expand_chain = gen_related_topics_prompt | fast_llm.with_structured_output(RelatedSubjects)
+expand_chain = gen_related_topics_prompt | config.fast_llm.with_structured_output(RelatedSubjects)
 
 
-async def get_related_subjects(topic):
+async def get_related_subjects(topic: str):
+    """Get related subjects for research."""
     print("\n🔍 Finding related topics...")
-    subjects = await expand_chain.ainvoke({"topic": topic})
-    print(f"✅ Found {len(subjects.topics)} related topics")
-    return subjects
+    try:
+        subjects = await with_retries(
+            expand_chain.ainvoke,
+            {"topic": topic},
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to find related topics",
+            success_message=lambda result: f"Found {len(result.topics)} related topics"
+        )
+        return subjects
+    except RetryError:
+        # Return minimal related subjects as fallback
+        return RelatedSubjects(topics=[topic])
 
 
 # Generate Perspectives
@@ -97,38 +146,66 @@ Ensure the editors' combined expertise will result in balanced, comprehensive co
     ]
 )
 
-gen_perspectives_chain = gen_perspectives_prompt | fast_llm.with_structured_output(Perspectives)
+gen_perspectives_chain = gen_perspectives_prompt | config.fast_llm.with_structured_output(Perspectives)
 
 # Wikipedia retrieval and formatting
 wikipedia_retriever = WikipediaRetriever(load_all_available_meta=True, top_k_results=1)
 
 
 def format_doc(doc, max_length=1000):
+    """Format a Wikipedia document for use in prompts."""
     related = "- ".join(doc.metadata["categories"])
     return f"### {doc.metadata['title']}\n\nSummary: {doc.page_content}\n\nRelated\n{related}"[:max_length]
 
 
 def format_docs(docs):
+    """Format multiple Wikipedia documents."""
     return "\n\n".join(format_doc(doc) for doc in docs)
 
 
 @as_runnable
 async def survey_subjects(topic: str):
+    """Survey Wikipedia for related content and generate editor perspectives."""
     print("\n🔍 Surveying Wikipedia for related content...")
-    related_subjects = await expand_chain.ainvoke({"topic": topic})
-    print(f"📚 Retrieving {len(related_subjects.topics)} Wikipedia articles...")
-    retrieved_docs = await wikipedia_retriever.abatch(related_subjects.topics, return_exceptions=True)
-    all_docs = []
-    for docs in retrieved_docs:
-        if isinstance(docs, BaseException):
-            continue
-        all_docs.extend(docs)
-    print(f"✅ Retrieved {len(all_docs)} articles successfully")
-    formatted = format_docs(all_docs)
-    print("\n🤔 Generating editor perspectives...")
-    perspectives = await gen_perspectives_chain.ainvoke({"examples": formatted, "topic": topic})
-    print(f"✅ Generated {len(perspectives.editors)} editor perspectives")
-    return perspectives
+    try:
+        related_subjects = await get_related_subjects(topic)
+        print(f"📚 Retrieving {len(related_subjects.topics)} Wikipedia articles...")
+        
+        retrieved_docs = await with_retries(
+            wikipedia_retriever.abatch,
+            related_subjects.topics,
+            return_exceptions=True,
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to retrieve Wikipedia articles",
+        )
+        
+        all_docs = []
+        for docs in retrieved_docs:
+            if not isinstance(docs, BaseException):
+                all_docs.extend(docs)
+        
+        print(f"✅ Retrieved {len(all_docs)} articles successfully")
+        formatted = format_docs(all_docs)
+        
+        print("\n🤔 Generating editor perspectives...")
+        perspectives = await with_retries(
+            gen_perspectives_chain.ainvoke,
+            {"examples": formatted, "topic": topic},
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to generate editor perspectives",
+            success_message=lambda result: f"Generated {len(result.editors)} editor perspectives"
+        )
+        return perspectives
+    except RetryError:
+        # Return minimal perspectives as fallback
+        return Perspectives(editors=[{
+            "name": "general_editor",
+            "affiliation": "Wikipedia",
+            "role": "General Editor",
+            "description": "Focuses on creating a balanced, comprehensive article."
+        }])
 
 
 # Refine Outline
@@ -172,17 +249,26 @@ Write the refined outline now:
     ]
 )
 
-refine_outline_chain = refine_outline_prompt | long_context_llm.with_structured_output(Outline)
+refine_outline_chain = refine_outline_prompt | config.long_context_llm.with_structured_output(Outline)
 
 
-async def get_refined_outline(topic, initial_outline, final_state):
+async def get_refined_outline(topic: str, initial_outline: Outline, final_state: dict):
+    """Refine the outline based on expert interviews."""
     print("\n📝 Refining outline based on expert interviews...")
-    refined = await refine_outline_chain.ainvoke(
-        {
-            "topic": topic,
-            "old_outline": initial_outline.as_str,
-            "conversations": "\n\n".join(f"### {m.name}\n\n{m.content}" for m in final_state["messages"]),
-        }
-    )
-    print("✅ Outline refinement complete")
-    return refined
+    try:
+        refined = await with_retries(
+            refine_outline_chain.ainvoke,
+            {
+                "topic": topic,
+                "old_outline": initial_outline.as_str,
+                "conversations": "\n\n".join(f"### {m.name}\n\n{m.content}" for m in final_state["messages"]),
+            },
+            max_retries=config.max_retries,
+            initial_delay=config.initial_retry_delay,
+            error_message="Failed to refine outline",
+            success_message="Outline refinement complete"
+        )
+        return refined
+    except RetryError:
+        print("\n⚠️ Outline refinement failed, using initial outline")
+        return initial_outline
