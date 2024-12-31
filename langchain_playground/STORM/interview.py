@@ -108,37 +108,72 @@ def swap_roles(state: InterviewState, name: str):
 async def generate_question(state: InterviewState):
     editor = state["editor"]
     print(f"\n💭 {editor.name} is thinking of a question...")
+    max_retries = 3
+    retry_delay = 5  # seconds
 
-    # Create base chain components
-    swap_chain = RunnableLambda(swap_roles).bind(name=editor.name)
-    tag_chain = RunnableLambda(tag_with_name).bind(name=editor.name)
+    for attempt in range(max_retries):
+        try:
+            # First try with the full persona-based prompt
+            try:
+                gen_question_chain = RunnableLambda(swap_roles).bind(name=editor.name) | gen_question_prompt.partial(persona=editor.persona) | fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
+                result = await gen_question_chain.ainvoke(state)
+            except Exception as e:
+                if "model produced invalid content" in str(e) or "InternalServerError" in str(e):
+                    print("\n⚠️ Using simplified prompt due to model error...")
+                    # Fallback to a simpler prompt without complex persona
+                    simple_question_prompt = ChatPromptTemplate.from_messages(
+                        [
+                            (
+                                "system",
+                                """You are researching for a Wikipedia article. Ask a relevant question about the topic.
+When you have no more questions, say "Thank you so much for your help!"
+Keep questions focused and specific.""",
+                            ),
+                            MessagesPlaceholder(variable_name="messages", optional=True),
+                        ]
+                    )
+                    gen_question_chain = RunnableLambda(swap_roles).bind(name=editor.name) | simple_question_prompt | fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
+                    result = await gen_question_chain.ainvoke(state)
+                else:
+                    raise
 
-    # Try persona-based prompt first
-    try:
-        question_chain = swap_chain | gen_question_prompt.partial(persona=editor.persona) | fast_llm | tag_chain
-        result = await question_chain.ainvoke(state)
-
-    except Exception as e:
-        # Fall back to simple prompt on model errors
-        if "model produced invalid content" in str(e) or "InternalServerError" in str(e):
-            print("\n⚠️ Using simplified prompt due to model error...")
-            question_chain = swap_chain | simple_question_prompt | fast_llm | tag_chain
-            result = await question_chain.ainvoke(state)
-        else:
-            raise
-
-    print(f"❓ {editor.name} asked: {result.content[:100]}...")
-    return {"messages": [result]}
+            print(f"❓ {editor.name} asked: {result.content[:100]}...")
+            return {"messages": [result]}
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️ Question generation attempt {attempt + 1} failed: {str(e)}")
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("\n❌ Failed to generate question")
+                # Return a basic question as fallback
+                return {"messages": [AIMessage(name=editor.name, content="Could you provide more information about this topic?")]}
 
 
 async def get_initial_question(topic, editor):
-    messages = [HumanMessage(f"So you said you were writing an article on {topic}?")]
-    return await generate_question.ainvoke(
-        {
-            "editor": editor,
-            "messages": messages,
-        }
-    )
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            messages = [HumanMessage(f"So you said you were writing an article on {topic}?")]
+            return await generate_question.ainvoke(
+                {
+                    "editor": editor,
+                    "messages": messages,
+                }
+            )
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️ Initial question generation attempt {attempt + 1} failed: {str(e)}")
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("\n❌ Failed to generate initial question")
+                # Return a basic question as fallback
+                return {"messages": [AIMessage(name=editor.name, content=f"Could you tell me more about {topic}?")]}
 
 
 # Answer questions
@@ -155,7 +190,22 @@ gen_queries_chain = gen_queries_prompt | fast_llm.with_structured_output(Queries
 
 
 async def get_queries(question_content):
-    return await gen_queries_chain.ainvoke({"messages": [HumanMessage(content=question_content)]})
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            return await gen_queries_chain.ainvoke({"messages": [HumanMessage(content=question_content)]})
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️ Query generation attempt {attempt + 1} failed: {str(e)}")
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("\n❌ Failed to generate queries")
+                # Return a basic query as fallback
+                return {"parsed": Queries(queries=[f"What is {question_content}?"]), "raw": AIMessage(content=f"Searching for: {question_content}")}
 
 
 gen_answer_prompt = ChatPromptTemplate.from_messages(
@@ -242,8 +292,30 @@ async def gen_answer(
     max_str_len: int = 15000,
 ):
     print("\n🔍 Expert is researching the answer...")
+    max_retries = 3
+    retry_delay = 5  # seconds
+
     swapped_state = swap_roles(state, name)  # Convert all other AI messages
-    queries = await gen_queries_chain.ainvoke(swapped_state)
+
+    # Generate queries with retry
+    for attempt in range(max_retries):
+        try:
+            queries = await gen_queries_chain.ainvoke(swapped_state)
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️ Query generation attempt {attempt + 1} failed: {str(e)}")
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("\n❌ Failed to generate queries")
+                # Return a basic response as fallback
+                return {
+                    "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble processing your question. Could you please rephrase it?")],
+                    "references": {}
+                }
+
     print(f"🌐 Searching web for {len(queries['parsed'].queries)} queries...")
     query_results = await search_engine_tool.abatch(queries["parsed"].queries, config, return_exceptions=True)
     successful_results = [res for res in query_results if not isinstance(res, Exception) and res]  # Filter out empty results
@@ -261,16 +333,34 @@ async def gen_answer(
     tool_id = tool_call["id"]
     tool_message = ToolMessage(tool_call_id=tool_id, content=dumped)
     swapped_state["messages"].extend([ai_message, tool_message])
+    
+    # Generate answer with retry
     print("\n💭 Expert is formulating response...")
-    # Only update the shared state with the final answer to avoid
-    # polluting the dialogue history with intermediate messages
-    generated = await gen_answer_chain.ainvoke(swapped_state)
-    cited_urls = set(generated["parsed"].cited_urls)
-    # Save the retrieved information to a the shared state for future reference
-    cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
-    formatted_message = AIMessage(name=name, content=generated["parsed"].as_str)
-    print(f"💬 Expert responded with {len(formatted_message.content)} characters")
-    return {"messages": [formatted_message], "references": cited_references}
+    retry_delay = 5  # Reset delay for new operation
+    for attempt in range(max_retries):
+        try:
+            # Only update the shared state with the final answer to avoid
+            # polluting the dialogue history with intermediate messages
+            generated = await gen_answer_chain.ainvoke(swapped_state)
+            cited_urls = set(generated["parsed"].cited_urls)
+            # Save the retrieved information to a the shared state for future reference
+            cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
+            formatted_message = AIMessage(name=name, content=generated["parsed"].as_str)
+            print(f"💬 Expert responded with {len(formatted_message.content)} characters")
+            return {"messages": [formatted_message], "references": cited_references}
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️ Answer generation attempt {attempt + 1} failed: {str(e)}")
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("\n❌ Failed to generate answer")
+                # Return a basic response as fallback
+                return {
+                    "messages": [AIMessage(name=name, content="I apologize, but I'm having trouble formulating a detailed response. Here's what I found in my search: " + "\n\n".join(all_query_results.values()))],
+                    "references": all_query_results
+                }
 
 
 async def get_example_answer(question_content):

@@ -65,15 +65,30 @@ section_writer = retrieve | section_writer_prompt | long_context_llm.with_struct
 
 async def write_section(outline, section_title, topic):
     print(f"\n📝 Writing section: {section_title}")
-    section = await section_writer.ainvoke(
-        {
-            "outline": outline.as_str,
-            "section": section_title,
-            "topic": topic,
-        }
-    )
-    print(f"✅ Completed section ({len(section.content)} chars)")
-    return section
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            section = await section_writer.ainvoke(
+                {
+                    "outline": outline.as_str,
+                    "section": section_title,
+                    "topic": topic,
+                }
+            )
+            print(f"✅ Completed section ({len(section.content)} chars)")
+            return section
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️ Section writing attempt {attempt + 1} failed: {str(e)}")
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print(f"\n❌ Failed to write section {section_title}")
+                # Create a basic section as fallback
+                return WikiSection(section_title=section_title, content=f"Content generation failed for this section. Please refer to the outline:\n\n{outline.as_str}", citations=[])
 
 
 # Generate final article
@@ -96,40 +111,63 @@ Aim to maintain clarity while being efficient with the content length.
     ]
 )
 
+# Simpler fallback prompt for when the main prompt fails
+simple_writer_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+Write a clear and concise Wikipedia article on {topic}. Use the following content as your source:
+{draft}
 
-async def retry_on_timeout(func, *args, **kwargs):
-    """Retry function on connection timeout with exponential backoff."""
-    for attempt in range(MAX_RETRIES):
-        try:
-            return await func(*args, **kwargs)
-        except openai.APIConnectionError as e:
-            if attempt == MAX_RETRIES - 1:
-                raise
-            delay = RETRY_DELAY * (2**attempt)
-            print(f"\n⚠️ OpenAI API connection error, retrying in {delay} seconds...")
-            await asyncio.sleep(delay)
-        except Exception as e:
-            raise
+Focus on presenting the key information in a straightforward manner.
+Keep the content brief but informative.
+""",
+        ),
+        (
+            "user",
+            "Write the article in markdown format with simple citation numbers [1] and a list of sources at the end.",
+        ),
+    ]
+)
 
 
 async def generate_with_fallback(inputs: dict) -> str:
-    """Generate article with the standard format. Returns empty string if generation fails."""
+    """Generate article with fallback to simpler format if needed."""
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    async def attempt_generation(prompt):
+        for attempt in range(max_retries):
+            try:
+                return await (prompt | long_context_llm | StrOutputParser()).ainvoke(inputs)
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"\n⚠️ Generation attempt {attempt + 1} failed: {str(e)}")
+                    print(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    raise
+
     try:
-        return await (writer_prompt | long_context_llm | StrOutputParser()).ainvoke(inputs)
+        # Try with main prompt
+        return await attempt_generation(writer_prompt)
     except Exception as e:
-        print(f"\n⚠️ Article generation failed: {str(e)}")
-        return ""
+        print("\n⚠️ Main generation failed, using simplified format...")
+        try:
+            # Try with simplified prompt
+            return await attempt_generation(simple_writer_prompt)
+        except Exception as fallback_e:
+            print(f"\n❌ All generation attempts failed: {str(fallback_e)}")
+            # Return a basic formatted version of the draft as last resort
+            return f"# {inputs['topic']}\n\n{inputs['draft']}"
 
 
 writer = RunnableLambda(generate_with_fallback)
 
-# Wrap the writer's ainvoke with retry logic
-original_ainvoke = writer.ainvoke
-writer.ainvoke = lambda *args, **kwargs: retry_on_timeout(original_ainvoke, *args, **kwargs)
-
 
 async def stream_writer(topic, section):
-    """Generate and stream the final article. Skips if generation fails."""
     print("\n📖 Generating final article...")
     try:
         result = await writer.ainvoke({"topic": topic, "draft": section.as_str})
@@ -137,3 +175,8 @@ async def stream_writer(topic, section):
         print("\n✅ Article generation complete")
     except Exception as e:
         print(f"\n⚠️ Error during article generation: {str(e)}")
+        print("\n🔄 Retrying with simplified format...")
+        # Final fallback: generate a basic article
+        simple_result = await (simple_writer_prompt | long_context_llm | StrOutputParser()).ainvoke({"topic": topic, "draft": section.as_str})
+        print(simple_result)
+        print("\n✅ Article generation complete (simplified format)")
