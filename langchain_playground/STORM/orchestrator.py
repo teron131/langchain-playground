@@ -158,14 +158,6 @@ storm = builder.compile(checkpointer=MemorySaver())
 
 
 def generate_article(topic: str) -> str:
-    """Generate a Wikipedia-style article on a given topic using the STORM pipeline.
-
-    Args:
-        topic (str): The topic to generate an article about
-
-    Returns:
-        str: The generated Wikipedia-style article
-    """
     print("\n🌟 Starting STORM pipeline for topic:", topic)
     config = {"configurable": {"thread_id": "my-thread"}}
 

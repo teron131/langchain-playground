@@ -49,23 +49,40 @@ class InterviewState(TypedDict):
 
 
 # Dialog Roles
-gen_qn_prompt = ChatPromptTemplate.from_messages(
+gen_question_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-You are an experienced Wikipedia writer and want to edit a specific page.
-Besides your identity as a Wikipedia writer, you have a specific focus when researching the topic.
-Now, you are chatting with an expert to get information. Ask good questions to get more useful information.
+You are an experienced Wikipedia editor conducting research for an article. You have a specific perspective and expertise that informs your research approach. Your goal is to gather detailed, accurate information through an interview with a subject matter expert.
 
-When you have no more questions to ask, say "Thank you so much for your help!" to end the conversation.
-Please only ask one question at a time and don't ask what you have asked before.
-Your questions should be related to the topic you want to write.
-Be comprehensive and curious, gaining as much unique insight from the expert as possible.
+Ask focused, insightful questions that:
+- Build on previous responses to explore topics in depth
+- Seek concrete examples and evidence
+- Challenge assumptions and probe for nuance
+- Draw out unique insights based on the expert's experience
+- Align with your specialized perspective: {persona}
 
-Stay true to your specific perspective:
+Guidelines:
+- Ask one clear, specific question at a time
+- Avoid repeating questions already asked
+- Stay focused on information relevant to the Wikipedia article
+- When you have gathered sufficient information, end with "Thank you so much for your help!"
 
-{persona}
+Remember to maintain a professional, curious tone while representing your unique editorial perspective.
+""",
+        ),
+        MessagesPlaceholder(variable_name="messages", optional=True),
+    ]
+)
+
+# Fallback prompt for when the full prompt fails
+simple_question_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+You are a Wikipedia researcher gathering information for an article. Ask one clear, focused question about the topic that will help provide accurate, verifiable content. Avoid questions that have already been answered. When you have gathered sufficient information, end with 'Thank you so much for your help!' Your questions should aim to uncover specific details, examples, or evidence that would strengthen the article.
 """,
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
@@ -91,8 +108,25 @@ def swap_roles(state: InterviewState, name: str):
 async def generate_question(state: InterviewState):
     editor = state["editor"]
     print(f"\n💭 {editor.name} is thinking of a question...")
-    gn_chain = RunnableLambda(swap_roles).bind(name=editor.name) | gen_qn_prompt.partial(persona=editor.persona) | fast_llm | RunnableLambda(tag_with_name).bind(name=editor.name)
-    result = await gn_chain.ainvoke(state)
+
+    # Create base chain components
+    swap_chain = RunnableLambda(swap_roles).bind(name=editor.name)
+    tag_chain = RunnableLambda(tag_with_name).bind(name=editor.name)
+
+    # Try persona-based prompt first
+    try:
+        question_chain = swap_chain | gen_question_prompt.partial(persona=editor.persona) | fast_llm | tag_chain
+        result = await question_chain.ainvoke(state)
+
+    except Exception as e:
+        # Fall back to simple prompt on model errors
+        if "model produced invalid content" in str(e) or "InternalServerError" in str(e):
+            print("\n⚠️ Using simplified prompt due to model error...")
+            question_chain = swap_chain | simple_question_prompt | fast_llm | tag_chain
+            result = await question_chain.ainvoke(state)
+        else:
+            raise
+
     print(f"❓ {editor.name} asked: {result.content[:100]}...")
     return {"messages": [result]}
 
@@ -129,12 +163,13 @@ gen_answer_prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-You are an expert who can use information effectively. You are chatting with a Wikipedia writer who wants to write a Wikipedia page on the topic you know. You have gathered the related information and will now use the information to form a response.
+You are an expert researcher and communicator engaging with a Wikipedia writer. Your role is to provide comprehensive, well-supported responses using gathered information to help create an accurate and authoritative Wikipedia article.
 
-Make your response as informative as possible. When specific sources are available, make sure every sentence is supported by the gathered information and include citations.
-If no specific sources are found (indicated by a "no_results" key), provide a general response based on your knowledge while maintaining factual accuracy. In this case, you can omit citations but should still provide valuable insights.
+When provided with source materials, analyze them carefully and synthesize the information into clear, factual statements. Every claim should be supported by relevant citations using footnote format (e.g. [1]). Focus on extracting key facts, statistics, expert opinions, and important context from the sources.
 
-When sources are available, back up each claim with a citation from a reliable source, formatted as a footnote, reproducing the URLs after your response.
+If no sources are found (indicated by "no_results"), draw upon your broad knowledge to provide a balanced, factual response while maintaining academic rigor. Even without citations, ensure your response is informative, nuanced, and aligned with Wikipedia's neutral point of view.
+
+Present information in a clear, organized manner that the writer can easily incorporate into the article. After your response, list all cited URLs in a numbered reference format that matches your footnotes.
 """,
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),

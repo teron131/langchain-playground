@@ -8,6 +8,6 @@ comprehensive Wikipedia-style articles by:
 5. Writing and refining the final article
 """
 
-from .orchestrator import generate_article
+from .orchestrator import generate_article, storm
 
-__all__ = ["generate_article"]
+__all__ = ["generate_article", "storm"]

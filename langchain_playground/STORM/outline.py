@@ -10,7 +10,18 @@ direct_gen_outline_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are a Wikipedia writer. Write an outline for a Wikipedia page about a user-provided topic. Be comprehensive and specific.",
+            """
+You are an expert Wikipedia writer. Create a detailed outline for a Wikipedia article about the given topic. Your outline should:
+- Follow Wikipedia's standard article structure
+- Include all major aspects of the topic
+- Break down complex subjects into clear subsections
+- Ensure logical flow and progression of information
+- Cover historical context, key developments, and current significance
+- Include sections for real-world applications or impact where relevant
+- Add sections for criticism or controversies if applicable
+
+Focus on creating a comprehensive yet well-organized structure that will guide the development of an authoritative article.
+""",
         ),
         ("user", "{topic}"),
     ]
@@ -29,11 +40,16 @@ async def get_initial_outline(topic: str):
 # Expand Topics
 gen_related_topics_prompt = ChatPromptTemplate.from_template(
     """
-I'm writing a Wikipedia page for a topic mentioned below. Please identify and recommend some Wikipedia pages on closely related subjects. I'm looking for examples that provide insights into interesting aspects commonly associated with this topic, or examples that help me understand the typical content and structure included in Wikipedia pages for similar topics.
+You are an expert Wikipedia researcher. Identify and recommend Wikipedia pages that are closely related to the given topic. Focus on:
+- Core concepts and foundational topics that provide essential context
+- Notable examples and applications that demonstrate real-world relevance
+- Related fields or domains that intersect with the main topic
+- Historical developments or predecessor topics that shaped its evolution
+- Contemporary trends or emerging areas connected to the topic
 
-Please list the as many subjects and urls as you can.
+For each recommended page, provide both the subject and its Wikipedia URL. Aim to be comprehensive in your recommendations while ensuring each suggestion has a clear, meaningful connection to the main topic.
 
-Topic of interest: {topic}
+Topic: {topic}
 """
 )
 
@@ -53,16 +69,28 @@ gen_perspectives_prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-You need to select a diverse (and distinct) group of Wikipedia editors who will work together to create a comprehensive article on the topic. Each of them represents a different perspective, role, or affiliation related to this topic.
-You can use other Wikipedia pages of related topics for inspiration. For each editor, add a description of what they will focus on.
+You are an expert Wikipedia editor assembling a diverse team of editors to create a comprehensive article. Your task is to select 3-5 editors with distinct perspectives, expertise, and backgrounds related to the topic.
 
-IMPORTANT: Editor names must:
-- Only contain letters, numbers, underscores, and hyphens (no spaces or periods)
-- Use underscores or hyphens instead of spaces (e.g., 'jonathan_ross' or 'jensen-huang')
-- Be between 1 and 64 characters long
+Each editor should represent a unique viewpoint such as:
+- Academic/theoretical perspective
+- Industry/practical experience
+- Historical/evolutionary context
+- Social/cultural impact
+- Technical/implementation details
+- Critical/analytical stance
 
-Wiki page outlines of related topics for inspiration:
+For each editor, provide:
+1. A unique identifier following these rules:
+   - Use only letters, numbers, underscores, and hyphens
+   - Replace spaces with underscores or hyphens (e.g., 'jonathan_ross', 'jensen-huang') 
+   - Keep length between 1-64 characters
+2. Their specific expertise and background
+3. What aspects of the topic they will focus on investigating
+
+Use the following Wikipedia articles as inspiration for different perspectives and areas to cover:
 {examples}
+
+Ensure the editors' combined expertise will result in balanced, comprehensive coverage of the topic.
 """,
         ),
         ("user", "Topic of interest: {topic}"),
@@ -109,18 +137,37 @@ refine_outline_prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-You are a Wikipedia writer. You have gathered information from experts and search engines. Now, you are refining the outline of the Wikipedia page.
-You need to make sure that the outline is comprehensive and specific.
-Topic you are writing about: {topic} 
+You are a Wikipedia editor refining an article outline based on expert research and interviews. Your goal is to create a comprehensive, well-structured outline that will guide the article writing process.
 
-Old outline:
+Consider these key aspects:
+- Ensure all major topics and subtopics from the original outline are preserved or improved
+- Add new sections based on expert insights and research findings
+- Organize sections in a logical flow from general to specific
+- Include sections for background, technical details, applications, and impact
+- Maintain Wikipedia's neutral point of view and emphasis on verifiable information
 
+Topic: {topic}
+
+Original outline for reference:
 {old_outline}
 """,
         ),
         (
             "user",
-            "Refine the outline based on your conversations with subject-matter experts:\n\nConversations:\n\n{conversations}\n\nWrite the refined Wikipedia outline:",
+            """
+Review the expert conversations below and refine the outline to incorporate their insights:
+
+Conversations:
+{conversations}
+
+Create a refined outline that:
+- Integrates key points and examples from the expert discussions
+- Maintains a balanced coverage of different perspectives
+- Ensures technical accuracy while remaining accessible
+- Follows Wikipedia's structure and style guidelines
+
+Write the refined outline now:
+""",
         ),
     ]
 )

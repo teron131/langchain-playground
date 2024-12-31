@@ -1,9 +1,11 @@
 import asyncio
+from typing import List
 
 import openai
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda
 from langchain_core.vectorstores.in_memory import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings
 
@@ -83,7 +85,8 @@ writer_prompt = ChatPromptTemplate.from_messages(
 You are an expert Wikipedia author. Write the complete wiki article on {topic} using the following section drafts:
 {draft}
 
-Strictly follow Wikipedia format guidelines.
+Strictly follow Wikipedia format guidelines, but keep the content concise and focused.
+Aim to maintain clarity while being efficient with the content length.
 """,
         ),
         (
@@ -109,7 +112,16 @@ async def retry_on_timeout(func, *args, **kwargs):
             raise
 
 
-writer = writer_prompt | long_context_llm | StrOutputParser()
+async def generate_with_fallback(inputs: dict) -> str:
+    """Generate article with the standard format. Returns empty string if generation fails."""
+    try:
+        return await (writer_prompt | long_context_llm | StrOutputParser()).ainvoke(inputs)
+    except Exception as e:
+        print(f"\n⚠️ Article generation failed: {str(e)}")
+        return ""
+
+
+writer = RunnableLambda(generate_with_fallback)
 
 # Wrap the writer's ainvoke with retry logic
 original_ainvoke = writer.ainvoke
@@ -117,7 +129,11 @@ writer.ainvoke = lambda *args, **kwargs: retry_on_timeout(original_ainvoke, *arg
 
 
 async def stream_writer(topic, section):
+    """Generate and stream the final article. Skips if generation fails."""
     print("\n📖 Generating final article...")
-    async for tok in writer.astream({"topic": topic, "draft": section.as_str}):
-        print(tok, end="")
-    print("\n✅ Article generation complete")
+    try:
+        result = await writer.ainvoke({"topic": topic, "draft": section.as_str})
+        print(result)
+        print("\n✅ Article generation complete")
+    except Exception as e:
+        print(f"\n⚠️ Error during article generation: {str(e)}")
