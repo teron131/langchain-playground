@@ -12,3 +12,5 @@ scratch/*
 *.jpg
 *.pdf
 *.json
+build/
+langchain_playground.egg-info/
