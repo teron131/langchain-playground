@@ -33,6 +33,8 @@ class UniversalChain:
                     azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
                     api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
                 )
+            elif "gpt" in model_id or "o1" in model_id:
+                llm = ChatOpenAI(model=model_id, api_key=os.getenv("OPENAI_API_KEY"))
             elif "gemini" in model_id:
                 llm = ChatGoogleGenerativeAI(model=model_id, api_key=os.getenv("GOOGLE_API_KEY"))
             elif "claude" in model_id:
@@ -41,8 +43,12 @@ class UniversalChain:
                     base_url="https://openrouter.ai/api/v1",
                     api_key=os.getenv("OPENROUTER_API_KEY"),
                 )
-            elif "gpt" in model_id:
-                llm = ChatOpenAI(model=model_id, api_key=os.getenv("OPENAI_API_KEY"))
+            elif "deepseek" in model_id:
+                llm = ChatOpenAI(
+                    model=f"deepseek/{model_id}",  # Avoid making model_id with '/', otherwise it will mess up the FastAPI URL
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=os.getenv("OPENROUTER_API_KEY"),
+                )
             else:
                 llm = init_chat_model(model=model_id)
         except Exception as e:
