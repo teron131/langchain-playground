@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.store.memory import InMemoryStore
@@ -10,7 +12,7 @@ class UniversalChain:
     def __init__(self, provider: str, model_id: str):
         self.chain = self.create_chain(provider, model_id)
 
-    def create_chain(self, provider: str, model_id: str):
+    def create_chain(self, provider: str, model_id: str, state_modifier: Optional[Any] = None):
         """Create a chain with the configured LLM and tools.
 
         Args:
@@ -26,6 +28,7 @@ class UniversalChain:
         chain = create_react_agent(
             llm,
             tools,
+            state_modifier=state_modifier,
             checkpointer=MemorySaver(),
             store=InMemoryStore(),
         )
