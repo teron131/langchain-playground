@@ -8,7 +8,7 @@ You can install this package directly from GitHub:
 
 ```bash
 git clone https://github.com/teron131/langchain-playground.git
-pip install ./langchain-playground
+pip install -U ./langchain-playground
 ```
 
 ## Modules
@@ -30,6 +30,10 @@ Implementation of the STORM (Self-Taught Reasoner) framework.
 ### TextToSQL
 
 SQL query generation tools using different approaches (ReAct and Simple).
+
+### UniversalChain
+
+A versatile chain implementation that can be customized for various use cases.
 
 ### YouTubeLoader
 
