@@ -9,8 +9,8 @@ from .tools import get_tools
 
 
 class UniversalChain:
-    def __init__(self, provider: str, model_id: str):
-        self.chain = self.create_chain(provider, model_id)
+    def __init__(self, provider: str, model_id: str, state_modifier: Optional[Any] = None):
+        self.chain = self.create_chain(provider, model_id, state_modifier)
 
     def create_chain(self, provider: str, model_id: str, state_modifier: Optional[Any] = None):
         """Create a chain with the configured LLM and tools.
@@ -18,7 +18,7 @@ class UniversalChain:
         Args:
             provider (str): Provider of the language model.
             model_id (str): ID of the language model to use.
-            use_history (bool): Whether to use conversation history. Defaults to True.
+            state_modifier (Optional[Any]): State modifier to use. Defaults to None.
 
         Returns:
             Agent: The created agent chain with an attached invoke method.
