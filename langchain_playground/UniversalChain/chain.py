@@ -1,54 +1,42 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
+from langgraph.store.memory import InMemoryStore
 
 from .llm import get_llm
 from .tools import get_tools
 
 
 class UniversalChain:
-    """A class that handles creation and execution of language model chains."""
+    def __init__(self, provider: str, model_id: str):
+        self.chain = self.create_chain(provider, model_id)
 
-    def __init__(self, model_name: str, use_history: bool = True):
-        """Initialize the UniversalChain.
-
-        Args:
-            model_name (str): Name of the language model to use.
-            use_history (bool): Whether to use conversation history. Defaults to True.
-        """
-        self.chain = self._create_chain(model_name, use_history)
-
-    def _create_chain(self, model_name: str, use_history: bool = True):
-        """Initialize a chain with the configured LLM and tools.
+    def create_chain(self, provider: str, model_id: str):
+        """Create a chain with the configured LLM and tools.
 
         Args:
-            model_name (str): Name of the language model to use.
+            provider (str): Provider of the language model.
+            model_id (str): ID of the language model to use.
             use_history (bool): Whether to use conversation history. Defaults to True.
 
         Returns:
-            Agent: The created agent chain.
+            Agent: The created agent chain with an attached invoke method.
         """
-        llm = get_llm(model_name)
+        llm = get_llm(provider, model_id)
         tools = get_tools()
-        checkpointer = MemorySaver() if use_history else None
-        agent = create_react_agent(
+        chain = create_react_agent(
             llm,
             tools,
-            checkpointer=checkpointer,
+            checkpointer=MemorySaver(),
+            store=InMemoryStore(),
         )
-        return agent
 
-    def invoke(self, input_text: str) -> str:
-        """Generate a response to the given input text.
+        return chain
 
-        Args:
-            input_text (str): The input text.
-
-        Returns:
-            str: The generated response.
-        """
+    def invoke(self, user_input: str) -> str:
+        """Generate a response to the given input text."""
         config = {"configurable": {"thread_id": "universal-chain-session"}}
-        response = self.chain.invoke(
-            {"messages": [("user", input_text)]},
+        result = self.chain.invoke(
+            {"messages": [("user", user_input)]},
             config,
         )
-        return response["messages"][-1].content
+        return result["messages"][-1].content
