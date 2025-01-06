@@ -12,5 +12,6 @@ scratch/*
 *.jpg
 *.pdf
 *.json
+*.pem
 build/
 langchain_playground.egg-info/
