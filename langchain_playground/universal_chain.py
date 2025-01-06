@@ -5,11 +5,10 @@ from typing import Generator, Iterator, List, Union
 import opencc
 from langchain.chat_models import init_chat_model
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_core.chat_history import InMemoryChatMessageHistory
-from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from pytubefix import YouTube
 
@@ -17,11 +16,17 @@ from .YouTubeLoader import url_to_subtitles
 
 
 class UniversalChain:
-    def __init__(self, model_name: str, use_history: bool = False):
+    def __init__(
+        self,
+        model_name: str,
+        use_history: bool = False,
+        max_token_limit: int = 128000,
+    ):
         self.llm = self.get_llm(model_name)
         self.tools = self.get_tools()
         self.use_history = use_history
-        self.history = InMemoryChatMessageHistory(session_id="universal-chain-session")
+        self.max_token_limit = max_token_limit
+        self.checkpointer = MemorySaver() if use_history else None
         self.chain = self.create_chain()
 
     def get_llm(self, model_id: str):
@@ -75,23 +80,33 @@ class UniversalChain:
         return [webloader, youtube_loader]
 
     def create_chain(self):
-        agent = create_react_agent(self.llm, self.tools)
-
-        if self.use_history:
-            return RunnableWithMessageHistory(
-                agent,
-                # This is needed because in most real world scenarios, a session id is needed
-                # It isn't really used here because we are using a simple in memory ChatMessageHistory
-                lambda session_id: self.history,
-                input_messages_key="messages",
-                history_messages_key="chat_history",
-            )
+        agent = create_react_agent(
+            self.llm,
+            self.tools,
+            checkpointer=self.checkpointer,
+        )
 
         return agent
 
     def generate_response(self, input_text: str):
-        config = {"configurable": {"session_id": "universal-chain-session"}}
-        return self.chain.invoke({"messages": [("user", input_text)]}, config)["messages"][-1].content
+        """
+        Generate a response to the given input text.
+
+        Args:
+            input_text (str): The input text.
+
+        Returns:
+            str: The response.
+        """
+        # Configure thread ID for memory persistence
+        config = {"configurable": {"thread_id": "universal-chain-session"}}
+
+        response = self.chain.invoke(
+            {"messages": [("user", input_text)]},
+            config,
+        )
+
+        return response["messages"][-1].content
 
     def s2hk(content: str) -> str:
         converter = opencc.OpenCC("s2hk")
