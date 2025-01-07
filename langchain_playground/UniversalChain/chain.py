@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
@@ -9,10 +9,11 @@ from .tools import get_tools
 
 
 class UniversalChain:
-    def __init__(self, provider: str, model_id: str, state_modifier: Optional[Any] = None):
-        self.chain = self.create_chain(provider, model_id, state_modifier)
+    def __init__(self, model_id: str, state_modifier: Optional[Any] = None):
+        self.chain = self.create_chain(model_id, state_modifier)
+        self.result = {}
 
-    def create_chain(self, provider: str, model_id: str, state_modifier: Optional[Any] = None):
+    def create_chain(self, model_id: str, state_modifier: Optional[Any] = None):
         """Create a chain with the configured LLM and tools.
 
         Args:
@@ -23,9 +24,9 @@ class UniversalChain:
         Returns:
             Agent: The created agent chain with an attached invoke method.
         """
-        llm = get_llm(provider, model_id)
+        llm = get_llm(model_id)
         tools = get_tools()
-        chain = create_react_agent(
+        return create_react_agent(
             llm,
             tools,
             state_modifier=state_modifier,
@@ -33,13 +34,21 @@ class UniversalChain:
             store=InMemoryStore(),
         )
 
-        return chain
-
-    def invoke(self, user_input: str) -> str:
+    def get_response(self, user_input: str) -> Dict:
         """Generate a response to the given input text."""
         config = {"configurable": {"thread_id": "universal-chain-session"}}
-        result = self.chain.invoke(
+        self.result = self.chain.invoke(
             {"messages": [("user", user_input)]},
             config,
         )
-        return result["messages"][-1].content
+        return self.result
+
+    def extract_ans_str(self) -> str:
+        return self.result["messages"][-1].content
+
+    def extract_history_msgs(self) -> list[str]:
+        return self.result["messages"][:-1]
+
+    def invoke(self, user_input: str) -> str:
+        self.get_response(user_input)
+        return self.extract_ans_str()
