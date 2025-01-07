@@ -9,17 +9,16 @@ from .tools import get_tools
 
 
 class UniversalChain:
-    def __init__(self, model_id: str, state_modifier: Optional[Any] = None):
-        self.chain = self.create_chain(model_id, state_modifier)
+    def __init__(self, model_id: str):
+        self.chain = self.create_chain(model_id)
         self.result = {}
 
-    def create_chain(self, model_id: str, state_modifier: Optional[Any] = None):
+    def create_chain(self, model_id: str):
         """Create a chain with the configured LLM and tools.
 
         Args:
             provider (str): Provider of the language model.
             model_id (str): ID of the language model to use.
-            state_modifier (Optional[Any]): State modifier to use. Defaults to None.
 
         Returns:
             Agent: The created agent chain with an attached invoke method.
@@ -29,16 +28,20 @@ class UniversalChain:
         return create_react_agent(
             llm,
             tools,
-            state_modifier=state_modifier,
             checkpointer=MemorySaver(),
             store=InMemoryStore(),
         )
 
-    def get_response(self, user_input: str) -> Dict:
+    def get_response(self, user_input: str, message_history: list = None) -> Dict:
         """Generate a response to the given input text."""
         config = {"configurable": {"thread_id": "universal-chain-session"}}
+
+        # Include message history if provided, otherwise just the current input
+        messages = message_history or []
+        messages.append(("user", user_input))
+
         self.result = self.chain.invoke(
-            {"messages": [("user", user_input)]},
+            {"messages": messages},
             config,
         )
         return self.result
@@ -49,6 +52,6 @@ class UniversalChain:
     def extract_history_msgs(self) -> list[str]:
         return self.result["messages"][:-1]
 
-    def invoke(self, user_input: str) -> str:
-        self.get_response(user_input)
+    def invoke(self, user_input: str, message_history: list = None) -> str:
+        self.get_response(user_input, message_history)
         return self.extract_ans_str()
