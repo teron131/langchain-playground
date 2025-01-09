@@ -32,7 +32,7 @@ def webloader_tool(url: str) -> str:
     return webloader(url)
 
 
-def youtube_loader(url: str) -> str:
+def youtubeloader(url: str) -> str:
     """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
@@ -53,9 +53,9 @@ def youtube_loader(url: str) -> str:
 
 
 @tool
-def youtube_loader_tool(url: str) -> str:
+def youtubeloader_tool(url: str) -> str:
     """Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more."""
-    return youtube_loader(url)
+    return youtubeloader(url)
 
 
 def print_tool_info(tool_func: BaseTool) -> None:
@@ -70,7 +70,7 @@ def get_tools() -> List[BaseTool]:
     Returns:
         List[BaseTool]: List of tool functions.
     """
-    tools = [webloader_tool, youtube_loader_tool]
+    tools = [webloader_tool, youtubeloader_tool]
 
     # Print info for all tools
     for tool_func in tools:
