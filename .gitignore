@@ -15,3 +15,4 @@ scratch/*
 *.pem
 build/
 langchain_playground.egg-info/
+langchain_playground/AG2/coding/
