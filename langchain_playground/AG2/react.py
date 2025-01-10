@@ -7,13 +7,9 @@ from autogen.coding import LocalCommandLineCodeExecutor
 from config import llm_config
 from dotenv import load_dotenv
 
-from langchain_playground.UniversalChain.tools import youtubeloader
+from langchain_playground.UniversalChain.tools import webloader, youtubeloader
 
 load_dotenv()
-agentops.init(
-    api_key=os.environ["AGENTOPS_API_KEY"],
-    default_tags=["langchain-playground"],
-)
 
 # NOTE: this ReAct prompt is adapted from Langchain's ReAct agent: https://github.com/langchain-ai/langchain/blob/master/libs/langchain/langchain/agents/react/agent.py#L79
 react_prompt = """
@@ -62,6 +58,13 @@ assistant = AssistantAgent(
 )
 
 register_function(
+    webloader,
+    caller=assistant,
+    executor=user_proxy,
+    description="Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more.",
+)
+
+register_function(
     youtubeloader,
     caller=assistant,
     executor=user_proxy,
@@ -70,14 +73,15 @@ register_function(
 
 
 def invoke(question: str):
+    agentops.init()
+
     # Cache LLM responses. To get different responses, change the cache_seed value.
     with Cache.disk(cache_seed=43) as cache:
         user_proxy.initiate_chat(
             assistant,
             message=react_prompt_message,
-            question=question,
+            question=question,  # Input variable defined in the prompt
             cache=cache,
         )
 
-
-agentops.end_session("Success")
+    agentops.end_session("Success")
