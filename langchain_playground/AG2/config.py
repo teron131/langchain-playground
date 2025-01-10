@@ -24,3 +24,12 @@ llm_config = {
         },
     ],
 }
+
+# Filtering example
+# import autogen
+
+# filter_dict = {"model": ["gpt-4o-mini"]}
+
+# config_list = autogen.filter_config(llm_config["config_list"], filter_dict)
+# llm_config["config_list"] = config_list
+# llm_config
