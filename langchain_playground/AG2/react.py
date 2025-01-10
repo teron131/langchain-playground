@@ -2,6 +2,7 @@ import os
 
 import agentops
 from autogen import AssistantAgent, UserProxyAgent, register_function
+from autogen.agentchat import ChatResult
 from autogen.cache import Cache
 from autogen.coding import LocalCommandLineCodeExecutor
 from config import llm_config
@@ -61,7 +62,7 @@ register_function(
     webloader,
     caller=assistant,
     executor=user_proxy,
-    description="Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more.",
+    description="Load the content of a website from url to text.",
 )
 
 register_function(
@@ -72,12 +73,12 @@ register_function(
 )
 
 
-def invoke(question: str):
+def get_result(question: str) -> ChatResult:
     agentops.init()
 
     # Cache LLM responses. To get different responses, change the cache_seed value.
     with Cache.disk(cache_seed=43) as cache:
-        user_proxy.initiate_chat(
+        result = user_proxy.initiate_chat(
             assistant,
             message=react_prompt_message,
             question=question,  # Input variable defined in the prompt
@@ -85,3 +86,9 @@ def invoke(question: str):
         )
 
     agentops.end_session("Success")
+    return result
+
+
+def invoke(question: str) -> str:
+    result = get_result(question)
+    return result.summary
