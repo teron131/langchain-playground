@@ -37,6 +37,7 @@ class UniversalChain:
         config = {"configurable": {"thread_id": "universal-chain-session"}}
 
         # Include message history if provided, otherwise just the current input
+        # Specialized for Open WebUI as the LangChain memory would get lost, likely due to session management, but it has a variable: messages (list[tuple[str, str]])
         messages = message_history or []
         messages.append(("user", user_input))
 
