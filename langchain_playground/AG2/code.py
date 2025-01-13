@@ -58,6 +58,7 @@ def invoke(question: str) -> str:
     result = get_result(question)
 
     # Handle plot if exists
+    # Assume the chat always gives the file id (from examples)
     file_id = extract_file_id(result)
     if file_id:
         os.makedirs("plots", exist_ok=True)
