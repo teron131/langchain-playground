@@ -32,7 +32,9 @@ Question: {input}
 """
 
 
-# Define the ReAct prompt message. Assuming a "question" field is present in the context
+# Define the ReAct prompt message.
+# Assuming a "question" field is present in the context
+# `sender` and `recipient` must exist in args
 def react_prompt_message(sender, recipient, context):
     return react_prompt.format(input=context["question"])
 
@@ -92,3 +94,11 @@ def get_result(question: str) -> ChatResult:
 def invoke(question: str) -> str:
     result = get_result(question)
     return result.summary
+
+
+if __name__ == "__main__":
+    question1 = "The volume of a cube is increasing at the rate of 16 cm3/s. At what rate is its total surface area increasing when the length of an edge is 6 cm?"
+    question2 = "Draw a line chart to show the population trend in US. Show how you solved it with code."
+
+    invoke(question1)
+    invoke(question2)
