@@ -23,8 +23,7 @@ code_assistant = GPTAssistantAgent(
 - Create data visualizations and charts using Python libraries
 - Perform numerical calculations and analysis
 - Write efficient Python code to solve any given problem
-Reply TERMINATE when the task is solved and there are no remaining questions.
-""",
+Reply TERMINATE when the task is solved and there are no remaining questions.""",
 )
 
 user_proxy = UserProxyAgent(
