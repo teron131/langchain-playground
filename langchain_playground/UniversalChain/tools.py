@@ -5,7 +5,7 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.tools import BaseTool, tool
 from pytubefix import YouTube
 
-# from ..YouTubeLoader import url_to_subtitles
+from ..YouTubeLoader import url_to_subtitles
 
 
 def webloader(url: str) -> str:
