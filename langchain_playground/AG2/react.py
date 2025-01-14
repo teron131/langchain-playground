@@ -8,7 +8,11 @@ from autogen.coding import LocalCommandLineCodeExecutor
 from config import llm_config
 from dotenv import load_dotenv
 
-from langchain_playground.UniversalChain.tools import webloader, youtubeloader
+from langchain_playground.UniversalChain.tools import (
+    webloader,
+    websearch,
+    youtubeloader,
+)
 
 load_dotenv()
 
@@ -61,6 +65,13 @@ assistant = AssistantAgent(
 )
 
 register_function(
+    websearch,
+    caller=assistant,
+    executor=user_proxy,
+    description="Search the web for information based on the query.",
+)
+
+register_function(
     webloader,
     caller=assistant,
     executor=user_proxy,
@@ -94,11 +105,3 @@ def get_result(question: str) -> ChatResult:
 def invoke(question: str) -> str:
     result = get_result(question)
     return result.summary
-
-
-if __name__ == "__main__":
-    question1 = "The volume of a cube is increasing at the rate of 16 cm3/s. At what rate is its total surface area increasing when the length of an edge is 6 cm?"
-    question2 = "Draw a line chart to show the population trend in US. Show how you solved it with code."
-
-    invoke(question1)
-    invoke(question2)
