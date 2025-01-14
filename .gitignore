@@ -3,7 +3,6 @@ __pycache__
 .cache
 cache
 *.log
-*test*
 images/*
 audio/*
 pdfs/*
