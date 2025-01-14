@@ -5,7 +5,14 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.tools import BaseTool, tool
 from pytubefix import YouTube
 
-from ..YouTubeLoader import url_to_subtitles
+from ..Tools.WebSearch import websearch
+from ..Tools.YouTubeLoader import youtubeloader
+
+
+@tool
+def websearch_tool(query: str) -> str:
+    """Search the web for information based on the query."""
+    return websearch(query)
 
 
 def webloader(url: str) -> str:
@@ -30,26 +37,6 @@ def webloader(url: str) -> str:
 def webloader_tool(url: str) -> str:
     """Load the content of a website from url to text."""
     return webloader(url)
-
-
-def youtubeloader(url: str) -> str:
-    """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
-
-    Args:
-        url (str): The YouTube video URL to load
-
-    Returns:
-        str: Formatted string containing the video title, author and subtitles
-    """
-    yt = YouTube(url)
-    content = [
-        "Answer the user's question based on the full content.",
-        f"Title: {yt.title}",
-        f"Author: {yt.author}",
-        "Subtitles:",
-        url_to_subtitles(url),
-    ]
-    return "\n".join(content)
 
 
 @tool
@@ -77,3 +64,7 @@ def get_tools() -> List[BaseTool]:
         print_tool_info(tool_func)
 
     return tools
+
+
+if __name__ == "__main__":
+    get_tools()

@@ -15,6 +15,7 @@ from .whisper_hf import whisper_hf_transcribe
 
 load_dotenv()
 
+
 # File handling functions
 
 
@@ -229,3 +230,26 @@ def url_to_subtitles(url: str, whisper_model: str = "fal") -> str:
         error_message = f"Error processing video {url}: {str(e)}"
         print(error_message)
         return error_message
+
+
+# Main function
+
+
+def youtubeloader(url: str) -> str:
+    """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+
+    Args:
+        url (str): The YouTube video URL to load
+
+    Returns:
+        str: Formatted string containing the video title, author and subtitles
+    """
+    yt = YouTube(url)
+    content = [
+        "Answer the user's question based on the full content.",
+        f"Title: {yt.title}",
+        f"Author: {yt.author}",
+        "Subtitles:",
+        url_to_subtitles(url),
+    ]
+    return "\n".join(content)
