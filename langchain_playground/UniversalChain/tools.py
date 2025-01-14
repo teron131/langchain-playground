@@ -3,16 +3,9 @@ from typing import List
 
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.tools import BaseTool, tool
-from pytubefix import YouTube
 
 from ..Tools.WebSearch import websearch
 from ..Tools.YouTubeLoader import youtubeloader
-
-
-@tool
-def websearch_tool(query: str) -> str:
-    """Search the web for information based on the query."""
-    return websearch(query)
 
 
 def webloader(url: str) -> str:
@@ -33,18 +26,6 @@ def webloader(url: str) -> str:
     return "\n\n".join(content)
 
 
-@tool
-def webloader_tool(url: str) -> str:
-    """Load the content of a website from url to text."""
-    return webloader(url)
-
-
-@tool
-def youtubeloader_tool(url: str) -> str:
-    """Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more."""
-    return youtubeloader(url)
-
-
 def print_tool_info(tool_func: BaseTool) -> None:
     print(f"Tool:{tool_func.name}")
     print(f"Description: {tool_func.description}")
@@ -57,7 +38,23 @@ def get_tools() -> List[BaseTool]:
     Returns:
         List[BaseTool]: List of tool functions.
     """
-    tools = [webloader_tool, youtubeloader_tool]
+
+    @tool
+    def websearch_tool(query: str) -> str:
+        """Search the web for information based on the query."""
+        return websearch(query)
+
+    @tool
+    def webloader_tool(url: str) -> str:
+        """Load the content of a website from url to text."""
+        return webloader(url)
+
+    @tool
+    def youtubeloader_tool(url: str) -> str:
+        """Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more."""
+        return youtubeloader(url)
+
+    tools = [websearch_tool, webloader_tool, youtubeloader_tool]
 
     # Print info for all tools
     for tool_func in tools:
