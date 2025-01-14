@@ -1,2 +1,4 @@
-from .WebSearch import *
-from .YouTubeLoader import *
+from .WebSearch import websearch
+from .YouTubeLoader import youtubeloader
+
+__all__ = ["websearch", "youtubeloader"]
