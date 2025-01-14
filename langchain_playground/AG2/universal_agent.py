@@ -16,37 +16,8 @@ from langchain_playground.UniversalChain.tools import (
 
 load_dotenv()
 
-# NOTE: this ReAct prompt is adapted from Langchain's ReAct agent: https://github.com/langchain-ai/langchain/blob/master/libs/langchain/langchain/agents/react/agent.py#L79
-react_prompt = """
-Answer the following questions as best you can. You have access to tools provided.
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take
-Action Input: the input to the action
-Observation: the result of the action
-... (this process can repeat multiple times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-Question: {input}
-"""
-
-
-# Define the ReAct prompt message.
-# Assuming a "question" field is present in the context
-# `sender` and `recipient` must exist in args
-def react_prompt_message(sender, recipient, context):
-    return react_prompt.format(input=context["question"])
-
-
-# Setting up code executor.
+# Setting up code executor
 os.makedirs("coding", exist_ok=True)
-# Use docker executor for running code in a container if you have docker installed.
-# code_executor = DockerCommandLineCodeExecutor(work_dir="coding")
 code_executor = LocalCommandLineCodeExecutor(work_dir="coding")
 
 user_proxy = UserProxyAgent(
@@ -89,12 +60,10 @@ register_function(
 def get_result(question: str) -> ChatResult:
     agentops.init()
 
-    # Cache LLM responses. To get different responses, change the cache_seed value.
     with Cache.disk(cache_seed=43) as cache:
         result = user_proxy.initiate_chat(
             assistant,
-            message=react_prompt_message,
-            question=question,  # Input variable defined in the prompt
+            message=question,
             cache=cache,
         )
 
