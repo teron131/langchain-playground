@@ -5,7 +5,7 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.tools import BaseTool, tool
 from pytubefix import YouTube
 
-from ..YouTubeLoader import url_to_subtitles
+# from ..YouTubeLoader import url_to_subtitles
 
 
 def webloader(url: str) -> str:
@@ -18,7 +18,7 @@ def webloader(url: str) -> str:
         str: Formatted string containing the website URL followed by the processed content
     """
     docs = WebBaseLoader(url).load()
-    docs = [re.sub(r"\n{3,}", r"\n\n", doc.page_content) for doc in docs]
+    docs = [re.sub(r"\n{3,}", r"\n\n", re.sub(r" {2,}", " ", doc.page_content)) for doc in docs]
     content = [
         f"Website: {url}",
         *docs,
