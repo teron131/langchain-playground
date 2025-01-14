@@ -1,6 +1,6 @@
 # LangChain Playground
 
-A collection of LangChain utilities and tools for personal use.
+A collection of LangChain utilities and tools for experimental, prototyping, and personal use.
 
 ## Installation
 
@@ -35,9 +35,22 @@ SQL query generation tools using different approaches (ReAct and Simple).
 
 A versatile chain implementation that can be customized for various use cases.
 
-### YouTubeLoader
+### AG2
 
-Tools for processing YouTube content, including transcription using Whisper.
+Agent framework with code interpreter capabilities.
+
+### Tools
+
+- **WebSearch**: Tools for performing web searches.
+- **YouTubeLoader**: Tools for processing YouTube content, including transcription using Whisper.
+
+### gemini.py
+
+Provides an interface for interacting with Google Gemini models, including tools for Google Search and code execution.
+
+### image_processing.py
+
+Utilities for image processing and manipulation, such as loading, resizing, and converting images to base64.
 
 ## Requirements
 
@@ -46,7 +59,7 @@ Tools for processing YouTube content, including transcription using Whisper.
 
 ## Environment Variables
 
-Some modules may require environment variables (e.g., API keys). Create a `.env` file based on `.env_example`.
+Some modules may require environment variables (e.g., API keys). Create a `.env` file based on `.env_example`. The `gemini.py` module requires environment variables for Google API access.
 
 ## License
 
