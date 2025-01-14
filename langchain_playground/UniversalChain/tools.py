@@ -64,7 +64,3 @@ def get_tools() -> List[BaseTool]:
         print_tool_info(tool_func)
 
     return tools
-
-
-if __name__ == "__main__":
-    get_tools()
