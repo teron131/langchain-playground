@@ -77,8 +77,7 @@ llm_config = {
 }
 
 # Filtering example
-# import autogen
+# from autogen import filter_config
 
 # filter_dict = {"model": ["google/gemini-2.0-flash-exp:free"]}
-# llm_config["config_list"] = autogen.filter_config(llm_config["config_list"], filter_dict)
-# llm_config
+# llm_config["config_list"] = filter_config(llm_config["config_list"], filter_dict)
