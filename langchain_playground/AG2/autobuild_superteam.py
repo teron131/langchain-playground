@@ -1,6 +1,7 @@
 import agentops
 from autogen import (
     AssistantAgent,
+    ConversableAgent,
     GroupChat,
     GroupChatManager,
     UserProxyAgent,
@@ -27,15 +28,7 @@ config_list = config_list_from_json(
 llm_config["config_list"] = config_list
 
 
-def build_agents(task: str):
-    """Creates a list of agents for the given task.
-
-    Args:
-        task (str): Task description for building the team
-
-    Returns:
-        tuple: List of agents and user proxy agent
-    """
+def build_agents(task: str) -> tuple[list[ConversableAgent], UserProxyAgent]:
     builder = AgentBuilder(
         config_file_or_env="OAI_CONFIG_LIST",
         builder_model="gpt-4o-mini",
@@ -54,7 +47,7 @@ def build_agents(task: str):
     return agent_list, user_proxy
 
 
-def create_tools_assistant(agent_list, user_proxy):
+def create_tools_assistant(agent_list: list[ConversableAgent], user_proxy: UserProxyAgent) -> list[ConversableAgent]:
     tools = [
         (websearch, "Search the web for information based on the query."),
         (webloader, "Load the content of a website from url to text."),
@@ -87,8 +80,8 @@ def setup_group_chat(agent_list):
     group_chat = GroupChat(
         agents=agent_list,
         messages=[],
-        max_round=12,
-        speaker_selection_method="round_robin",
+        # max_round=12,
+        speaker_selection_method="auto",
     )
 
     manager = GroupChatManager(
@@ -100,30 +93,14 @@ def setup_group_chat(agent_list):
     return manager
 
 
-def create_team(task: str):
-    """Creates a team of agents for the given task.
-
-    Args:
-        task (str): Task description for building the team
-
-    Returns:
-        tuple: Group chat manager and list of agents
-    """
+def create_team(task: str) -> tuple[GroupChatManager, list[ConversableAgent]]:
     agent_list, user_proxy = build_agents(task)
     agent_list = create_tools_assistant(agent_list, user_proxy)
     manager = setup_group_chat(agent_list)
     return manager, agent_list
 
 
-def invoke(task: str) -> ChatResult:
-    """Get chat result for the given task.
-
-    Args:
-        task (str): Task to be executed by the team
-
-    Returns:
-        ChatResult: Result of the chat interaction
-    """
+def get_result(task: str) -> ChatResult:
     manager, agent_list = create_team(task)
 
     # User proxy agent is auto created by the builder
@@ -137,3 +114,8 @@ def invoke(task: str) -> ChatResult:
     )
     agentops.end_session("Success")
     return chat_result
+
+
+def invoke(task: str) -> str:
+    chat_result = get_result(task)
+    return chat_result.summary
