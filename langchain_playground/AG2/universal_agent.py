@@ -22,6 +22,14 @@ from langchain_playground.UniversalChain.tools import (
 
 load_dotenv()
 
+# OAI_CONFIG_LIST
+# config_list = config_list_from_json(
+#     "OAI_CONFIG_LIST",
+#     filter_dict={"model": ["gpt-4o-mini"]},
+# )
+# llm_config["config_list"] = config_list
+
+# config.py
 llm_config["config_list"] = filter_config(
     config_list=llm_config["config_list"],
     filter_dict={"model": ["gpt-4o-mini"]},
