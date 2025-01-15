@@ -26,6 +26,10 @@ llm_config = {
             "api_key": os.environ["OPENAI_API_KEY"],
         },
         {
+            "model": "gpt-4o-mini-realtime-preview",
+            "api_key": os.environ["OPENAI_API_KEY"],
+        },
+        {
             "model": "openai/gpt-4o-mini",
             "api_key": os.environ["OPENROUTER_API_KEY"],
             "base_url": "https://openrouter.ai/api/v1",
