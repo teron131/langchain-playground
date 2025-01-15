@@ -1,4 +1,3 @@
-import autogen
 from autogen import GroupChat, GroupChatManager, filter_config
 from autogen.agentchat import ChatResult
 from autogen.agentchat.contrib.agent_builder import AgentBuilder
