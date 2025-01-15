@@ -1,12 +1,10 @@
 import agentops
 from autogen import (
     AssistantAgent,
-    ConversableAgent,
     GroupChat,
     GroupChatManager,
     UserProxyAgent,
     config_list_from_json,
-    filter_config,
     register_function,
 )
 from autogen.agentchat import ChatResult
