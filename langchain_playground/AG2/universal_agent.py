@@ -1,7 +1,13 @@
 import os
 
 import agentops
-from autogen import AssistantAgent, UserProxyAgent, filter_config, register_function
+from autogen import (
+    AssistantAgent,
+    UserProxyAgent,
+    config_list_from_json,
+    filter_config,
+    register_function,
+)
 from autogen.agentchat import ChatResult
 from autogen.cache import Cache
 from autogen.coding import LocalCommandLineCodeExecutor
@@ -16,8 +22,10 @@ from langchain_playground.UniversalChain.tools import (
 
 load_dotenv()
 
-filter_dict = {"model": ["gpt-4o-mini"]}
-llm_config["config_list"] = filter_config(llm_config["config_list"], filter_dict)
+llm_config["config_list"] = filter_config(
+    config_list=llm_config["config_list"],
+    filter_dict={"model": ["gpt-4o-mini"]},
+)
 
 # Setting up code executor
 os.makedirs("coding", exist_ok=True)
