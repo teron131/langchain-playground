@@ -34,10 +34,10 @@ def print_tool_info(tool_func: BaseTool) -> None:
 
 
 def get_tools() -> List[BaseTool]:
-    """Get the list of available tools for the UniversalChain.
+    """Get the list of available tools for the UniversalChain. The tools are wrapped with their original docstrings and registered as langchain tools.
 
     Returns:
-        List[BaseTool]: List of tool functions
+        List[BaseTool]: List of tool functions with their docstrings preserved
     """
 
     @tool
