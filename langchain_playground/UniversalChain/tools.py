@@ -1,11 +1,12 @@
 import re
+from functools import wraps
 from typing import List
 
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.tools import BaseTool, tool
 
-from ..Tools.WebSearch import websearch
-from ..Tools.YouTubeLoader import youtubeloader
+from langchain_playground.Tools.WebSearch import websearch
+from langchain_playground.Tools.YouTubeLoader import youtubeloader
 
 
 def webloader(url: str) -> str:
@@ -36,22 +37,22 @@ def get_tools() -> List[BaseTool]:
     """Get the list of available tools for the UniversalChain.
 
     Returns:
-        List[BaseTool]: List of tool functions.
+        List[BaseTool]: List of tool functions
     """
 
     @tool
+    @wraps(websearch)
     def websearch_tool(query: str) -> str:
-        """Search the web for information based on the query."""
         return websearch(query)
 
     @tool
+    @wraps(webloader)
     def webloader_tool(url: str) -> str:
-        """Load the content of a website from url to text."""
         return webloader(url)
 
     @tool
+    @wraps(youtubeloader)
     def youtubeloader_tool(url: str) -> str:
-        """Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more."""
         return youtubeloader(url)
 
     tools = [websearch_tool, webloader_tool, youtubeloader_tool]
