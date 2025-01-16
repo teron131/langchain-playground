@@ -9,7 +9,7 @@ load_dotenv()
 
 
 @dataclass
-class SearchArgs:
+class WebSearchConfig:
     query: str
     max_results: int = 5
     filter_score: float = 0.5
@@ -17,19 +17,19 @@ class SearchArgs:
     suggested_answer: bool = False
 
 
-def tavily_search(args: SearchArgs) -> dict:
+def tavily_search(config: WebSearchConfig) -> dict:
     """Execute a Tavily search query.
 
-    Args:
-        args (SearchArgs): Search arguments containing query and max_results
+    config:
+        config (WebSearchConfig): Search arguments containing query and max_results
 
     Returns:
         dict: Raw Tavily API response
     """
     tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
     return tavily_client.search(
-        args.query,
-        max_results=args.max_results,
+        config.query,
+        max_results=config.max_results,
         search_depth="advanced",
         include_answer=True,
         include_raw_content=True,
@@ -40,7 +40,7 @@ def tavily_search(args: SearchArgs) -> dict:
 def filter_garbage(text: str) -> str:
     """Removes garbage characters while keeping printable ASCII, Chinese characters, and emojis intact.
 
-    Args:
+    config:
         text (str): The input string containing various characters
 
     Returns:
@@ -87,17 +87,17 @@ def _summarize_content(response: dict) -> None:
             result["content"] = content_list[i]
 
 
-def process_response(response: dict, args: SearchArgs) -> str:
+def process_response(response: dict, config: WebSearchConfig) -> str:
     """Process Tavily search response by filtering results and cleaning content.
 
-    Args:
+    config:
         response (dict): Raw Tavily API response
-        args (SearchArgs): Search arguments containing processing options
+        config (WebSearchConfig): Search arguments containing processing options
 
     Returns:
         str: Formatted string containing filtered and processed search results
     """
-    response["results"] = [result for result in response["results"] if result["score"] >= args.filter_score]
+    response["results"] = [result for result in response["results"] if result["score"] >= config.filter_score]
 
     for result in response["results"]:
         if result["content"] is not None:
@@ -105,7 +105,7 @@ def process_response(response: dict, args: SearchArgs) -> str:
         if result["raw_content"] is not None:
             result["raw_content"] = filter_garbage(result["raw_content"])
 
-    if args.summarize_content:
+    if config.summarize_content:
         _summarize_content(response)
 
     content = [
@@ -122,7 +122,7 @@ def process_response(response: dict, args: SearchArgs) -> str:
             ]
         )
 
-    if args.suggested_answer:
+    if config.suggested_answer:
         content.append(f"Suggested Answer: {response['answer']}")
 
     return "\n".join(content)
@@ -137,7 +137,7 @@ def websearch(
 ) -> str:
     """Execute a web search and process the results.
 
-    Args:
+    config:
         query (str): Search query string
         filter_score (float): Minimum score threshold for filtering results
         summarize_content (bool): Whether to summarize content using LLM
@@ -146,12 +146,12 @@ def websearch(
     Returns:
         str: Processed and formatted search results
     """
-    args = SearchArgs(
+    config = WebSearchConfig(
         query=query,
         max_results=max_results,
         filter_score=filter_score,
         summarize_content=summarize_content,
         suggested_answer=suggested_answer,
     )
-    response = tavily_search(args)
-    return process_response(response, args)
+    response = tavily_search(config)
+    return process_response(response, config)
