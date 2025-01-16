@@ -1,8 +1,8 @@
-gradio
 ipython
 langchain
 langchain-community
 langchain-openai
-langchain-together
+autogen
+pytubefix
 opencc
 python-dotenv
