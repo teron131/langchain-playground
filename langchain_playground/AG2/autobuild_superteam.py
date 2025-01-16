@@ -135,7 +135,7 @@ def invoke(
     agent_model: str = "gpt-4o-mini",
     coding: bool = True,
     max_agents: int = 5,
-    max_round: int = 20,
+    max_round: int = 12,
     speaker_selection_method: str = "auto",
 ) -> str:
     superteam_args = SuperTeamArgs(
