@@ -78,14 +78,10 @@ register_function(
 
 def get_result(question: str) -> ChatResult:
     agentops.init()
-
-    with Cache.disk(cache_seed=43) as cache:
-        result = user_proxy.initiate_chat(
-            assistant,
-            message=question,
-            cache=cache,
-        )
-
+    result = user_proxy.initiate_chat(
+        assistant,
+        message=question,
+    )
     agentops.end_session("Success")
     return result
 
