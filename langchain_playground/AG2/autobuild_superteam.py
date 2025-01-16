@@ -147,4 +147,4 @@ def invoke(
         speaker_selection_method=speaker_selection_method,
     )
     chat_result = get_result(task, superteam_args)
-    return chat_result.summary
+    return chat_result
