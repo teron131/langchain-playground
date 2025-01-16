@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import agentops
 from autogen import (
     AssistantAgent,
@@ -19,6 +21,17 @@ from langchain_playground.UniversalChain.tools import (
     youtubeloader,
 )
 
+
+@dataclass
+class SuperTeamArgs:
+    builder_model: str = "gpt-4o-mini"
+    agent_model: str = "gpt-4o-mini"
+    coding: bool = True
+    max_agents: int = 5
+    max_round: int = 12
+    speaker_selection_method: str = "auto"
+
+
 load_dotenv()
 
 config_list = config_list_from_json(
@@ -28,18 +41,18 @@ config_list = config_list_from_json(
 llm_config["config_list"] = config_list
 
 
-def build_agents(task: str) -> tuple[list[ConversableAgent], UserProxyAgent]:
+def build_agents(task: str, superteam_args: SuperTeamArgs) -> tuple[list[ConversableAgent], UserProxyAgent]:
     builder = AgentBuilder(
         config_file_or_env="OAI_CONFIG_LIST",
-        builder_model="gpt-4o-mini",
-        agent_model="gpt-4o-mini",
+        builder_model=superteam_args.builder_model,
+        agent_model=superteam_args.agent_model,
     )
 
     agent_list, _ = builder.build(
         building_task=task,
         default_llm_config=llm_config,
-        coding=True,
-        max_agents=5,
+        coding=superteam_args.coding,
+        max_agents=superteam_args.max_agents,
     )
 
     user_proxy = agent_list[-1] if isinstance(agent_list[-1], UserProxyAgent) else next(agent for agent in agent_list if isinstance(agent, UserProxyAgent))
@@ -76,12 +89,12 @@ def create_tools_assistant(agent_list: list[ConversableAgent], user_proxy: UserP
     return agent_list
 
 
-def setup_group_chat(agent_list):
+def setup_group_chat(agent_list: list[ConversableAgent], superteam_args: SuperTeamArgs) -> GroupChatManager:
     group_chat = GroupChat(
         agents=agent_list,
         messages=[],
-        # max_round=12,
-        speaker_selection_method="auto",
+        max_round=superteam_args.max_round,
+        speaker_selection_method=superteam_args.speaker_selection_method,
     )
 
     manager = GroupChatManager(
@@ -93,15 +106,15 @@ def setup_group_chat(agent_list):
     return manager
 
 
-def create_team(task: str) -> tuple[GroupChatManager, list[ConversableAgent]]:
-    agent_list, user_proxy = build_agents(task)
+def create_team(task: str, superteam_args: SuperTeamArgs) -> tuple[GroupChatManager, list[ConversableAgent]]:
+    agent_list, user_proxy = build_agents(task, superteam_args)
     agent_list = create_tools_assistant(agent_list, user_proxy)
-    manager = setup_group_chat(agent_list)
+    manager = setup_group_chat(agent_list, superteam_args)
     return manager, agent_list
 
 
-def get_result(task: str) -> ChatResult:
-    manager, agent_list = create_team(task)
+def get_result(task: str, superteam_args: SuperTeamArgs) -> ChatResult:
+    manager, agent_list = create_team(task, superteam_args)
 
     # User proxy agent is auto created by the builder
     # It is usually the last agent in the list
@@ -116,6 +129,22 @@ def get_result(task: str) -> ChatResult:
     return chat_result
 
 
-def invoke(task: str) -> str:
-    chat_result = get_result(task)
+def invoke(
+    task: str,
+    builder_model: str = "gpt-4o-mini",
+    agent_model: str = "gpt-4o-mini",
+    coding: bool = True,
+    max_agents: int = 5,
+    max_round: int = 20,
+    speaker_selection_method: str = "auto",
+) -> str:
+    superteam_args = SuperTeamArgs(
+        builder_model=builder_model,
+        agent_model=agent_model,
+        coding=coding,
+        max_agents=max_agents,
+        max_round=max_round,
+        speaker_selection_method=speaker_selection_method,
+    )
+    chat_result = get_result(task, superteam_args)
     return chat_result.summary
