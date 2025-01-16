@@ -131,30 +131,21 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
     return "\n".join(content)
 
 
-def websearch(
-    query: str,
-    max_results: int = 5,
-    filter_score: float = 0.5,
-    summarize_content: bool = False,
-    suggested_answer: bool = False,
-) -> str:
-    """Execute a web search and process the results.
+def websearch(query: str) -> str:
+    """Search the web for information based on the query.
 
     args:
         query (str): Search query string
-        filter_score (float): Minimum score threshold for filtering results
-        summarize_content (bool): Whether to summarize content using LLM
-        suggested_answer (bool): Whether to provide a suggested answer
 
     Returns:
         str: Processed and formatted search results
     """
     websearch_args = WebSearchArgs(
         query=query,
-        max_results=max_results,
-        filter_score=filter_score,
-        summarize_content=summarize_content,
-        suggested_answer=suggested_answer,
+        max_results=5,
+        filter_score=0.5,
+        summarize_content=True,
+        suggested_answer=True,
     )
     response = tavily_search(websearch_args)
     return process_response(response, websearch_args)
