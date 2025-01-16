@@ -97,14 +97,17 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
     Returns:
         str: Formatted string containing filtered and processed search results
     """
+    # Filter results by score
     response["results"] = [result for result in response["results"] if result["score"] >= websearch_args.filter_score]
 
+    # Filter garbage characters
     for result in response["results"]:
         if result["content"] is not None:
             result["content"] = filter_garbage(result["content"])
         if result["raw_content"] is not None:
             result["raw_content"] = filter_garbage(result["raw_content"])
 
+    # Summarize "raw_content" to replace "content"
     if websearch_args.summarize_content:
         _summarize_content(response)
 
