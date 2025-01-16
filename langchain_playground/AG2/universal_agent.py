@@ -9,7 +9,6 @@ from autogen import (
     register_function,
 )
 from autogen.agentchat import ChatResult
-from autogen.cache import Cache
 from autogen.coding import LocalCommandLineCodeExecutor
 from config import llm_config
 from dotenv import load_dotenv
@@ -54,26 +53,19 @@ assistant = AssistantAgent(
     llm_config=llm_config,
 )
 
-register_function(
-    websearch,
-    caller=assistant,
-    executor=user_proxy,
-    description="Search the web for information based on the query.",
-)
+tools = [
+    (websearch, "Search the web for information based on the query."),
+    (webloader, "Load the content of a website from url to text."),
+    (youtubeloader, "Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more."),
+]
 
-register_function(
-    webloader,
-    caller=assistant,
-    executor=user_proxy,
-    description="Load the content of a website from url to text.",
-)
-
-register_function(
-    youtubeloader,
-    caller=assistant,
-    executor=user_proxy,
-    description="Load the subtitles of a YouTube video by url in form such as: https://www.youtube.com/watch?v=..., https://youtu.be/..., or more.",
-)
+for tool, description in tools:
+    register_function(
+        tool,
+        caller=assistant,
+        executor=user_proxy,
+        description=description,
+    )
 
 
 def get_result(question: str) -> ChatResult:
