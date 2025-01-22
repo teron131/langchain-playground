@@ -4,8 +4,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.store.memory import InMemoryStore
 
-from ..Tools import get_tools
 from .llm import get_llm
+from .Tools import get_tools
 
 
 class UniversalChain:
@@ -17,7 +17,6 @@ class UniversalChain:
         """Create a chain with the configured LLM and tools.
 
         Args:
-            provider (str): Provider of the language model.
             model_id (str): ID of the language model to use.
 
         Returns:
