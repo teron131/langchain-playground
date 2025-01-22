@@ -186,11 +186,6 @@ class TreeState(TypedDict):
 
 llm = ChatOpenAI(model="gpt-4o-mini")
 
-search = TavilySearchAPIWrapper()
-tavily_tool = TavilySearchResults(api_wrapper=search, max_results=5)
-tools = [tavily_tool]
-tool_node = ToolNode(tools=tools)
-
 prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -231,7 +226,7 @@ prompt_template = ChatPromptTemplate.from_messages(
 )
 
 
-initial_answer_chain = prompt_template | llm.bind_tools(tools=tools).with_config(run_name="GenerateInitialCandidate")
+initial_answer_chain = prompt_template | llm.with_config(run_name="GenerateInitialCandidate")
 
 
 parser = JsonOutputToolsParser(return_id=True)
@@ -242,10 +237,6 @@ planner_prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """You are a thoughtful planner. Your task is to break down the given problem into clear, logical steps.
-
-Tools can be one of the following:
-(1) Search[input]: Worker that searches results from web. Useful when you need to find short and succinct answers about a specific topic. The input should be a search query.
-(2) LLM[input]: A pretrained LLM like yourself. Useful when you need to act with general world knowledge and common sense. Prioritize it when you are confident in solving the problem yourself. Input can be any instruction.
 
 Begin! 
 Describe your steps with rich details. Each Step should be followed by only one #E.
@@ -285,20 +276,7 @@ def generate_initial_response(state: TreeState) -> dict:
     # Generate initial response for first step
     res = initial_answer_chain.invoke({"input": first_step.tool_input})
     parsed = parser.invoke(res)
-    tool_responses = [
-        tool_node.invoke(
-            {
-                "messages": [
-                    AIMessage(
-                        content="",
-                        tool_calls=[{"name": r["type"], "args": r["args"], "id": r["id"]}],
-                    )
-                ]
-            }
-        )
-        for r in parsed
-    ]
-    output_messages = [res] + [tr["messages"][0] for tr in tool_responses]
+    output_messages = [res]
 
     print("\n📝 Generated outputs:")
     for msg in output_messages:
@@ -379,20 +357,7 @@ def expand(state: TreeState, config: RunnableConfig) -> dict:
             # Generate initial response for next step
             res = initial_answer_chain.invoke({"input": next_step.tool_input})
             parsed = parser.invoke(res)
-            tool_responses = [
-                tool_node.invoke(
-                    {
-                        "messages": [
-                            AIMessage(
-                                content="",
-                                tool_calls=[{"name": r["type"], "args": r["args"], "id": r["id"]}],
-                            )
-                        ]
-                    }
-                )
-                for r in parsed
-            ]
-            output_messages = [res] + [tr["messages"][0] for tr in tool_responses]
+            output_messages = [res]
 
             print("\n📝 Generated outputs:")
             for msg in output_messages:
@@ -418,31 +383,8 @@ def expand(state: TreeState, config: RunnableConfig) -> dict:
     new_candidates = expansion_chain.invoke({"input": current_step.tool_input, "messages": messages}, config)
     parsed = parser.batch(new_candidates)
     flattened = [(i, tool_call) for i, tool_calls in enumerate(parsed) for tool_call in tool_calls]
-    tool_responses = [
-        (
-            i,
-            tool_node.invoke(
-                {
-                    "messages": [
-                        AIMessage(
-                            content="",
-                            tool_calls=[
-                                {
-                                    "name": tool_call["type"],
-                                    "args": tool_call["args"],
-                                    "id": tool_call["id"],
-                                }
-                            ],
-                        )
-                    ]
-                }
-            ),
-        )
-        for i, tool_call in flattened
-    ]
     collected_responses = defaultdict(list)
-    for i, resp in tool_responses:
-        collected_responses[i].append(resp["messages"][0])
+
     output_messages = []
     for i, candidate in enumerate(new_candidates):
         output_messages.append([candidate] + collected_responses[i])
