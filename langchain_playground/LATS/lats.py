@@ -1,11 +1,23 @@
 import math
 import os
-from collections import deque
-from typing import Optional
+from collections import defaultdict, deque
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.output_parsers.openai_tools import (
+    JsonOutputToolsParser,
+    PydanticToolsParser,
+)
+from langchain_core.prompt_values import ChatPromptValue
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import chain as as_runnable
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
@@ -133,38 +145,62 @@ class Node:
             parent = parent.parent
 
 
+class Step(BaseModel):
+    description: str = Field(description="Description of the step")
+    tool: str = Field(description="Tool to use (Search or LLM)")
+    tool_input: str = Field(description="Input for the tool")
+
+
+class Plan(BaseModel):
+    steps: list[Step] = Field(description="List of steps to solve the problem")
+    current_step: int = Field(description="Current step being executed (1-based)", default=1)
+    is_complete: bool = Field(description="Whether all steps have been completed", default=False)
+
+    def next_step(self) -> Optional[Step]:
+        if self.current_step > len(self.steps):
+            self.is_complete = True
+            return None
+        return self.steps[self.current_step - 1]
+
+    def advance(self):
+        self.current_step += 1
+        if self.current_step > len(self.steps):
+            self.is_complete = True
+
+    def get_current_context(self) -> str:
+        """Get context of current step execution for reflection."""
+        if self.current_step > len(self.steps):
+            return "Final solution verification"
+        step = self.steps[self.current_step - 1]
+        return f"Step {self.current_step}: {step.description}"
+
+
 class TreeState(TypedDict):
     # The full tree
     root: Node
     # The original input
     input: str
+    # The execution plan
+    plan: Plan
 
-
-from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(model="gpt-4o-mini")
-
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
-from langgraph.prebuilt import ToolNode
 
 search = TavilySearchAPIWrapper()
 tavily_tool = TavilySearchResults(api_wrapper=search, max_results=5)
 tools = [tavily_tool]
 tool_node = ToolNode(tools=tools)
 
-from langchain_core.output_parsers.openai_tools import (
-    JsonOutputToolsParser,
-    PydanticToolsParser,
-)
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import chain as as_runnable
-
 prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "Reflect and grade the assistant response to the user question below.",
+            """You are a thoughtful evaluator. Your task is to carefully analyze and grade the assistant's response to the user's question. Consider:
+1. Accuracy and correctness of the information
+2. Completeness of the answer
+3. Clarity and coherence
+4. Appropriate use of available tools
+5. Whether the response fully addresses the user's needs""",
         ),
         ("user", "{input}"),
         MessagesPlaceholder(variable_name="candidate"),
@@ -182,9 +218,6 @@ def reflection_chain(inputs) -> Reflection:
         reflection.found_solution = False
     return reflection
 
-
-from langchain_core.prompt_values import ChatPromptValue
-from langchain_core.runnables import RunnableConfig
 
 prompt_template = ChatPromptTemplate.from_messages(
     [
@@ -204,10 +237,53 @@ initial_answer_chain = prompt_template | llm.bind_tools(tools=tools).with_config
 parser = JsonOutputToolsParser(return_id=True)
 
 
+planner_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """You are a thoughtful planner. Your task is to break down the given problem into clear, logical steps.
+
+Tools can be one of the following:
+(1) Search[input]: Worker that searches results from web. Useful when you need to find short and succinct answers about a specific topic. The input should be a search query.
+(2) LLM[input]: A pretrained LLM like yourself. Useful when you need to act with general world knowledge and common sense. Prioritize it when you are confident in solving the problem yourself. Input can be any instruction.
+
+Begin! 
+Describe your steps with rich details. Each Step should be followed by only one #E.
+
+Task: {input}""",
+        ),
+        MessagesPlaceholder(variable_name="messages", optional=True),
+    ]
+)
+
+planner_chain = planner_prompt | llm.bind_tools(tools=[Step, Plan], tool_choice="Plan").with_config(run_name="Planner") | PydanticToolsParser(tools=[Plan])
+
+
 # Define the node we will add to the graph
 def generate_initial_response(state: TreeState) -> dict:
-    """Generate the initial candidate response."""
-    res = initial_answer_chain.invoke({"input": state["input"]})
+    """Generate the initial plan and start executing it."""
+    print("\n🎯 Generating initial plan...")
+    # First generate a plan
+    plan_result = planner_chain.invoke({"input": state["input"]})
+    plan = plan_result[0]
+
+    print("\n📋 Generated Plan:")
+    for i, step in enumerate(plan.steps, 1):
+        print(f"\nStep {i}:")
+        print(f"Description: {step.description}")
+        print(f"Tool: {step.tool}[{step.tool_input}]")
+
+    # Get the first step
+    first_step = plan.next_step()
+    if not first_step:
+        print("\n⚠️ No steps in plan!")
+        return {**state, "plan": plan}
+
+    print(f"\n🚀 Starting execution of Step 1: {first_step.description}")
+    print(f"Using {first_step.tool}: {first_step.tool_input}")
+
+    # Generate initial response for first step
+    res = initial_answer_chain.invoke({"input": first_step.tool_input})
     parsed = parser.invoke(res)
     tool_responses = [
         tool_node.invoke(
@@ -223,11 +299,22 @@ def generate_initial_response(state: TreeState) -> dict:
         for r in parsed
     ]
     output_messages = [res] + [tr["messages"][0] for tr in tool_responses]
-    reflection = reflection_chain.invoke({"input": state["input"], "candidate": output_messages})
+
+    print("\n📝 Generated outputs:")
+    for msg in output_messages:
+        print(f"\n{msg.content}")
+
+    print("\n💭 Reflecting on step execution...")
+    reflection = reflection_chain.invoke({"context": plan.get_current_context(), "input": state["input"], "candidate": output_messages})
+    print(f"Score: {reflection.score}/10")
+    print(f"Reflection: {reflection.reflections}")
+    print(f"Solution found: {'Yes' if reflection.found_solution else 'No'}")
+
     root = Node(output_messages, reflection=reflection)
     return {
         **state,
         "root": root,
+        "plan": plan,
     }
 
 
@@ -250,8 +337,6 @@ def generate_candidates(messages: ChatPromptValue, config: RunnableConfig):
 
 expansion_chain = prompt_template | generate_candidates
 
-from collections import defaultdict
-
 
 def select(root: Node) -> dict:
     """Starting from the root node a child node is selected at each tree level until a leaf node is reached."""
@@ -268,12 +353,69 @@ def select(root: Node) -> dict:
 
 
 def expand(state: TreeState, config: RunnableConfig) -> dict:
-    """Starting from the "best" node in the tree, generate N candidates for the next step."""
+    """Execute the next step in the plan using tree search."""
     root = state["root"]
+    plan = state["plan"]
+    current_step = plan.next_step()
+
+    print(f"\n📍 Current progress:")
+    print(f"Step {plan.current_step}/{len(plan.steps)}: {current_step.description}")
+    print(f"Tree height: {root.height}")
+    print(f"Current step solved: {'Yes' if root.is_solved else 'No'}")
+
+    # If current step is complete, advance to next step
+    if root.is_solved:
+        plan.advance()
+        if plan.is_complete:
+            print("\n✅ All steps completed!")
+            return state
+
+        # Get next step
+        next_step = plan.next_step()
+        if next_step:
+            print(f"\n🚀 Moving to Step {plan.current_step}: {next_step.description}")
+            print(f"Using {next_step.tool}: {next_step.tool_input}")
+
+            # Generate initial response for next step
+            res = initial_answer_chain.invoke({"input": next_step.tool_input})
+            parsed = parser.invoke(res)
+            tool_responses = [
+                tool_node.invoke(
+                    {
+                        "messages": [
+                            AIMessage(
+                                content="",
+                                tool_calls=[{"name": r["type"], "args": r["args"], "id": r["id"]}],
+                            )
+                        ]
+                    }
+                )
+                for r in parsed
+            ]
+            output_messages = [res] + [tr["messages"][0] for tr in tool_responses]
+
+            print("\n📝 Generated outputs:")
+            for msg in output_messages:
+                print(f"\n{msg.content}")
+
+            print("\n💭 Reflecting on step execution...")
+            reflection = reflection_chain.invoke({"context": plan.get_current_context(), "input": state["input"], "candidate": output_messages})
+            print(f"Score: {reflection.score}/10")
+            print(f"Reflection: {reflection.reflections}")
+            print(f"Solution found: {'Yes' if reflection.found_solution else 'No'}")
+
+            root = Node(output_messages, reflection=reflection)
+            state["root"] = root
+            return state
+
+    # Otherwise continue expanding current step
+    print("\n🔄 Continuing current step exploration...")
     best_candidate: Node = select(root)
     messages = best_candidate.get_trajectory()
+
     # Generate N candidates from the single child candidate
-    new_candidates = expansion_chain.invoke({"input": state["input"], "messages": messages}, config)
+    print(f"\n🌱 Generating new candidates for step {plan.current_step}...")
+    new_candidates = expansion_chain.invoke({"input": current_step.tool_input, "messages": messages}, config)
     parsed = parser.batch(new_candidates)
     flattened = [(i, tool_call) for i, tool_calls in enumerate(parsed) for tool_call in tool_calls]
     tool_responses = [
@@ -305,30 +447,47 @@ def expand(state: TreeState, config: RunnableConfig) -> dict:
     for i, candidate in enumerate(new_candidates):
         output_messages.append([candidate] + collected_responses[i])
 
+    print("\n📝 Generated outputs:")
+    for i, msgs in enumerate(output_messages, 1):
+        print(f"\nCandidate {i}:")
+        for msg in msgs:
+            print(f"\n{msg.content}")
+
     # Reflect on each candidate
-    # For tasks with external validation, you'd add that here.
+    print("\n💭 Evaluating candidates...")
     reflections = reflection_chain.batch(
-        [{"input": state["input"], "candidate": msges} for msges in output_messages],
+        [{"context": plan.get_current_context(), "input": state["input"], "candidate": msges} for msges in output_messages],
         config,
     )
+
+    for i, reflection in enumerate(reflections):
+        print(f"\nCandidate {i+1}:")
+        print(f"Score: {reflection.score}/10")
+        print(f"Solution found: {'Yes' if reflection.found_solution else 'No'}")
+
     # Grow tree
-    child_nodes = [Node(cand, parent=best_candidate, reflection=reflection) for cand, reflection in zip(output_messages, reflections)]
+    child_nodes = [
+        Node(
+            cand,
+            parent=best_candidate,
+            reflection=reflection,
+        )
+        for cand, reflection in zip(output_messages, reflections)
+    ]
     best_candidate.children.extend(child_nodes)
-    # We have already extended the tree directly, so we just return the state
     return state
-
-
-from typing import Literal
-
-from langgraph.graph import END, START, StateGraph
 
 
 def should_loop(state: TreeState):
     """Determine whether to continue the tree search."""
     root = state["root"]
-    if root.is_solved:
+    plan = state["plan"]
+
+    if plan.is_complete and root.is_solved:
+        print("\n🎉 Task completed successfully!")
         return END
     if root.height > 5:
+        print("\n⚠️ Maximum tree height reached!")
         return END
     return "expand"
 
@@ -354,17 +513,34 @@ builder.add_conditional_edges(
 
 graph = builder.compile()
 
+# Example usage
 question = "What is the expected maximum dice value if you can roll a 6-sided dice three times?"
+print("\n🎮 Starting execution with question:", question)
 last_step = None
-for step in graph.stream({"input": question}):
+for step in graph.stream({"input": question, "plan": None}):
     last_step = step
     step_name, step_state = next(iter(step.items()))
-    print(step_name)
-    print("rolled out: ", step_state["root"].height)
-    print("---")
+    print("\n" + "=" * 50)
+    print(f"Current phase: {step_name}")
+    print(f"Tree height: {step_state['root'].height if 'root' in step_state else 0}")
+    print(f"Current step: {step_state['plan'].current_step if step_state.get('plan') else 'Planning'}")
+    print("=" * 50)
 
 # Get the root node from the last step regardless of which node it ended on
 step_name, step_state = next(iter(last_step.items()))
 solution_node = step_state["root"].get_best_solution()
-best_trajectory = solution_node.get_trajectory(include_reflections=False)
+best_trajectory = solution_node.get_trajectory(include_reflections=True)
+
+print("\n📊 Final Solution Path:")
+print("=" * 50)
+for i, message in enumerate(best_trajectory):
+    if isinstance(message, HumanMessage):
+        print(f"\n💭 Reflection {i}:")
+        print(message.content)
+    else:
+        print(f"\n🤖 Step {i}:")
+        print(message.content)
+print("=" * 50)
+
+print("\n🎯 Final Answer:")
 print(best_trajectory[-1].content)
