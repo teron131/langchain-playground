@@ -1,11 +1,12 @@
 import os
 
 from langchain.chat_models import init_chat_model
+from langchain_core.language_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
 
-def get_llm(model_id: str):
+def get_llm(model: str = None, model_id: str = None) -> BaseChatModel:
     """Initialize and return a language model based on the model ID.
 
     Args:
@@ -17,6 +18,7 @@ def get_llm(model_id: str):
     Raises:
         ValueError: If the model_id is invalid or initialization fails.
     """
+    model_id = model_id or model
     try:
         if "/" in model_id:
             llm = ChatOpenAI(
