@@ -184,7 +184,9 @@ class TreeState(TypedDict):
     plan: Plan
 
 
-llm = ChatOpenAI(model="gpt-4o-mini")
+from langchain_playground.UniversalChain.llm import get_llm
+
+llm = get_llm(model_id="gpt-4o-mini")
 
 prompt = ChatPromptTemplate.from_messages(
     [
@@ -298,17 +300,13 @@ def generate_initial_response(state: TreeState) -> dict:
 
 # This generates N candidate values
 # for a single input to sample actions from the environment
-
-
 def generate_candidates(messages: ChatPromptValue, config: RunnableConfig):
     n = config["configurable"].get("N", 5)
-    bound_kwargs = llm.bind_tools(tools=tools).kwargs
     chat_result = llm.generate(
         [messages.to_messages()],
         n=n,
         callbacks=config["callbacks"],
         run_name="GenerateCandidates",
-        **bound_kwargs,
     )
     return [gen.message for gen in chat_result.generations[0]]
 
@@ -455,34 +453,46 @@ builder.add_conditional_edges(
 
 graph = builder.compile()
 
+
 # Example usage
-question = "What is the expected maximum dice value if you can roll a 6-sided dice three times?"
-print("\n🎮 Starting execution with question:", question)
-last_step = None
-for step in graph.stream({"input": question, "plan": None}):
-    last_step = step
-    step_name, step_state = next(iter(step.items()))
-    print("\n" + "=" * 50)
-    print(f"Current phase: {step_name}")
-    print(f"Tree height: {step_state['root'].height if 'root' in step_state else 0}")
-    print(f"Current step: {step_state['plan'].current_step if step_state.get('plan') else 'Planning'}")
+def invoke(question: str):
+    print("\n🎮 Starting execution with question:", question)
+    last_step = None
+    for step in graph.stream({"input": question, "plan": None}):
+        last_step = step
+        step_name, step_state = next(iter(step.items()))
+        print("\n" + "=" * 50)
+        print(f"Current phase: {step_name}")
+        print(f"Tree height: {step_state['root'].height if 'root' in step_state else 0}")
+        print(f"Current step: {step_state['plan'].current_step if step_state.get('plan') else 'Planning'}")
+        print("=" * 50)
+
+    # Get the root node from the last step regardless of which node it ended on
+    step_name, step_state = next(iter(last_step.items()))
+    solution_node = step_state["root"].get_best_solution()
+    best_trajectory = solution_node.get_trajectory(include_reflections=True)
+
+    print("\n📊 Final Solution Path:")
+    print("=" * 50)
+    for i, message in enumerate(best_trajectory):
+        if isinstance(message, HumanMessage):
+            print(f"\n💭 Reflection {i}:")
+            print(message.content)
+        else:
+            print(f"\n🤖 Step {i}:")
+            print(message.content)
     print("=" * 50)
 
-# Get the root node from the last step regardless of which node it ended on
-step_name, step_state = next(iter(last_step.items()))
-solution_node = step_state["root"].get_best_solution()
-best_trajectory = solution_node.get_trajectory(include_reflections=True)
+    print("\n🎯 Final Answer:")
+    print(best_trajectory[-1].content)
 
-print("\n📊 Final Solution Path:")
-print("=" * 50)
-for i, message in enumerate(best_trajectory):
-    if isinstance(message, HumanMessage):
-        print(f"\n💭 Reflection {i}:")
-        print(message.content)
-    else:
-        print(f"\n🤖 Step {i}:")
-        print(message.content)
-print("=" * 50)
 
-print("\n🎯 Final Answer:")
-print(best_trajectory[-1].content)
+if __name__ == "__main__":
+    question = """
+An store sells a batch of 60 iPods, 10 of which are defective. Suppose that you purchase 2 iPods from
+this store for your FYP project.
+Suppose that if any of the iPods that you purchased were defective, then you returned them to the
+store to swap for new iPods and you can only go back to the store for one time.
+What is the probability that both the 2 iPods are non-defective?
+    """
+    invoke(question)
