@@ -1,143 +1,40 @@
 import json
 import subprocess
-from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Tuple
 
 from dotenv import load_dotenv
-from langchain import hub
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableLambda
-from langchain_openai import ChatOpenAI
-from opencc import OpenCC
 from pytubefix import YouTube
 
-from .whisper_fal import whisper_fal_transcribe
-from .whisper_hf import whisper_hf_transcribe
-from .whisper_replicate import whisper_replicate_transcribe
+from .llm_formatter import llm_format_txt
+from .utils import response_to_srt, response_to_txt, s2hk, srt_to_txt
+from .whisper import whisper_transcribe
 
 load_dotenv()
 
 BASE_CACHE_DIR = Path(".cache")
 
 
-# File handling functions
-
-
-def create_cache_dir(video_id: str) -> Path:
-    cache_dir = BASE_CACHE_DIR / video_id
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
-
-
-def get_output_path(cache_dir: Path, video_id: str) -> Path:
-    """Get the output path for the given cache directory and video ID."""
-    return cache_dir / video_id
-
-
-def read_file(file_path: Path) -> str:
-    return file_path.read_text(encoding="utf-8")
-
-
-def write_file(file_path: Path, content: str) -> None:
-    file_path.write_text(content, encoding="utf-8")
-
-
-# Subtitle preprocessing functions
-
-
-@lru_cache(maxsize=None)
-def s2hk(content: str) -> str:
-    return OpenCC("s2hk").convert(content)
-
-
-def llm_format_txt(txt_filepath: Path, chunk_size: int = 1000) -> None:
-    """Format subtitles using LLM."""
-    preprocess_subtitles_chain = (
-        hub.pull("preprocess_subtitles")
-        | ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-        )
-        | StrOutputParser()
-        | RunnableLambda(s2hk)
-    )
-
-    subtitles = read_file(txt_filepath)
-    chunked_subtitles = [subtitles[i : i + chunk_size] for i in range(0, len(subtitles), chunk_size)]
-
-    formatted_subtitles = preprocess_subtitles_chain.batch([{"subtitles": chunk} for chunk in chunked_subtitles])
-    formatted_subtitles = "".join(formatted_subtitles)
-
-    write_file(txt_filepath, formatted_subtitles)
-    print(f"Formatted TXT: {txt_filepath}")
-
-
-# Utility functions
-
-
-def convert_time_to_hms(seconds_float: float) -> str:
-    """
-    Converts a time in seconds to 'hh:mm:ss,ms' format for SRT.
+def read_file(file_path: Path | str) -> str:
+    """Read text from a file with UTF-8 encoding.
 
     Args:
-        seconds_float (float): Time in seconds.
+        file_path (Path | str): Path to the file to read
 
     Returns:
-        str: Time in 'hh:mm:ss,ms' format.
+        str: The file contents
     """
-    hours, remainder = divmod(seconds_float, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    milliseconds = int((seconds % 1) * 1000)
-    return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
+    return Path(file_path).read_text(encoding="utf-8")
 
 
-def response_to_srt(result: Dict, srt_path: Path) -> None:
-    """
-    Process the transcription result into SRT format and write to a file.
+def write_file(file_path: Path | str, content: str) -> None:
+    """Write text to a file with UTF-8 encoding.
 
     Args:
-        result (Dict): The transcription result from the Whisper model.
-        srt_path (Path): The path to the output SRT file.
-
-    Returns:
-        None
+        file_path (Path | str): Path to the file to write
+        content (str): Content to write to the file
     """
-    with srt_path.open("w", encoding="utf-8") as srt_file:
-        for counter, chunk in enumerate(result["chunks"], 1):
-            start_time = chunk.get("timestamp", [0])[0]
-            end_time = chunk.get("timestamp", [0, start_time + 2.0])[1]  # Add 2 seconds to fade out
-            start_time_hms = convert_time_to_hms(start_time)
-            end_time_hms = convert_time_to_hms(end_time)
-            transcript = chunk["text"].strip()
-            transcript = s2hk(transcript)
-            srt_entry = f"{counter}\n{start_time_hms} --> {end_time_hms}\n{transcript}\n\n"
-            srt_file.write(srt_entry)
-
-
-def response_to_txt(result: Dict, txt_path: Path) -> None:
-    """
-    Process the transcription result into a plain text format and write to a file.
-
-    Args:
-        result (Dict): The transcription result from the Whisper model.
-        txt_path (Path): The path to the output text file.
-
-    Returns:
-        None
-    """
-    with txt_path.open("w", encoding="utf-8") as txt_file:
-        txt_file.write("\n".join(s2hk(chunk["text"].strip()) for chunk in result["chunks"]))
-
-
-def srt_to_txt(srt_path: Path) -> None:
-    txt_path = srt_path.with_suffix(".txt")
-    content = read_file(srt_path)
-
-    txt_content = "\n".join(s2hk(line.strip()) for line in content.splitlines() if not line.strip().isdigit() and "-->" not in line and line.strip())
-
-    write_file(txt_path, txt_content)
-    print(f"Converted TXT: {txt_path}")
+    Path(file_path).write_text(content, encoding="utf-8")
 
 
 # YouTube video processing functions
@@ -173,8 +70,11 @@ def download_subtitles(youtube: YouTube, output_path: Path) -> None:
     print("No suitable subtitles found for download.")
 
 
-def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str = "fal") -> None:
-    """Process subtitles: download or transcribe as needed."""
+def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -> None:
+    """
+    Process subtitles: download or transcribe as needed.
+    Give preference to the uploader's existing manual captions. If unavailable, use Whisper to transcribe the video, as English automatic captions are bad and nonexistent for Chinese.
+    """
     mp3_path = output_path.with_suffix(".mp3")
     srt_path = output_path.with_suffix(".srt")
     txt_path = output_path.with_suffix(".txt")
@@ -185,7 +85,8 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str = 
         download_subtitles(youtube, output_path)
 
     if srt_path.exists() and not txt_path.exists():
-        srt_to_txt(srt_path)
+        write_file(txt_path, srt_to_txt(read_file(srt_path)))
+        print(f"Converted TXT: {txt_path}")
         return
 
     # Assume 'a.en' always exists if it is English
@@ -195,27 +96,21 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str = 
     elif not available_subtitles or any(lang in available_subtitles for lang in ["zh-HK", "zh-CN"]):
         transcribe_language = "zh"
 
-    if whisper_model == "fal":
-        response = whisper_fal_transcribe(str(mp3_path), language=transcribe_language)
-    elif whisper_model == "hf":
-        response = whisper_hf_transcribe(str(mp3_path))
-    elif whisper_model == "replicate":
-        response = whisper_replicate_transcribe(str(mp3_path))
-    else:
-        raise ValueError(f"Unsupported whisper model: {whisper_model}")
+    response = whisper_transcribe(mp3_path, whisper_model, transcribe_language)
 
-    response_to_srt(response, srt_path)
+    write_file(srt_path, response_to_srt(response))
     print(f"Transcribed SRT: {srt_path}")
 
-    response_to_txt(response, txt_path)
+    write_file(txt_path, response_to_txt(response))
     print(f"Transcribed TXT: {txt_path}")
 
 
-def url_to_subtitles(youtube: YouTube, whisper_model: str = "fal") -> str:
+def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
     """Process a YouTube video: download audio and handle subtitles."""
     try:
-        cache_dir = create_cache_dir(youtube.video_id)
-        output_path = get_output_path(cache_dir, youtube.video_id)
+        cache_dir = BASE_CACHE_DIR / youtube.video_id
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        output_path = cache_dir / youtube.video_id
         txt_path = output_path.with_suffix(".txt")
 
         if txt_path.exists():
@@ -224,7 +119,11 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str = "fal") -> str:
 
         download_audio(youtube, cache_dir, output_path)
         process_subtitles(youtube, output_path, whisper_model)
-        llm_format_txt(txt_path)
+
+        content = read_file(txt_path)
+        formatted_content = llm_format_txt(content)
+        write_file(txt_path, formatted_content)
+        print(f"Formatted TXT: {txt_path}")
 
         return read_file(txt_path)
 
@@ -252,7 +151,7 @@ def po_token_verifier() -> Tuple[str, str]:
     return tokens["visitorData"], tokens["poToken"]
 
 
-def youtubeloader(url: str, whisper_model: str = "fal") -> str:
+def youtubeloader(url: str, whisper_model: str = ["fal", "hf", "replicate"]) -> str:
     """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
