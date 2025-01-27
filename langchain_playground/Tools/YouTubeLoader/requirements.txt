@@ -1,4 +1,5 @@
 fal-client
+replicate
 ipython
 more-itertools
 numpy
