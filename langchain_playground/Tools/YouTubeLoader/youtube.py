@@ -14,32 +14,33 @@ from pytubefix import YouTube
 
 from .whisper_fal import whisper_fal_transcribe
 from .whisper_hf import whisper_hf_transcribe
+from .whisper_replicate import whisper_replicate_transcribe
 
 load_dotenv()
+
+BASE_CACHE_DIR = Path(".cache")
 
 
 # File handling functions
 
 
 def create_cache_dir(video_id: str) -> Path:
-    cache_dir = Path(f".cache/{video_id}")
+    cache_dir = BASE_CACHE_DIR / video_id
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 
 
 def get_output_path(cache_dir: Path, video_id: str) -> Path:
     """Get the output path for the given cache directory and video ID."""
-    return Path(cache_dir / video_id)
+    return cache_dir / video_id
 
 
 def read_file(file_path: Path) -> str:
-    with open(file_path, "r", encoding="utf-8") as file:
-        return file.read()
+    return file_path.read_text(encoding="utf-8")
 
 
 def write_file(file_path: Path, content: str) -> None:
-    with open(file_path, "w", encoding="utf-8") as file:
-        file.write(content)
+    file_path.write_text(content, encoding="utf-8")
 
 
 # Subtitle preprocessing functions
@@ -50,10 +51,8 @@ def s2hk(content: str) -> str:
     return OpenCC("s2hk").convert(content)
 
 
-def llm_format_txt(txt_filepath: str, chunk_size: int = 1000) -> None:
+def llm_format_txt(txt_filepath: Path, chunk_size: int = 1000) -> None:
     """Format subtitles using LLM."""
-    txt_path = Path(txt_filepath).with_suffix(".txt")
-
     preprocess_subtitles_chain = (
         hub.pull("preprocess_subtitles")
         | ChatOpenAI(
@@ -64,14 +63,14 @@ def llm_format_txt(txt_filepath: str, chunk_size: int = 1000) -> None:
         | RunnableLambda(s2hk)
     )
 
-    subtitles = read_file(txt_path)
+    subtitles = read_file(txt_filepath)
     chunked_subtitles = [subtitles[i : i + chunk_size] for i in range(0, len(subtitles), chunk_size)]
 
     formatted_subtitles = preprocess_subtitles_chain.batch([{"subtitles": chunk} for chunk in chunked_subtitles])
     formatted_subtitles = "".join(formatted_subtitles)
 
-    write_file(txt_path, formatted_subtitles)
-    print(f"Formatted TXT: {txt_path}")
+    write_file(txt_filepath, formatted_subtitles)
+    print(f"Formatted TXT: {txt_filepath}")
 
 
 # Utility functions
@@ -93,18 +92,18 @@ def convert_time_to_hms(seconds_float: float) -> str:
     return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
 
 
-def response_to_srt(result: Dict, srt_path: str) -> None:
+def response_to_srt(result: Dict, srt_path: Path) -> None:
     """
     Process the transcription result into SRT format and write to a file.
 
     Args:
         result (Dict): The transcription result from the Whisper model.
-        srt_path (str): The path to the output SRT file.
+        srt_path (Path): The path to the output SRT file.
 
     Returns:
         None
     """
-    with open(srt_path, "w", encoding="utf-8") as srt_file:
+    with srt_path.open("w", encoding="utf-8") as srt_file:
         for counter, chunk in enumerate(result["chunks"], 1):
             start_time = chunk.get("timestamp", [0])[0]
             end_time = chunk.get("timestamp", [0, start_time + 2.0])[1]  # Add 2 seconds to fade out
@@ -116,18 +115,18 @@ def response_to_srt(result: Dict, srt_path: str) -> None:
             srt_file.write(srt_entry)
 
 
-def response_to_txt(result: Dict, txt_path: str) -> None:
+def response_to_txt(result: Dict, txt_path: Path) -> None:
     """
     Process the transcription result into a plain text format and write to a file.
 
     Args:
         result (Dict): The transcription result from the Whisper model.
-        txt_path (str): The path to the output text file.
+        txt_path (Path): The path to the output text file.
 
     Returns:
         None
     """
-    with open(txt_path, "w", encoding="utf-8") as txt_file:
+    with txt_path.open("w", encoding="utf-8") as txt_file:
         txt_file.write("\n".join(s2hk(chunk["text"].strip()) for chunk in result["chunks"]))
 
 
@@ -163,7 +162,7 @@ def download_subtitles(youtube: YouTube, output_path: Path) -> None:
     # Implicit priority
     for lang in ["zh-HK", "zh-CN", "en"]:
         if lang in youtube.captions:
-            youtube.captions[lang].save_captions(filename=srt_path)
+            youtube.captions[lang].save_captions(filename=str(srt_path))
             print(f"Downloaded subtitle: {srt_path}")
             if lang == "zh-CN":
                 content = s2hk(read_file(srt_path))
@@ -200,13 +199,15 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str = 
         response = whisper_fal_transcribe(str(mp3_path), language=transcribe_language)
     elif whisper_model == "hf":
         response = whisper_hf_transcribe(str(mp3_path))
+    elif whisper_model == "replicate":
+        response = whisper_replicate_transcribe(str(mp3_path))
     else:
         raise ValueError(f"Unsupported whisper model: {whisper_model}")
 
-    response_to_srt(response, str(srt_path))
+    response_to_srt(response, srt_path)
     print(f"Transcribed SRT: {srt_path}")
 
-    response_to_txt(response, str(txt_path))
+    response_to_txt(response, txt_path)
     print(f"Transcribed TXT: {txt_path}")
 
 
@@ -223,7 +224,7 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str = "fal") -> str:
 
         download_audio(youtube, cache_dir, output_path)
         process_subtitles(youtube, output_path, whisper_model)
-        llm_format_txt(str(txt_path))
+        llm_format_txt(txt_path)
 
         return read_file(txt_path)
 
@@ -239,7 +240,11 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str = "fal") -> str:
 def po_token_verifier() -> Tuple[str, str]:
     """Get YouTube authentication tokens using node.js generator and return as tuple."""
     result = subprocess.run(
-        ["node", "-e", "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));"],
+        [
+            "node",
+            "-e",
+            "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));",
+        ],
         capture_output=True,
         text=True,
     )
@@ -247,7 +252,7 @@ def po_token_verifier() -> Tuple[str, str]:
     return tokens["visitorData"], tokens["poToken"]
 
 
-def youtubeloader(url: str) -> str:
+def youtubeloader(url: str, whisper_model: str = "fal") -> str:
     """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
@@ -266,6 +271,6 @@ def youtubeloader(url: str) -> str:
         f"Title: {yt.title}",
         f"Author: {yt.author}",
         "Subtitles:",
-        url_to_subtitles(yt, whisper_model="fal"),
+        url_to_subtitles(yt, whisper_model),
     ]
     return "\n".join(content)
