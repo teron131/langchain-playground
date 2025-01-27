@@ -8,7 +8,7 @@ from .utils import s2hk
 
 def llm_format_txt(content: str, chunk_size: int = 1000) -> str:
     """Format text content using LLM.
-
+    Note that Chinese are longer than it seems.
     Args:
         content (str): The text content to format
         chunk_size (int, optional): Size of chunks to process. Defaults to 1000.
