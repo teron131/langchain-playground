@@ -1,6 +1,8 @@
+import json
+import subprocess
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 from dotenv import load_dotenv
 from langchain import hub
@@ -147,7 +149,7 @@ def download_audio(youtube: YouTube, cache_dir: Path, output_path: Path) -> None
     if mp3_path.exists():
         print(f"Audio file already exists: {mp3_path}")
         return
-    youtube.streams.get_audio_only().download(output_path=str(cache_dir), filename=youtube.video_id, mp3=True)
+    youtube.streams.get_audio_only().download(output_path=str(cache_dir), filename=youtube.video_id + ".mp3")
     print(f"Downloaded audio: {mp3_path}")
 
 
@@ -208,10 +210,9 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str = 
     print(f"Transcribed TXT: {txt_path}")
 
 
-def url_to_subtitles(url: str, whisper_model: str = "fal") -> str:
+def url_to_subtitles(youtube: YouTube, whisper_model: str = "fal") -> str:
     """Process a YouTube video: download audio and handle subtitles."""
     try:
-        youtube = YouTube(url)
         cache_dir = create_cache_dir(youtube.video_id)
         output_path = get_output_path(cache_dir, youtube.video_id)
         txt_path = output_path.with_suffix(".txt")
@@ -227,12 +228,23 @@ def url_to_subtitles(url: str, whisper_model: str = "fal") -> str:
         return read_file(txt_path)
 
     except Exception as e:
-        error_message = f"Error processing video {url}: {str(e)}"
+        error_message = f"Error processing video {youtube.title}: {str(e)}"
         print(error_message)
         return error_message
 
 
 # Main function
+
+
+def po_token_verifier() -> Tuple[str, str]:
+    """Get YouTube authentication tokens using node.js generator and return as tuple."""
+    result = subprocess.run(
+        ["node", "-e", "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));"],
+        capture_output=True,
+        text=True,
+    )
+    tokens = json.loads(result.stdout)
+    return tokens["visitorData"], tokens["poToken"]
 
 
 def youtubeloader(url: str) -> str:
@@ -244,12 +256,16 @@ def youtubeloader(url: str) -> str:
     Returns:
         str: Formatted string containing the video title, author and subtitles
     """
-    yt = YouTube(url)
+    yt = YouTube(
+        url,
+        use_po_token=True,
+        po_token_verifier=po_token_verifier,
+    )
     content = [
         "Answer the user's question based on the full content.",
         f"Title: {yt.title}",
         f"Author: {yt.author}",
         "Subtitles:",
-        url_to_subtitles(url),
+        url_to_subtitles(yt, whisper_model="fal"),
     ]
     return "\n".join(content)
