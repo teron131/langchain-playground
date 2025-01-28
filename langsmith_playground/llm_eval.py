@@ -24,15 +24,15 @@ examples = [
     ),
 ]
 
-inputs = [{"question": input_prompt} for input_prompt, _ in examples]
-outputs = [{"answer": output_answer} for _, output_answer in examples]
+questions = [{"question": input_prompt} for input_prompt, _ in examples]
+answers = [{"answer": output_answer} for _, output_answer in examples]
 
 try:
     # Programmatically create a dataset in LangSmith
     dataset = client.create_dataset(dataset_name="Sample dataset", description="A sample dataset in LangSmith.")
 
     # Add examples to the dataset
-    client.create_examples(inputs=inputs, outputs=outputs, dataset_id=dataset.id)
+    client.create_examples(inputs=questions, outputs=answers, dataset_id=dataset.id)
 except Exception as e:
     pass
 
@@ -44,7 +44,7 @@ def target(inputs: dict) -> dict:
     llm = ChatOpenAI(model="gpt-4o-mini")
     chain = prompt | llm
     response = chain.invoke({"question": inputs["question"]})
-    return {"response": response.content}
+    return {"attempted_answer": response.content}
 
 
 # Define instructions for the LLM judge evaluator
@@ -57,21 +57,31 @@ instructions = """Evaluate Student Answer against Ground Truth for conceptual si
 
 # Define output schema for the LLM judge
 class Grade(BaseModel):
-    score: bool = Field(description="Boolean that indicates whether the response is accurate relative to the reference answer")
+    score: bool = Field(description="Boolean that indicates whether the attempted answer is accurate relative to the ground truth answer")
+    explanation: str = Field(description="Explanation of the grading decision")
 
 
 # Define LLM judge that grades the accuracy of the response relative to reference output
-def accuracy(outputs: dict, reference_outputs: dict) -> bool:
+def accuracy(outputs: dict, reference_outputs: dict) -> list[dict]:
+    """Evaluate the accuracy of the attempted answer relative to the ground truth answer with explanation.
+
+    Returns:
+        list[dict]: Contains the boolean score and explanation from the LLM judge
+    """
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", instructions),
-            ("user", "Ground Truth answer: {answer}; Student's Answer: {response}"),
+            ("user", "Ground Truth answer: {ground_truth_answer}; Attempted Answer: {attempted_answer}"),
         ]
     )
     llm = ChatOpenAI(model="gpt-4o-mini")
     chain = prompt | llm.with_structured_output(Grade)
-    response = chain.invoke({"answer": reference_outputs["answer"], "response": outputs["response"]})
-    return response.score
+    response = chain.invoke({"ground_truth_answer": reference_outputs["answer"], "attempted_answer": outputs["attempted_answer"]})
+
+    return [
+        {"key": "accuracy", "score": response.score},
+        {"key": "explanation", "value": response.explanation},
+    ]
 
 
 # After running the evaluation, a link will be provided to view the results in langsmith
