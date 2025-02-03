@@ -24,8 +24,8 @@ examples = [
     ),
 ]
 
-questions = [{"question": input_prompt} for input_prompt, _ in examples]
-answers = [{"answer": output_answer} for _, output_answer in examples]
+questions = [{"question": question} for question, _ in examples]
+answers = [{"answer": answer} for _, answer in examples]
 
 try:
     # Programmatically create a dataset in LangSmith
@@ -71,12 +71,12 @@ def accuracy(outputs: dict, reference_outputs: dict) -> list[dict]:
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", instructions),
-            ("user", "Ground Truth answer: {ground_truth_answer}; Attempted Answer: {attempted_answer}"),
+            ("user", "Ground Truth: {ground_truth}; Attempted Answer: {attempted_answer}"),
         ]
     )
     llm = ChatOpenAI(model="gpt-4o-mini")
     chain = prompt | llm.with_structured_output(Grade)
-    response = chain.invoke({"ground_truth_answer": reference_outputs["answer"], "attempted_answer": outputs["attempted_answer"]})
+    response = chain.invoke({"ground_truth": reference_outputs["answer"], "attempted_answer": outputs["attempted_answer"]})
 
     return [
         {"key": "accuracy", "score": response.score},
