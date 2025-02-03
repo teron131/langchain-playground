@@ -96,7 +96,7 @@ def model_b_chain(inputs: dict) -> dict:
     """Generate response using second model."""
     prompt = ChatPromptTemplate.from_messages([("user", "{question}")])
     llm2 = ChatOpenAI(
-        model="mistralai/mistral-small-24b-instruct-2501",
+        model="anthropic/claude-3.5-haiku",
         api_key=os.getenv("OPENROUTER_API_KEY"),
         base_url="https://openrouter.ai/api/v1",
     )
@@ -132,7 +132,7 @@ def ranked_preference(inputs: dict, outputs: list[dict]) -> list:
         """Result of the preference evaluation between two AI responses"""
 
         preferred_assistant: Literal["A", "B", "Tie"] = Field(..., description="Which assistant provided the better response - A, B, or Tie if equal")
-        explanation: str = Field(..., description="Detailed explanation of the reasoning behind the preference, analyzing the quality, accuracy, and effectiveness of the responses")
+        # explanation: str = Field(..., description="Detailed explanation of the reasoning behind the preference, analyzing the quality, accuracy, and effectiveness of the responses")
 
     # See the prompt: https://smith.langchain.com/hub/langchain-ai/pairwise-evaluation-2
     # prompt = hub.pull("langchain-ai/pairwise-evaluation-2")
