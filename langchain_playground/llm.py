@@ -26,7 +26,7 @@ def get_llm(model: str = None, model_id: str = None) -> BaseChatModel:
                 api_key=os.getenv("OPENROUTER_API_KEY"),
                 base_url="https://openrouter.ai/api/v1",
             )
-        elif "gpt" in model_id or "o1" in model_id:
+        elif "gpt" in model_id or "o1" in model_id or "o3" in model_id:
             llm = ChatOpenAI(
                 model=model_id,
                 api_key=os.getenv("OPENAI_API_KEY"),
