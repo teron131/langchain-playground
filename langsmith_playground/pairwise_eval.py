@@ -3,6 +3,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from langchain.prompts import ChatPromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langsmith import Client, evaluate
 from pydantic import BaseModel, Field
@@ -29,6 +30,19 @@ try:
 except Exception:
     pass
 
+# Define model response generators
+llm1 = ChatOpenAI(model="gpt-4o-mini")
+llm2 = ChatOpenAI(
+    model="anthropic/claude-3.5-sonnet",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+)
+judge_model = ChatOpenAI(
+    model="qwen/qwen-max",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+)
+
 
 # Evaluators
 def ranked_preference(inputs: dict, outputs: list[dict]) -> list:
@@ -52,8 +66,7 @@ def ranked_preference(inputs: dict, outputs: list[dict]) -> list:
         ]
     )
 
-    model = ChatOpenAI(model="gpt-4o-mini")
-    chain = prompt | model.with_structured_output(PreferenceResult)
+    chain = prompt | judge_model.with_structured_output(PreferenceResult)
     response = chain.invoke(
         {
             "question": inputs["question"],
@@ -83,8 +96,7 @@ def task_fulfillment_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> li
             ("human", "{question}"),
         ]
     )
-    condition_model = ChatOpenAI(model="gpt-4o-mini")
-    condition_chain = condition_prompt | condition_model.with_structured_output(TaskExistence)
+    condition_chain = condition_prompt | judge_model.with_structured_output(TaskExistence)
     condition_response = condition_chain.invoke({"question": inputs["question"]})
     if condition_response.task_exists:
         return [1, 1]
@@ -128,9 +140,7 @@ Your final score should be the sum of these criteria. Be extremely critical and 
                 ("human", "[Question:] {question}\n[Answer:] {answer}"),
             ]
         )
-
-        model = ChatOpenAI(model="gpt-4o-mini")
-        chain = prompt | model.with_structured_output(TaskFulfillmentResult)
+        chain = prompt | judge_model.with_structured_output(TaskFulfillmentResult)
         response = chain.invoke({"question": question, "answer": answer})
         return response.rating
 
@@ -189,9 +199,7 @@ Most responses should score in the lower half of the range. Reserve high scores 
                 ("human", "[Question:] {question}\n[Answer:] {answer}"),
             ]
         )
-
-        model = ChatOpenAI(model="gpt-4o-mini")
-        chain = prompt | model.with_structured_output(ValidReasoningResult)
+        chain = prompt | judge_model.with_structured_output(ValidReasoningResult)
         response = chain.invoke(
             {
                 "question": question,
@@ -248,9 +256,7 @@ Be extremely critical. Most responses should score in the bottom half of each ra
                 ("human", "[Question:] {question}\n[Answer:] {answer}"),
             ]
         )
-
-        model = ChatOpenAI(model="gpt-4o-mini")
-        chain = prompt | model.with_structured_output(StyleReadabilityResult)
+        chain = prompt | judge_model.with_structured_output(StyleReadabilityResult)
         response = chain.invoke({"question": question, "answer": answer})
         return response.rating
 
@@ -268,21 +274,13 @@ def weighted_average(inputs: dict, outputs: list[dict]) -> list:
     style_scores = style_evaluator_pairwise(inputs, outputs)
 
     # Calculate weighted average for each model
-    weights = [0.4, 0.3, 0.2, 0.1]  # Preference, Task, Reasoning, Style weights
+    # weights = [0.4, 0.3, 0.2, 0.1]  # Preference, Task, Reasoning, Style weights
+    weights = [1, 1, 1, 1]  # Preference, Task, Reasoning, Style weights
     scores = [preference_scores, task_scores, reasoning_scores, style_scores]
     model_a_score = sum(score[0] * weight for score, weight in zip(scores, weights))
     model_b_score = sum(score[1] * weight for score, weight in zip(scores, weights))
 
     return [model_a_score, model_b_score]
-
-
-# Define model response generators
-llm1 = ChatOpenAI(model="gpt-4o-mini")
-llm2 = ChatOpenAI(
-    model="anthropic/claude-3.5-sonnet",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
-)
 
 
 # Models generate responses
