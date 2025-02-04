@@ -1,8 +1,35 @@
-ipython
+# Core LangChain dependencies
 langchain
 langchain-community
 langchain-openai
-autogen
-pytubefix
-opencc
+langchain-google-genai
+
+# LLM API Clients
+openai
+google-generativeai
+
+# UI and Interface
+gradio
+
+# Data Processing
+numpy
+pandas
+pillow
 python-dotenv
+pydantic
+
+# Media Processing
+pytubefix
+openai-whisper
+transformers
+torch
+optimum
+tiktoken
+
+# Utilities
+httpx
+tqdm
+ipython
+more-itertools
+fal-client
+opencc-python-reimplemented
