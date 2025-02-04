@@ -43,26 +43,44 @@ setup(
         ],
     },
     install_requires=[
-        # Core LangChain dependencies
+        # Core Dependencies
+        "numpy",
+        "pandas",
+        "pydantic",
+        "python-dotenv",
+
+        # LangChain Framework
         "langchain",
         "langchain-community",
+        "langchain-google-genai",
         "langchain-openai",
-        "langchain-together",
-        # UI and Interface
-        "gradio",
-        # YouTubeLoader dependencies
+        "langgraph",
+        "langsmith",
+        "openai",
+
+        # Providers
         "fal-client",
-        "ipython",
-        "more-itertools",
-        "numpy",
+        "google-genai",
+        "replicate",
+
+        # Media Processing
         "openai-whisper",
-        "opencc-python-reimplemented",
         "optimum",
+        "pillow",
         "pytubefix",
-        "python-dotenv",
         "tiktoken",
         "torch",
         "transformers",
+
+        # Document Processing
+        "docling",
+        "opencc-python-reimplemented",
+        "tavily-python",
+
+        # Utilities
+        "httpx",
+        "ipython",
+        "more-itertools",
         "tqdm",
     ],
     python_requires=">=3.9",

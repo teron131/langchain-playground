@@ -135,7 +135,7 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
 
 # Main function
 
-
+# npm install -g npm@11.1.0
 def po_token_verifier() -> Tuple[str, str]:
     """Get YouTube authentication tokens using node.js generator and return as tuple."""
     result = subprocess.run(

@@ -1,24 +1,25 @@
-# Core LangChain dependencies
+# Core Dependencies
+python-dotenv
+pydantic
+numpy
+pandas
+
+# LangChain Framework
 langchain
 langchain-community
 langchain-openai
-langchain-google-genai
-
-# LLM API Clients
 openai
-google-generativeai
+langchain_google_genai
+langgraph
+langsmith
 
-# UI and Interface
-gradio
-
-# Data Processing
-numpy
-pandas
-pillow
-python-dotenv
-pydantic
+# Providers
+google-genai
+replicate
+fal-client
 
 # Media Processing
+pillow
 pytubefix
 openai-whisper
 transformers
@@ -26,10 +27,13 @@ torch
 optimum
 tiktoken
 
+# Document Processing
+docling
+opencc-python-reimplemented
+tavily-python
+
 # Utilities
 httpx
 tqdm
 ipython
 more-itertools
-fal-client
-opencc-python-reimplemented
