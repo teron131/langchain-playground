@@ -134,7 +134,7 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
 def websearch(query: str) -> str:
     """Search the web for information based on the query.
 
-    args:
+    Args:
         query (str): Search query string
 
     Returns:
