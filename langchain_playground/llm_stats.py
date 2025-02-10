@@ -1,13 +1,54 @@
 import os
+import re
 import warnings
 from typing import ClassVar, Dict, List, Literal, Union
 
+import pandas as pd
+from datasets import load_dataset
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 warnings.filterwarnings("ignore")
 
 load_dotenv()
+
+
+ELO_FILE = "model_elo.pkl"
+
+
+def load_elo_data() -> pd.DataFrame:
+    if os.path.exists(ELO_FILE):
+        return pd.read_pickle(ELO_FILE)
+    else:
+        dataset = load_dataset("mathewhe/chatbot-arena-elo", split="train")
+        df = dataset.to_pandas()
+
+        df = df[["Rank* (UB)", "Model", "Arena Score"]]
+        df.loc[:, "Model"] = df["Model"].str.lower()
+
+        # Remove parentheses content and trailing date patterns
+        df.loc[:, "Model"] = df["Model"].apply(lambda x: re.sub(r"\s*\([^)]*\)|\s*-\d{2}-\d{2}(?!\d)|\s*-\d{4}-\d{2}-\d{2}|\s*-\d{4}|\s*-\d{6}|\s*-\d{8}", "", x).strip())
+
+        df.loc[:, "Model"] = df["Model"].apply(lambda x: x.replace(" ", "-"))
+
+        # Merge duplicate rows (if any) by grouping on Rank* (UB) and Model
+        # and taking the maximum Arena Score per group
+        df = df.groupby(["Model"], as_index=False).agg({"Arena Score": "max", "Rank* (UB)": "min"})
+
+        df = df.sort_values(by="Rank* (UB)").reset_index(drop=True)
+        df = df[["Rank* (UB)", "Model", "Arena Score"]]
+        df.to_pickle(ELO_FILE)
+        return df
+
+
+df = load_elo_data()
+
+
+def lookup_elo(model: str) -> int:
+    matches = df[df["Model"] == model.lower()]
+    if len(matches) == 0:
+        return None
+    return int(matches["Arena Score"].iloc[0])
 
 
 class BaseLLMwithStats(ChatOpenAI):
@@ -47,7 +88,7 @@ MODEL_CONFIGS = {
     "gpt4omini": {
         "model_name": "openai/gpt-4o-mini",
         "model_type": "chat",
-        "elo": 1273,
+        "elo": lookup_elo("gpt-4o-mini"),
         "latency": 0.36,
         "throughput": 62.23,
         "input_price_per_1k": 0.15,
@@ -56,7 +97,7 @@ MODEL_CONFIGS = {
     "gpt4o": {
         "model_name": "openai/gpt-4o",
         "model_type": "chat",
-        "elo": 1365,
+        "elo": lookup_elo("gpt-4o"),
         "latency": 0.32,
         "throughput": 67.58,
         "input_price_per_1k": 2.5,
@@ -65,7 +106,7 @@ MODEL_CONFIGS = {
     "o1mini": {
         "model_name": "openai/o1-mini",
         "model_type": "reasoning",
-        "elo": 1305,
+        "elo": lookup_elo("o1-mini"),
         "latency": 1.17,
         "throughput": 183.9,
         "input_price_per_1k": 1.1,
@@ -75,7 +116,7 @@ MODEL_CONFIGS = {
     "geminiexp": {
         "model_name": "google/gemini-exp-1206:free",
         "model_type": "chat",
-        "elo": 1373,
+        "elo": lookup_elo("gemini-exp-1206"),
         "latency": 0.79,
         "throughput": 44.97,
         "input_price_per_1k": 0,
@@ -84,7 +125,7 @@ MODEL_CONFIGS = {
     "gemini20flash": {
         "model_name": "google/gemini-2.0-flash-exp:free",
         "model_type": "chat",
-        "elo": 1356,
+        "elo": lookup_elo("gemini-2.0-flash-exp"),
         "latency": 1.05,
         "throughput": 120.5,
         "input_price_per_1k": 0,
@@ -93,7 +134,7 @@ MODEL_CONFIGS = {
     "gemini20flashthinking": {
         "model_name": "google/gemini-2.0-flash-thinking-exp:free",
         "model_type": "reasoning",
-        "elo": 1384,
+        "elo": lookup_elo("gemini-2.0-flash-thinking-exp"),
         "latency": 4.45,
         "throughput": 228.4,
         "input_price_per_1k": 0,
@@ -103,7 +144,7 @@ MODEL_CONFIGS = {
     "claude35sonnet": {
         "model_name": "anthropic/claude-3.5-sonnet",
         "model_type": "chat",
-        "elo": 1283,
+        "elo": lookup_elo("claude-3.5-sonnet"),
         "latency": 1.48,
         "throughput": 55.66,
         "input_price_per_1k": 3,
@@ -113,7 +154,7 @@ MODEL_CONFIGS = {
     "deepseekr1distillqwen32b": {
         "model_name": "deepseek/deepseek-r1-distill-qwen-32b",
         "model_type": "reasoning",
-        "elo": 1305,
+        "elo": lookup_elo("deepseek-r1-distill-qwen-32b"),
         "latency": 0.18,
         "throughput": 34.53,
         "input_price_per_1k": 0.12,
@@ -122,7 +163,7 @@ MODEL_CONFIGS = {
     "deepseekr1distillllama70b": {
         "model_name": "deepseek/deepseek-r1-distill-llama-70b",
         "model_type": "reasoning",
-        "elo": 1305,
+        "elo": lookup_elo("deepseek-r1-distill-llama-70b"),
         "latency": 0.36,
         "throughput": 31.18,
         "input_price_per_1k": 0.23,
@@ -131,7 +172,7 @@ MODEL_CONFIGS = {
     "deepseekr1": {
         "model_name": "deepseek/deepseek-r1",
         "model_type": "reasoning",
-        "elo": 1361,
+        "elo": lookup_elo("deepseek-r1"),
         "latency": 0.72,
         "throughput": 10.54,
         "input_price_per_1k": 0.8,
