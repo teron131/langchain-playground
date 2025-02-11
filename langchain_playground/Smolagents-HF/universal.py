@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from smolagents import CodeAgent, LiteLLMModel, tool
+from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent, tool
 
 from langchain_playground.Tools import webloader, websearch, youtubeloader
 
@@ -58,5 +58,8 @@ def invoke(question: str):
 
 
 if __name__ == "__main__":
-    response = invoke("What is the capital of France?")
+    question = """
+Cyberpunk 2077 \u2014 Never Fade Away by P. T. Adamczyk & Olga Jankowska (SAMURAI Cover)\n\nWe lost everything\nWe had to pay the price\nYeah we lost everything\nWe had to pay the price\nI saw in you what life was missing\nYou lit a flame that consumed my hate\nI'm not one for reminiscing but\nI'd trade it all for your sweet embrace\nYeah\n'Cause we lost everything\nWe had to pay the price\nThere's a canvas with two faces\nOf fallen angels who loved and lost\nIt was a passion for the ages\nAnd in the end guess we paid the cost\nA thing of beauty, I know\nWill never fade away\nWhat you did to me, I know\nSaid what you had to say\nBut a thing of beauty\nWill never fade away\nWill never fade away\nWill never fade away\nI see your eyes, I know you see me\nYou're like a ghost how you're everywhere\nI'm your demon never leaving\nA metal soul of rage and fear\nThat one thing that changed it all\nThat one sin that caused the fall\nA thing of beauty, I know\nWill never fade away\nWhat you did to me, I know\nSaid what you had to say\nBut a thing of beauty, I know\nWill never fade away\nAnd I'll do my duty, I know\nSomehow I'll find a way\nBut a thing of beauty\nWill never fade away\nAnd I'll do my duty\nYeah\nWe'll never fade away\nWe'll never fade away\nWe'll never fade away\nWe'll never fade away\n\nWritten and composed by Johnny Silverhand, \"Never Fade Away\" was part of his 2013 album A Cool Metal Fire under the label of Universal Media.[1][2] Some time afterwards he released the song again in an album titled Never Fade Away. Finally, after the Samurai reunion, another version with the rest of the band was recorded. By 2077, the Samurai version was usually played on 107.3 Morro Rock Radio.\n\nCan you analyze this lyrics?
+"""
+    response = invoke(question)
     print(response)
