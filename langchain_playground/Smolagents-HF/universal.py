@@ -54,4 +54,5 @@ agent = CodeAgent(
 
 
 def invoke(question: str):
+    agent.visualize()
     return agent.run(question)
