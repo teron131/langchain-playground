@@ -1,7 +1,7 @@
 import re
 from typing import Dict, List, Optional, Tuple
 
-from .utils import is_rich_text_block
+from utils import is_rich_text_block
 
 
 ## BLOCK TO MARKDOWN

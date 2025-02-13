@@ -1,10 +1,11 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from typing import List
 
-from IPython.display import display
-
-from .formatters import BaseFormatter, LatexFormatter, Rephraser
-from .markdown import blocks_to_markdown, markdown_to_blocks
-from .notion_api import NotionAPI
+from formatters import BaseFormatter, LatexFormatter
+from notion_api import NotionAPI
 
 
 def process_with_formatters(blocks: List[dict], formatters: List[BaseFormatter]) -> None:
@@ -20,10 +21,7 @@ def process_with_formatters(blocks: List[dict], formatters: List[BaseFormatter])
 
 
 if __name__ == "__main__":
-    notion_api = NotionAPI()
-    rephraser = Rephraser(notion_api)
+    notion_api = NotionAPI(PAGE_ID="196bb2c6d133804a910bddd4596647db")
     blocks = notion_api.read_blocks()
-    markdown = blocks_to_markdown(blocks)
-    rephrased_markdown = rephraser.rephrase_text(markdown)
-    rephrased_blocks = markdown_to_blocks(rephrased_markdown)
-    notion_api.write_blocks(rephrased_blocks)
+    process_with_formatters(blocks, [LatexFormatter(notion_api)])
+    notion_api.write_blocks(blocks)
