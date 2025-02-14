@@ -32,7 +32,7 @@ def webloader_docling(url: str) -> str:
     Returns:
         str: Formatted string containing the website URL followed by the processed content
     """
-    converter = DocumentConverter(allowed_formats=["html"])
+    converter = DocumentConverter()
     result = converter.convert(url)
     return result.document.export_to_markdown()
 
