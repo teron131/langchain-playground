@@ -1,7 +1,7 @@
 import gradio as gr
 from dotenv import load_dotenv
 
-from src.UniversalChain import UniversalChain
+from langchain_playground.UniversalChain import UniversalChain
 
 load_dotenv()
 

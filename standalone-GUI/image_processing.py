@@ -54,4 +54,4 @@ def resize_base64_image(image_source: Union[str, Image.Image], max_size: Tuple[i
 
 def plt_img_base64(image_data: str) -> None:
     """Display a base64 encoded image."""
-    display(HTML(f'<img src="data:image/jpeg;base64,{image_data}" />'))
+    display(HTML(f'<img langchain_playground="data:image/jpeg;base64,{image_data}" />'))

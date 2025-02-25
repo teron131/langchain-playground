@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent, tool
 
-from src.Tools import webloader, websearch, youtubeloader
+from langchain_playground.Tools import webloader, websearch, youtubeloader
 
 load_dotenv()
 
