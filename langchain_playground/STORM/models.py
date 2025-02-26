@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field
 
 
 class Subsection(BaseModel):
-    subsection_title: str = Field(..., title="Title of the subsection")
-    description: str = Field(..., title="Content of the subsection")
+    subsection_title: str = Field(title="Title of the subsection")
+    description: str = Field(title="Content of the subsection")
 
     @property
     def as_str(self) -> str:
@@ -13,8 +13,8 @@ class Subsection(BaseModel):
 
 
 class Section(BaseModel):
-    section_title: str = Field(..., title="Title of the section")
-    description: str = Field(..., title="Content of the section")
+    section_title: str = Field(title="Title of the section")
+    description: str = Field(title="Content of the section")
     subsections: Optional[List[Subsection]] = Field(default=None, title="Titles and descriptions for each subsection of the Wikipedia page.")
 
     @property
@@ -24,7 +24,7 @@ class Section(BaseModel):
 
 
 class Outline(BaseModel):
-    page_title: str = Field(..., title="Title of the Wikipedia page")
+    page_title: str = Field(title="Title of the Wikipedia page")
     sections: List[Section] = Field(default_factory=list, title="Titles and descriptions for each section of the Wikipedia page.")
 
     @property
@@ -68,8 +68,8 @@ class Queries(BaseModel):
 
 
 class SubSection(BaseModel):
-    subsection_title: str = Field(..., title="Title of the subsection")
-    content: str = Field(..., title="Full content of the subsection. Include [#] citations to the cited sources where relevant.")
+    subsection_title: str = Field(title="Title of the subsection")
+    content: str = Field(title="Full content of the subsection. Include [#] citations to the cited sources where relevant.")
 
     @property
     def as_str(self) -> str:
@@ -77,8 +77,8 @@ class SubSection(BaseModel):
 
 
 class WikiSection(BaseModel):
-    section_title: str = Field(..., title="Title of the section")
-    content: str = Field(..., title="Full content of the section")
+    section_title: str = Field(title="Title of the section")
+    content: str = Field(title="Full content of the section")
     subsections: Optional[List[Subsection]] = Field(default=None, title="Titles and descriptions for each subsection of the Wikipedia page.")
     citations: List[str] = Field(default_factory=list)
 

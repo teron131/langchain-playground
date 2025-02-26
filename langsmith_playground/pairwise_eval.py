@@ -7,7 +7,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langsmith import Client, evaluate
 from pydantic import BaseModel, Field
-
 from questions import questions
 
 load_dotenv()
@@ -54,8 +53,8 @@ def ranked_preference(inputs: dict, outputs: list[dict]) -> list:
     class PreferenceResult(BaseModel):
         """Result of the preference evaluation between two AI responses"""
 
-        preferred_assistant: Literal["A", "B", "Tie"] = Field(..., description="Which assistant provided the better response - A, B, or Tie if equal")
-        explanation: str = Field(..., description="Detailed explanation of the reasoning behind the preference, analyzing the quality, accuracy, and effectiveness of the responses")
+        preferred_assistant: Literal["A", "B", "Tie"] = Field(description="Which assistant provided the better response - A, B, or Tie if equal")
+        explanation: str = Field(description="Detailed explanation of the reasoning behind the preference, analyzing the quality, accuracy, and effectiveness of the responses")
 
     # See the prompt: https://smith.langchain.com/hub/langchain-ai/pairwise-evaluation-2
     # prompt = hub.pull("langchain-ai/pairwise-evaluation-2")
@@ -88,7 +87,7 @@ def task_fulfillment_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> li
     """Evaluate how well the response fulfills the user's task instructions."""
 
     class TaskExistence(BaseModel):
-        task_exists: bool = Field(..., description="Whether the question includes explicit task instructions that the answer should fulfill")
+        task_exists: bool = Field(description="Whether the question includes explicit task instructions that the answer should fulfill")
 
     condition_prompt = ChatPromptTemplate.from_messages(
         [
@@ -105,8 +104,8 @@ def task_fulfillment_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> li
         """Evaluate if the response fulfills the task instructions adequately."""
 
         class TaskFulfillmentResult(BaseModel):
-            rating: int = Field(..., description="How well the response fulfills the task instructions, from 0 to 10", ge=0, le=10)
-            explanation: str = Field(..., description="Explanation of the evaluation of task fulfillment")
+            rating: int = Field(description="How well the response fulfills the task instructions, from 0 to 10", ge=0, le=10)
+            explanation: str = Field(description="Explanation of the evaluation of task fulfillment")
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -158,8 +157,8 @@ def valid_reasoning_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> lis
         class ValidReasoningResult(BaseModel):
             """Result of the preference evaluation between two AI responses"""
 
-            rating: int = Field(..., description="How well the reasoning is valid, from 0 to 10", ge=0, le=10)
-            explanation: str = Field(..., description="Explanation of the reasoning behind the rating")
+            rating: int = Field(description="How well the reasoning is valid, from 0 to 10", ge=0, le=10)
+            explanation: str = Field(description="Explanation of the reasoning behind the rating")
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -221,8 +220,8 @@ def style_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> list:
         """Evaluate the presentation aspects of the response."""
 
         class StyleReadabilityResult(BaseModel):
-            rating: int = Field(..., description="Rating for formatting, readability, style matching, originality, and non-redundancy on a scale of 0 to 10", ge=0, le=10)
-            explanation: str = Field(..., description="Explanation of the evaluation regarding presentation aspects")
+            rating: int = Field(description="Rating for formatting, readability, style matching, originality, and non-redundancy on a scale of 0 to 10", ge=0, le=10)
+            explanation: str = Field(description="Explanation of the evaluation regarding presentation aspects")
 
         prompt = ChatPromptTemplate.from_messages(
             [

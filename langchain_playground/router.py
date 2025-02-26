@@ -25,8 +25,8 @@ def analyzer(state: State) -> State:
     """Analyze input to determine model type and complexity."""
 
     class AnalyzerOutput(BaseModel):
-        model_type: Literal["chat", "reasoning"] = Field(..., description="Type of model needed - 'chat' for simple Q&A or 'reasoning' for complex tasks")
-        complexity: Literal["low", "high"] = Field(..., description="Complexity level of the task")
+        model_type: Literal["chat", "reasoning"] = Field(description="Type of model needed - 'chat' for simple Q&A or 'reasoning' for complex tasks")
+        complexity: Literal["low", "high"] = Field(description="Complexity level of the task")
 
     prompt = ChatPromptTemplate.from_messages(
         [
