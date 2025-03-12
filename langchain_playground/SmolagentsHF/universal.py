@@ -1,7 +1,14 @@
 import os
 
 from dotenv import load_dotenv
-from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent, tool
+from smolagents import (
+    CodeAgent,
+    LiteLLMModel,
+    Model,
+    MultiStepAgent,
+    ToolCallingAgent,
+    tool,
+)
 
 from langchain_playground.Tools import webloader, websearch, youtubeloader
 
@@ -10,17 +17,23 @@ load_dotenv()
 
 class UniversalAgent:
     def __init__(self, model_id: str):
+        """
+        Initialize the UniversalAgent with a language model.
+
+        Args:
+            model_id (str): The model ID in OpenRouter format.
+        """
         self.model = self.create_model(model_id)
         self.agent = self.create_agent()
 
-    def create_model(self, model_id: str):
+    def create_model(self, model_id: str) -> Model:
         return LiteLLMModel(
             model_id=f"openrouter/{model_id}",
             api_base="https://openrouter.ai/api/v1",
             api_key=os.getenv("OPENROUTER_API_KEY"),
         )
 
-    def create_agent(self):
+    def create_agent(self) -> MultiStepAgent:
         @tool
         def web_search(query: str) -> str:
             """
