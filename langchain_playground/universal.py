@@ -46,7 +46,11 @@ class UniversalChain:
             store=InMemoryStore(),
         )
 
-    def get_response(self, user_input: str, message_history: list[BaseMessage] = None) -> dict[str, list[BaseMessage]]:
+    def get_response(
+        self,
+        user_input: str,
+        message_history: list[BaseMessage] = None,
+    ) -> dict[str, list[BaseMessage]]:
         """Generate a response to the given input text."""
         config = {"configurable": {"thread_id": "universal-chain-session"}}
 
@@ -69,7 +73,11 @@ class UniversalChain:
         """Extract the history messages from the result."""
         return self.result["messages"][:-1]
 
-    def invoke(self, user_input: str, message_history: list[BaseMessage] = None) -> str:
+    def invoke(
+        self,
+        user_input: str,
+        message_history: list[BaseMessage] = None,
+    ) -> str:
         """
         Invoke the chain with the given input and message history.
 
