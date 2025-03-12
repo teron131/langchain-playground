@@ -11,6 +11,7 @@ langchain-openai
 openai
 langchain_google_genai
 langgraph
+langgraph-prebuilt
 langsmith
 
 # Providers
@@ -37,3 +38,4 @@ httpx
 tqdm
 ipython
 more-itertools
+rich

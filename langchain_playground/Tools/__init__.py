@@ -2,6 +2,7 @@ from functools import wraps
 from typing import List
 
 from langchain_core.tools import BaseTool, tool
+from rich import print
 
 from .WebLoader import webloader
 from .WebSearch import websearch
