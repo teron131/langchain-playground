@@ -1,3 +1,6 @@
+!langgraph.json
+deployment
+
 __pycache__
 node_modules
 .env
@@ -13,7 +16,6 @@ scratch/*
 *.jpg
 *.pdf
 *.json
-!langgraph.json
 *.pem
 build/
 langchain_playground.egg-info/
