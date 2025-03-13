@@ -13,6 +13,7 @@ scratch/*
 *.jpg
 *.pdf
 *.json
+!langgraph.json
 *.pem
 build/
 langchain_playground.egg-info/

@@ -23,7 +23,7 @@ class UniversalChain:
         self.llm = llm or ChatOpenAI(
             model=model_id,
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url=os.getenv("OPENROUTER_BASE_URL"),
+            base_url="https://openrouter.ai/api/v1",
         )
         self.chain: CompiledGraph = self.create_chain()
         self.result: dict[str, list[BaseMessage]] = {}

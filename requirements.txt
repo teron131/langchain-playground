@@ -9,7 +9,7 @@ langchain
 langchain-community
 langchain-openai
 openai
-langchain_google_genai
+langchain-google-genai
 langgraph
 langgraph-prebuilt
 langsmith
