@@ -8,7 +8,7 @@ from pytubefix import YouTube
 
 from .llm_formatter import llm_format_txt
 from .utils import response_to_srt, response_to_txt, s2hk, srt_to_txt
-from .whisper import whisper_transcribe
+from .Whisper import whisper_transcribe
 
 load_dotenv()
 
@@ -134,6 +134,7 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
 
 
 # Main function
+
 
 # npm install -g npm@11.1.0
 def po_token_verifier() -> Tuple[str, str]:
