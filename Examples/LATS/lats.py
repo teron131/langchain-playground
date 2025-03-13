@@ -184,9 +184,11 @@ class TreeState(TypedDict):
     plan: Plan
 
 
-from langchain_playground.llm import get_llm
-
-llm = get_llm(model_id="gpt-4o-mini")
+llm = ChatOpenAI(
+    model="google/gemini-2.0-flash-001",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+)
 
 prompt = ChatPromptTemplate.from_messages(
     [
