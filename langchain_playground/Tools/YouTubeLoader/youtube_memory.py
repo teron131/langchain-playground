@@ -9,7 +9,7 @@ from pytubefix import Buffer, YouTube
 
 from .llm_formatter import llm_format_txt
 from .utils import response_to_txt
-from .Whisper.whisper_transcribe import whisper_transcribe
+from .Whisper import whisper_transcribe
 
 load_dotenv()
 
