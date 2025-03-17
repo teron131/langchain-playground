@@ -1,7 +1,7 @@
 import json
 import subprocess
 from pathlib import Path
-from typing import Tuple
+from typing import Literal, Tuple
 
 from dotenv import load_dotenv
 from pytubefix import YouTube
@@ -152,7 +152,7 @@ def po_token_verifier() -> Tuple[str, str]:
     return tokens["visitorData"], tokens["poToken"]
 
 
-def youtubeloader(url: str, whisper_model: str = ["fal", "hf", "replicate"]) -> str:
+def youtubeloader(url: str, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
     """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
