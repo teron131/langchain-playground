@@ -1,16 +1,15 @@
 import io
 import json
 import subprocess
-from pathlib import Path
 from typing import Tuple
 
-import fal_client
 from dotenv import load_dotenv
 from pydub import AudioSegment
 from pytubefix import Buffer, YouTube
 
 from .llm_formatter import llm_format_txt
-from .utils import response_to_srt, response_to_txt, s2hk, srt_to_txt
+from .utils import response_to_txt
+from .Whisper.whisper_transcribe import whisper_transcribe
 
 load_dotenv()
 
@@ -44,39 +43,14 @@ def get_audio_bytes(youtube: YouTube) -> bytes:
         return output_buffer.getvalue()
 
 
-def whisper_transcribe_fal(audio_bytes: bytes) -> dict:
-    def on_queue_update(update):
-        if isinstance(update, fal_client.InProgress):
-            for log in update.logs:
-                print(log["message"])
-
-    url = fal_client.upload(
-        data=audio_bytes,
-        content_type="audio/mp3",
-    )
-    result = fal_client.subscribe(
-        # "fal-ai/wizper",
-        "fal-ai/whisper",
-        arguments={
-            "audio_url": url,
-            "task": "transcribe",
-        },
-        with_logs=True,
-        on_queue_update=on_queue_update,
-    )
-    return result
-
-
 def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
     """Process a YouTube video: download audio and handle subtitles."""
     try:
         audio_bytes = get_audio_bytes(youtube)
-        response = whisper_transcribe_fal(audio_bytes)
+        response = whisper_transcribe(audio_bytes, whisper_model)
         subtitle = response_to_txt(response)
         formatted_content = llm_format_txt(subtitle)
-
-        print(f"Formatted TXT")
-
+        print(f"Formatted TXT: {youtube.title}")
         return formatted_content
 
     except Exception as e:
@@ -104,7 +78,7 @@ def po_token_verifier() -> Tuple[str, str]:
     return tokens["visitorData"], tokens["poToken"]
 
 
-def youtubeloader(url: str, whisper_model: str = ["fal", "replicate"]) -> str:
+def youtubeloader(url: str, whisper_model: str = ["fal", "replicate", "hf"]) -> str:
     """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:

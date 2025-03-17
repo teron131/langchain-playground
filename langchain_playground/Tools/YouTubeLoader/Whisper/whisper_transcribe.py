@@ -11,7 +11,7 @@ def whisper_transcribe(
     whisper_model: Literal["fal", "replicate", "hf"] = "fal",
     language: str = None,
 ) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
-    """Transcribe audio file using specified whisper model and save as SRT and TXT files.
+    """Transcribe audio file using specified whisper model.
 
     Args:
         audio (Path | bytes): The audio file / data to be transcribed.
@@ -31,12 +31,13 @@ def whisper_transcribe(
                 ]
             }
     """
-    if whisper_model == "fal":
-        response = whisper_fal(audio, language=language)
-    elif whisper_model == "replicate":
-        response = whisper_replicate(audio)
-    elif whisper_model == "hf":
-        response = whisper_hf(audio)
-    else:
+    model_map = {
+        "fal": lambda: whisper_fal(audio, language=language),
+        "hf": lambda: whisper_hf(audio),
+        "replicate": lambda: whisper_replicate(audio),
+    }
+
+    if whisper_model not in model_map:
         raise ValueError(f"Unsupported whisper model: {whisper_model}")
-    return response
+
+    return model_map[whisper_model]()
