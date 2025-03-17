@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Dict
+from typing import cast
 
 from opencc import OpenCC
 
@@ -25,7 +25,7 @@ def convert_time_to_hms(seconds_float: float) -> str:
     return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
 
 
-def response_to_srt(result: Dict) -> str:
+def response_to_srt(result: dict) -> str:
     """
     Convert the specific transcription  API response into SRT format string.
 
@@ -37,6 +37,7 @@ def response_to_srt(result: Dict) -> str:
     """
     srt_entries = []
     for counter, chunk in enumerate(result["chunks"], 1):
+        chunk: dict
         start_time = chunk.get("timestamp", [0])[0]
         end_time = chunk.get("timestamp", [0, start_time + 2.0])[1]  # Add 2 seconds to fade out
         start_time_hms = convert_time_to_hms(start_time)
@@ -48,7 +49,7 @@ def response_to_srt(result: Dict) -> str:
     return "".join(srt_entries)
 
 
-def response_to_txt(result: Dict) -> str:
+def response_to_txt(result: dict) -> str:
     """
     Convert the specific transcription API response into plain text format.
 
@@ -58,7 +59,7 @@ def response_to_txt(result: Dict) -> str:
     Returns:
         str: Plain text formatted string with each chunk on a new line
     """
-    return "\n".join(s2hk(chunk["text"].strip()) for chunk in result["chunks"])
+    return "\n".join(s2hk(cast(str, chunk["text"]).strip()) for chunk in result["chunks"])
 
 
 def srt_to_txt(srt_content: str) -> str:
