@@ -5,7 +5,7 @@ from .whisper_hf import whisper_hf
 from .whisper_replicate import whisper_replicate
 
 
-def whisper_transcribe(mp3_path: str | Path, whisper_model: str = "fal", language: str = "en") -> tuple[Path, Path]:
+def whisper_transcribe(mp3_path: str | Path, whisper_model: str = "fal", language: str = None) -> tuple[Path, Path]:
     """Transcribe audio file using specified whisper model and save as SRT and TXT files.
 
     Args:
