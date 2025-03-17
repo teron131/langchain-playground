@@ -1,7 +1,9 @@
+from pathlib import Path
+
 import fal_client
 
 
-def whisper_fal(audio_path: str, language: str = "en") -> dict:
+def whisper_fal(audio: Path | bytes, language: str = None) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
     """
     Transcribe an audio file using Fal model.
     https://fal.ai/models/fal-ai/whisper
@@ -12,18 +14,19 @@ def whisper_fal(audio_path: str, language: str = "en") -> dict:
     It defaults at English.
 
     Args:
-        audio_path (str): The path to the audio file to be transcribed.
+        audio (Path | bytes): The audio file / data to be transcribed.
         language (str): The language of the audio file. Defaults to "en".
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {
-                "text": str,  # Full transcribed text
-                "chunks": List[dict],  # List of transcription chunks
+                "text": str,    # Full transcribed text
+                "chunks": [     # List of transcription chunks
                     # Each chunk is a dictionary with:
                     {
-                        "timestamp": List[float],  # Start and end time of the chunk
-                        "text": str,  # Transcribed text for this chunk
-                    }
+                        "timestamp": tuple[float],  # Start and end time of the chunk
+                        "text": str,               # Transcribed text for this chunk
+                    },
+                ]
             }
     """
 
@@ -32,7 +35,13 @@ def whisper_fal(audio_path: str, language: str = "en") -> dict:
             for log in update.logs:
                 print(log["message"])
 
-    url = fal_client.upload_file(audio_path)
+    if isinstance(audio, Path):
+        url = fal_client.upload_file(audio)
+    elif isinstance(audio, bytes):
+        url = fal_client.upload(data=audio, content_type="audio/mp3")
+    else:
+        raise ValueError("Invalid audio type")
+
     result = fal_client.subscribe(
         # "fal-ai/wizper",
         "fal-ai/whisper",

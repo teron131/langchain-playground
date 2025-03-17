@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 
 import torch
 from dotenv import load_dotenv
@@ -9,19 +10,22 @@ warnings.filterwarnings("ignore")
 load_dotenv()
 
 
-def whisper_hf(audio_path: str) -> dict:
+def whisper_hf(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
     """
     Transcribe audio file using whisper-large-v3-turbo model with Hugging Face optimization.
 
+    Args:
+        audio (Path | bytes): The audio file / data to be transcribed.
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {
-                "text": str,  # Full transcribed text
-                "chunks": [
+                "text": str,    # Full transcribed text
+                "chunks": [     # List of transcription chunks
+                    # Each chunk is a dictionary with:
                     {
-                        "timestamp": Tuple[float],  # Start and end time of the chunk
-                        "text": str,  # Transcribed text for this chunk
-                    }
+                        "timestamp": tuple[float],  # Start and end time of the chunk
+                        "text": str,               # Transcribed text for this chunk
+                    },
                 ]
             }
     """
@@ -48,5 +52,5 @@ def whisper_hf(audio_path: str) -> dict:
         torch_dtype=torch_dtype,
         device=device,
     )
-    result = pipe(audio_path)
+    result = pipe(audio)
     return result

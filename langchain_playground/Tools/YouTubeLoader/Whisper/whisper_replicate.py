@@ -1,9 +1,10 @@
 import base64
+from pathlib import Path
 
 import replicate
 
 
-def whisper_replicate(audio_path: str) -> dict:
+def whisper_replicate(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
     """
     Transcribe an audio file using Replicate model.
     https://replicate.com/vaibhavs10/incredibly-fast-whisper
@@ -11,22 +12,31 @@ def whisper_replicate(audio_path: str) -> dict:
     This function converts the audio file to base64 URI, and returns the transcription result.
 
     Args:
-        audio_path (str): The path to the audio file to be transcribed.
+        audio (Path | bytes): The audio file / data to be transcribed.
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {
-                "text": str,  # Full transcribed text
-                "chunks": List[dict],  # List of transcription chunks
+                "text": str,    # Full transcribed text
+                "chunks": [     # List of transcription chunks
                     # Each chunk is a dictionary with:
                     {
-                        "timestamp": List[float],  # Start and end time of the chunk
-                        "text": str,  # Transcribed text for this chunk
-                    }
+                        "timestamp": tuple[float],  # Start and end time of the chunk
+                        "text": str,                # Transcribed text for this chunk
+                    },
+                ]
             }
     """
-    with open(audio_path, "rb") as file:
-        data = base64.b64encode(file.read()).decode("utf-8")
-        audio = f"data:application/octet-stream;base64,{data}"
+    if isinstance(audio, Path):
+        with open(audio, "rb") as file:
+            audio_bytes = file.read()
+    elif isinstance(audio, bytes):
+        audio_bytes = audio
+    else:
+        raise ValueError("Invalid audio type. Must be Path or bytes.")
+
+    # Convert audio to base64 data URI
+    data = base64.b64encode(audio_bytes).decode("utf-8")
+    audio = f"data:application/octet-stream;base64,{data}"
 
     input = {"audio": audio, "batch_size": 64}
     output = replicate.run(
