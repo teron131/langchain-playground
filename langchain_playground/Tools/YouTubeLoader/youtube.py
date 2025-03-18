@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -13,6 +14,31 @@ load_dotenv()
 BASE_CACHE_DIR = Path(".cache")
 
 
+@dataclass
+class FilePaths:
+    cache_dir: Path
+    output_path: Path
+    mp3_path: Path
+    srt_path: Path
+    txt_path: Path
+
+    @classmethod
+    def from_youtube(cls, youtube: YouTube) -> "FilePaths":
+        cache_dir = BASE_CACHE_DIR / youtube.video_id
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        output_path = cache_dir / youtube.video_id
+        mp3_path = output_path.with_suffix(".mp3")
+        srt_path = output_path.with_suffix(".srt")
+        txt_path = output_path.with_suffix(".txt")
+        return cls(
+            cache_dir=cache_dir,
+            output_path=output_path,
+            mp3_path=mp3_path,
+            srt_path=srt_path,
+            txt_path=txt_path,
+        )
+
+
 def read_text_file(file_path: Path) -> str:
     """
     Read text from a file with UTF-8 encoding.
@@ -23,7 +49,7 @@ def read_text_file(file_path: Path) -> str:
     Returns:
         str: The file contents
     """
-    return Path(file_path).read_text(encoding="utf-8")
+    return file_path.read_text(encoding="utf-8")
 
 
 def write_text_file(file_path: Path, content: str) -> None:
@@ -34,83 +60,66 @@ def write_text_file(file_path: Path, content: str) -> None:
         file_path (Path): Path to the text file to write
         content (str): Content to write to the text file
     """
-    Path(file_path).write_text(content, encoding="utf-8")
+    file_path.write_text(content, encoding="utf-8")
 
 
 # YouTube video processing functions
 
 
-def download_audio(
-    youtube: YouTube,
-    cache_dir: Path,
-    output_path: Path,
-) -> None:
-    mp3_path = output_path.with_suffix(".mp3")
-    if mp3_path.exists():
-        print(f"Audio file already exists: {mp3_path}")
+def download_audio(youtube: YouTube) -> None:
+    paths = FilePaths.from_youtube(youtube)
+    if paths.mp3_path.exists():
+        print(f"Audio file already exists: {paths.mp3_path}")
         return
-    youtube.streams.get_audio_only().download(output_path=str(cache_dir), filename=youtube.video_id + ".mp3")
-    print(f"Downloaded audio: {mp3_path}")
+    youtube.streams.get_audio_only().download(output_path=str(paths.cache_dir), filename=youtube.video_id + ".mp3")
+    print(f"Downloaded audio: {paths.mp3_path}")
 
 
-def download_subtitles(youtube: YouTube, output_path: Path) -> None:
-    srt_path = output_path.with_suffix(".srt")
-
-    if srt_path.exists():
-        print(f"SRT already exists: {srt_path}")
+def download_subtitles(youtube: YouTube) -> None:
+    paths = FilePaths.from_youtube(youtube)
+    if paths.srt_path.exists():
+        print(f"SRT already exists: {paths.srt_path}")
         return
 
     # Implicit priority
     for lang in ["zh-HK", "zh-CN", "en"]:
         if lang in youtube.captions:
-            youtube.captions[lang].save_captions(filename=str(srt_path))
-            print(f"Downloaded subtitle: {srt_path}")
+            youtube.captions[lang].save_captions(filename=str(paths.srt_path))
+            print(f"Downloaded subtitle: {paths.srt_path}")
             if lang == "zh-CN":
-                content = s2hk(read_text_file(srt_path))
-                write_text_file(srt_path, content)
-                print(f"Converted subtitle: {srt_path}")
+                content = s2hk(read_text_file(paths.srt_path))
+                write_text_file(paths.srt_path, content)
+                print(f"Converted subtitle: {paths.srt_path}")
             return
 
     print("No suitable subtitle found for download.")
 
 
-def process_subtitles(
-    youtube: YouTube,
-    output_path: Path,
-    whisper_model: str,
-) -> None:
+def process_subtitles(youtube: YouTube, whisper_model: str) -> None:
     """
     Process subtitle: download or transcribe as needed.
     Give preference to the uploader's existing manual captions. If unavailable, use Whisper to transcribe the video, as English automatic captions are bad and nonexistent for Chinese.
     """
-    mp3_path = output_path.with_suffix(".mp3")
-    srt_path = output_path.with_suffix(".srt")
-    txt_path = output_path.with_suffix(".txt")
+    paths = FilePaths.from_youtube(youtube)
     available_subtitles = youtube.captions
     print(f"Available subtitle: {available_subtitles}")
 
     if available_subtitles and any(lang in available_subtitles for lang in ["en", "zh-HK", "zh-CN"]):
-        download_subtitles(youtube, output_path)
+        download_subtitles(youtube)
 
-    if srt_path.exists() and not txt_path.exists():
-        write_text_file(txt_path, srt_to_txt(read_text_file(srt_path)))
-        print(f"Converted TXT: {txt_path}")
+    if paths.srt_path.exists() and not paths.txt_path.exists():
+        write_text_file(paths.txt_path, srt_to_txt(read_text_file(paths.srt_path)))
+        print(f"Converted TXT: {paths.txt_path}")
         return
 
-    # Assume 'a.en' always exists if it is English
-    transcribe_language = "en"
-    if "a.en" in available_subtitles:
-        transcribe_language = "en"
-    elif not available_subtitles or any(lang in available_subtitles for lang in ["zh-HK", "zh-CN"]):
-        transcribe_language = "zh"
+    transcribe_language = "en" if "a.en" in available_subtitles else "zh"
+    result = whisper_transcribe(paths.mp3_path, whisper_model, transcribe_language)
 
-    result = whisper_transcribe(mp3_path, whisper_model, transcribe_language)
+    write_text_file(paths.srt_path, result_to_srt(result))
+    print(f"Transcribed SRT: {paths.srt_path}")
 
-    write_text_file(srt_path, result_to_srt(result))
-    print(f"Transcribed SRT: {srt_path}")
-
-    write_text_file(txt_path, result_to_txt(result))
-    print(f"Transcribed TXT: {txt_path}")
+    write_text_file(paths.txt_path, result_to_txt(result))
+    print(f"Transcribed TXT: {paths.txt_path}")
 
 
 def youtube_to_subtitle(
@@ -118,30 +127,23 @@ def youtube_to_subtitle(
     whisper_model: Literal["fal", "hf", "replicate"] = "fal",
 ) -> str:
     """Process a YouTube video: download audio and handle subtitle."""
-    cache_dir = BASE_CACHE_DIR / youtube.video_id
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    output_path = cache_dir / youtube.video_id
-    txt_path = output_path.with_suffix(".txt")
-    mp3_path = output_path.with_suffix(".mp3")
-    if txt_path.exists():
-        print(f"Subtitle txt file already exists: {txt_path}")
-        return read_text_file(txt_path)
+    paths = FilePaths.from_youtube(youtube)
+    if paths.txt_path.exists():
+        print(f"Subtitle txt file already exists: {paths.txt_path}")
+        return read_text_file(paths.txt_path)
 
-    download_audio(youtube, cache_dir, output_path)
-    process_subtitles(youtube, output_path, whisper_model)
+    download_audio(youtube)
+    process_subtitles(youtube, whisper_model)
 
-    with open(mp3_path, "rb") as audio_file:
+    with open(paths.mp3_path, "rb") as audio_file:
         audio_bytes = audio_file.read()
 
-    subtitle = read_text_file(txt_path)
+    subtitle = read_text_file(paths.txt_path)
     formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
-    write_text_file(txt_path, formatted_subtitle)
-    print(f"Formatted TXT: {txt_path}")
+    write_text_file(paths.txt_path, formatted_subtitle)
+    print(f"Formatted TXT: {paths.txt_path}")
 
-    return read_text_file(txt_path)
-
-
-# Main function
+    return read_text_file(paths.txt_path)
 
 
 def youtubeloader(
@@ -162,26 +164,21 @@ def youtubeloader(
         use_po_token=True,
         po_token_verifier=po_token_verifier,
     )
+    paths = FilePaths.from_youtube(youtube)
+    if paths.txt_path.exists():
+        print(f"Subtitle txt file already exists: {paths.txt_path}")
+        return read_text_file(paths.txt_path)
 
-    cache_dir = BASE_CACHE_DIR / youtube.video_id
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    output_path = cache_dir / youtube.video_id
-    txt_path = output_path.with_suffix(".txt")
-    mp3_path = output_path.with_suffix(".mp3")
-    if txt_path.exists():
-        print(f"Subtitle txt file already exists: {txt_path}")
-        return read_text_file(txt_path)
+    download_audio(youtube)
+    process_subtitles(youtube, whisper_model)
 
-    download_audio(youtube, cache_dir, output_path)
-    process_subtitles(youtube, output_path, whisper_model)
-
-    with open(mp3_path, "rb") as audio_file:
+    with open(paths.mp3_path, "rb") as audio_file:
         audio_bytes = audio_file.read()
 
-    subtitle = read_text_file(txt_path)
-    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
-    write_text_file(txt_path, formatted_subtitle)
-    print(f"Formatted TXT: {txt_path}")
+    subtitle = read_text_file(paths.txt_path)
+    formatted_subtitle = llm_format_text(subtitle)
+    write_text_file(paths.txt_path, formatted_subtitle)
+    print(f"Formatted TXT: {paths.txt_path}")
 
     content = [
         "Answer the user's question based on the full content.",

@@ -13,8 +13,6 @@ load_dotenv()
 
 
 # YouTube video processing functions
-
-
 def youtube_to_audio_bytes(youtube: YouTube) -> bytes:
     """
     Get audio bytes from YouTube object.
