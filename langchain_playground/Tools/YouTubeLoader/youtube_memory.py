@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 from pydub import AudioSegment
 from pytubefix import Buffer, YouTube
 
-from .llm_formatter import llm_format_txt
-from .utils import po_token_verifier, response_to_txt
+from .llm_formatter import llm_format_text, llm_format_text_audio
+from .utils import po_token_verifier, result_to_txt
 from .Whisper import whisper_transcribe
 
 load_dotenv()
@@ -37,17 +37,21 @@ def youtube_to_audio_bytes(youtube: YouTube) -> bytes:
 
     # Export audio bytes (MP3 format with ID3 metadata)
     with io.BytesIO() as output_buffer:
-        audio_segment.export(output_buffer, format="mp3")
+        audio_segment.export(output_buffer, format="mp3", bitrate="16k")
         return output_buffer.getvalue()
 
 
-def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
+def url_to_subtitles(
+    youtube: YouTube,
+    whisper_model: Literal["fal", "hf", "replicate"] = "fal",
+    language: str = None,
+) -> str:
     """Process a YouTube video: download audio and handle subtitles."""
     try:
         audio_bytes = youtube_to_audio_bytes(youtube)
-        response = whisper_transcribe(audio_bytes, whisper_model)
-        subtitle = response_to_txt(response)
-        formatted_content = llm_format_txt(subtitle)
+        result = whisper_transcribe(audio_bytes, whisper_model, language)
+        subtitle = result_to_txt(result)
+        formatted_content = llm_format_text_audio(subtitle, audio_bytes)
         print(f"Formatted TXT: {youtube.title}")
         return formatted_content
 
@@ -60,7 +64,11 @@ def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "repl
 # Main function
 
 
-def youtubeloader(url: str, whisper_model: Literal["fal", "replicate", "hf"] = "fal") -> str:
+def youtubeloader(
+    url: str,
+    whisper_model: Literal["fal", "replicate", "hf"] = "fal",
+    language: str = None,
+) -> str:
     """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
@@ -79,6 +87,6 @@ def youtubeloader(url: str, whisper_model: Literal["fal", "replicate", "hf"] = "
         f"Title: {yt.title}",
         f"Author: {yt.author}",
         "Subtitles:",
-        url_to_subtitles(yt, whisper_model),
+        url_to_subtitles(yt, whisper_model, language),
     ]
     return "\n".join(content)

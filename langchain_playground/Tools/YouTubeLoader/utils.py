@@ -43,7 +43,7 @@ def convert_time_to_hms(seconds_float: float) -> str:
     return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
 
 
-def response_to_srt(result: dict) -> str:
+def result_to_srt(result: dict) -> str:
     """
     Convert the specific transcription  API response into SRT format string.
 
@@ -67,7 +67,7 @@ def response_to_srt(result: dict) -> str:
     return "".join(srt_entries)
 
 
-def response_to_txt(result: dict) -> str:
+def result_to_txt(result: dict) -> str:
     """
     Convert the specific transcription API response into plain text format.
 

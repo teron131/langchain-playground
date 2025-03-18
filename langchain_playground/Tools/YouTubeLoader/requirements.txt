@@ -1,5 +1,5 @@
 fal-client
-replicate
+google-genai
 ipython
 more-itertools
 numpy
@@ -8,6 +8,7 @@ opencc-python-reimplemented
 optimum
 pytubefix
 python-dotenv
+replicate
 tiktoken
 torch
 transformers

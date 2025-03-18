@@ -4,8 +4,8 @@ from typing import Literal
 from dotenv import load_dotenv
 from pytubefix import YouTube
 
-from .llm_formatter import llm_format_txt
-from .utils import po_token_verifier, response_to_srt, response_to_txt, s2hk, srt_to_txt
+from .llm_formatter import llm_format_text, llm_format_text_audio
+from .utils import po_token_verifier, result_to_srt, result_to_txt, s2hk, srt_to_txt
 from .Whisper import whisper_transcribe
 
 load_dotenv()
@@ -14,7 +14,8 @@ BASE_CACHE_DIR = Path(".cache")
 
 
 def read_text_file(file_path: Path) -> str:
-    """Read text from a file with UTF-8 encoding.
+    """
+    Read text from a file with UTF-8 encoding.
 
     Args:
         file_path (Path): Path to the text file to read
@@ -26,7 +27,8 @@ def read_text_file(file_path: Path) -> str:
 
 
 def write_text_file(file_path: Path, content: str) -> None:
-    """Write text to a file with UTF-8 encoding.
+    """
+    Write text to a file with UTF-8 encoding.
 
     Args:
         file_path (Path): Path to the text file to write
@@ -94,12 +96,12 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -
     elif not available_subtitles or any(lang in available_subtitles for lang in ["zh-HK", "zh-CN"]):
         transcribe_language = "zh"
 
-    response = whisper_transcribe(mp3_path, whisper_model, transcribe_language)
+    result = whisper_transcribe(mp3_path, whisper_model, transcribe_language)
 
-    write_text_file(srt_path, response_to_srt(response))
+    write_text_file(srt_path, result_to_srt(result))
     print(f"Transcribed SRT: {srt_path}")
 
-    write_text_file(txt_path, response_to_txt(response))
+    write_text_file(txt_path, result_to_txt(result))
     print(f"Transcribed TXT: {txt_path}")
 
 
@@ -110,7 +112,7 @@ def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "repl
         cache_dir.mkdir(parents=True, exist_ok=True)
         output_path = cache_dir / youtube.video_id
         txt_path = output_path.with_suffix(".txt")
-
+        mp3_path = output_path.with_suffix(".mp3")
         if txt_path.exists():
             print(f"Subtitle txt file already exists: {txt_path}")
             return read_text_file(txt_path)
@@ -118,9 +120,12 @@ def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "repl
         download_audio(youtube, cache_dir, output_path)
         process_subtitles(youtube, output_path, whisper_model)
 
-        content = read_text_file(txt_path)
-        formatted_content = llm_format_txt(content)
-        write_text_file(txt_path, formatted_content)
+        with open(mp3_path, "rb") as audio_file:
+            audio_bytes = audio_file.read()
+
+        subtitles = read_text_file(txt_path)
+        formatted_subtitles = llm_format_text_audio(subtitles, audio_bytes)
+        write_text_file(txt_path, formatted_subtitles)
         print(f"Formatted TXT: {txt_path}")
 
         return read_text_file(txt_path)
@@ -135,7 +140,8 @@ def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "repl
 
 
 def youtubeloader(url: str, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
-    """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+    """
+    Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
         url (str): The YouTube video URL to load
