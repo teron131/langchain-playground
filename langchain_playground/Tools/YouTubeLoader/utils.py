@@ -1,7 +1,25 @@
+import json
+import subprocess
 from functools import lru_cache
-from typing import cast
+from typing import Tuple, cast
 
 from opencc import OpenCC
+
+
+# npm install -g npm@11.1.0
+def po_token_verifier() -> Tuple[str, str]:
+    """Get YouTube authentication tokens using node.js generator and return as tuple."""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    tokens = json.loads(result.stdout)
+    return tokens["visitorData"], tokens["poToken"]
 
 
 @lru_cache(maxsize=None)

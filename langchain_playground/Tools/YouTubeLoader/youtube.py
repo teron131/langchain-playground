@@ -1,13 +1,11 @@
-import json
-import subprocess
 from pathlib import Path
-from typing import Literal, Tuple
+from typing import Literal
 
 from dotenv import load_dotenv
 from pytubefix import YouTube
 
 from .llm_formatter import llm_format_txt
-from .utils import response_to_srt, response_to_txt, s2hk, srt_to_txt
+from .utils import po_token_verifier, response_to_srt, response_to_txt, s2hk, srt_to_txt
 from .Whisper import whisper_transcribe
 
 load_dotenv()
@@ -15,11 +13,11 @@ load_dotenv()
 BASE_CACHE_DIR = Path(".cache")
 
 
-def read_file(file_path: Path | str) -> str:
+def read_text_file(file_path: Path) -> str:
     """Read text from a file with UTF-8 encoding.
 
     Args:
-        file_path (Path | str): Path to the file to read
+        file_path (Path): Path to the text file to read
 
     Returns:
         str: The file contents
@@ -27,12 +25,12 @@ def read_file(file_path: Path | str) -> str:
     return Path(file_path).read_text(encoding="utf-8")
 
 
-def write_file(file_path: Path | str, content: str) -> None:
+def write_text_file(file_path: Path, content: str) -> None:
     """Write text to a file with UTF-8 encoding.
 
     Args:
-        file_path (Path | str): Path to the file to write
-        content (str): Content to write to the file
+        file_path (Path): Path to the text file to write
+        content (str): Content to write to the text file
     """
     Path(file_path).write_text(content, encoding="utf-8")
 
@@ -62,8 +60,8 @@ def download_subtitles(youtube: YouTube, output_path: Path) -> None:
             youtube.captions[lang].save_captions(filename=str(srt_path))
             print(f"Downloaded subtitle: {srt_path}")
             if lang == "zh-CN":
-                content = s2hk(read_file(srt_path))
-                write_file(srt_path, content)
+                content = s2hk(read_text_file(srt_path))
+                write_text_file(srt_path, content)
                 print(f"Converted subtitle: {srt_path}")
             return
 
@@ -85,7 +83,7 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -
         download_subtitles(youtube, output_path)
 
     if srt_path.exists() and not txt_path.exists():
-        write_file(txt_path, srt_to_txt(read_file(srt_path)))
+        write_text_file(txt_path, srt_to_txt(read_text_file(srt_path)))
         print(f"Converted TXT: {txt_path}")
         return
 
@@ -98,14 +96,14 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -
 
     response = whisper_transcribe(mp3_path, whisper_model, transcribe_language)
 
-    write_file(srt_path, response_to_srt(response))
+    write_text_file(srt_path, response_to_srt(response))
     print(f"Transcribed SRT: {srt_path}")
 
-    write_file(txt_path, response_to_txt(response))
+    write_text_file(txt_path, response_to_txt(response))
     print(f"Transcribed TXT: {txt_path}")
 
 
-def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
+def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
     """Process a YouTube video: download audio and handle subtitles."""
     try:
         cache_dir = BASE_CACHE_DIR / youtube.video_id
@@ -115,17 +113,17 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
 
         if txt_path.exists():
             print(f"Subtitle txt file already exists: {txt_path}")
-            return read_file(txt_path)
+            return read_text_file(txt_path)
 
         download_audio(youtube, cache_dir, output_path)
         process_subtitles(youtube, output_path, whisper_model)
 
-        content = read_file(txt_path)
+        content = read_text_file(txt_path)
         formatted_content = llm_format_txt(content)
-        write_file(txt_path, formatted_content)
+        write_text_file(txt_path, formatted_content)
         print(f"Formatted TXT: {txt_path}")
 
-        return read_file(txt_path)
+        return read_text_file(txt_path)
 
     except Exception as e:
         error_message = f"Error processing video {youtube.title}: {str(e)}"
@@ -134,22 +132,6 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
 
 
 # Main function
-
-
-# npm install -g npm@11.1.0
-def po_token_verifier() -> Tuple[str, str]:
-    """Get YouTube authentication tokens using node.js generator and return as tuple."""
-    result = subprocess.run(
-        [
-            "node",
-            "-e",
-            "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    tokens = json.loads(result.stdout)
-    return tokens["visitorData"], tokens["poToken"]
 
 
 def youtubeloader(url: str, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:

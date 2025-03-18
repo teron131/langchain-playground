@@ -1,14 +1,12 @@
 import io
-import json
-import subprocess
-from typing import Literal, Tuple
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydub import AudioSegment
 from pytubefix import Buffer, YouTube
 
 from .llm_formatter import llm_format_txt
-from .utils import response_to_txt
+from .utils import po_token_verifier, response_to_txt
 from .Whisper import whisper_transcribe
 
 load_dotenv()
@@ -17,7 +15,7 @@ load_dotenv()
 # YouTube video processing functions
 
 
-def get_audio_bytes(youtube: YouTube) -> bytes:
+def youtube_to_audio_bytes(youtube: YouTube) -> bytes:
     """
     Get audio bytes from YouTube object.
     Args:
@@ -43,10 +41,10 @@ def get_audio_bytes(youtube: YouTube) -> bytes:
         return output_buffer.getvalue()
 
 
-def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
+def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
     """Process a YouTube video: download audio and handle subtitles."""
     try:
-        audio_bytes = get_audio_bytes(youtube)
+        audio_bytes = youtube_to_audio_bytes(youtube)
         response = whisper_transcribe(audio_bytes, whisper_model)
         subtitle = response_to_txt(response)
         formatted_content = llm_format_txt(subtitle)
@@ -60,22 +58,6 @@ def url_to_subtitles(youtube: YouTube, whisper_model: str) -> str:
 
 
 # Main function
-
-
-# npm install -g npm@11.1.0
-def po_token_verifier() -> Tuple[str, str]:
-    """Get YouTube authentication tokens using node.js generator and return as tuple."""
-    result = subprocess.run(
-        [
-            "node",
-            "-e",
-            "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    tokens = json.loads(result.stdout)
-    return tokens["visitorData"], tokens["poToken"]
 
 
 def youtubeloader(url: str, whisper_model: Literal["fal", "replicate", "hf"] = "fal") -> str:
