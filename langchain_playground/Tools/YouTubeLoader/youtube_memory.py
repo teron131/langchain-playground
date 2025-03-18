@@ -41,29 +41,7 @@ def youtube_to_audio_bytes(youtube: YouTube) -> bytes:
         return output_buffer.getvalue()
 
 
-def url_to_subtitles(
-    youtube: YouTube,
-    whisper_model: Literal["fal", "hf", "replicate"] = "fal",
-    language: str = None,
-) -> str:
-    """Process a YouTube video: download audio and handle subtitle."""
-    try:
-        audio_bytes = youtube_to_audio_bytes(youtube)
-        result = whisper_transcribe(audio_bytes, whisper_model, language)
-        subtitle = result_to_txt(result)
-        formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
-        print(f"Formatted TXT: {youtube.title}")
-        return formatted_subtitle
-
-    except Exception as e:
-        error_message = f"Error processing video {youtube.title}: {str(e)}"
-        print(error_message)
-        return error_message
-
-
 # Main function
-
-
 def youtubeloader(
     url: str,
     whisper_model: Literal["fal", "replicate", "hf"] = "fal",
@@ -82,11 +60,17 @@ def youtubeloader(
         use_po_token=True,
         po_token_verifier=po_token_verifier,
     )
+
+    audio_bytes = youtube_to_audio_bytes(youtube)
+    result = whisper_transcribe(audio_bytes, whisper_model, language)
+    subtitle = result_to_txt(result)
+    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
+    print(f"Formatted TXT: {youtube.title}")
+
     content = [
         "Answer the user's question based on the full content.",
         f"Title: {youtube.title}",
         f"Author: {youtube.author}",
-        "subtitle:",
-        url_to_subtitles(youtube, whisper_model, language),
+        f"subtitle:\n{formatted_subtitle}",
     ]
     return "\n".join(content)

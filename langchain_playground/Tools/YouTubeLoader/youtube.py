@@ -40,7 +40,11 @@ def write_text_file(file_path: Path, content: str) -> None:
 # YouTube video processing functions
 
 
-def download_audio(youtube: YouTube, cache_dir: Path, output_path: Path) -> None:
+def download_audio(
+    youtube: YouTube,
+    cache_dir: Path,
+    output_path: Path,
+) -> None:
     mp3_path = output_path.with_suffix(".mp3")
     if mp3_path.exists():
         print(f"Audio file already exists: {mp3_path}")
@@ -70,7 +74,11 @@ def download_subtitles(youtube: YouTube, output_path: Path) -> None:
     print("No suitable subtitle found for download.")
 
 
-def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -> None:
+def process_subtitles(
+    youtube: YouTube,
+    output_path: Path,
+    whisper_model: str,
+) -> None:
     """
     Process subtitle: download or transcribe as needed.
     Give preference to the uploader's existing manual captions. If unavailable, use Whisper to transcribe the video, as English automatic captions are bad and nonexistent for Chinese.
@@ -105,41 +113,41 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -
     print(f"Transcribed TXT: {txt_path}")
 
 
-def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
+def youtube_to_subtitle(
+    youtube: YouTube,
+    whisper_model: Literal["fal", "hf", "replicate"] = "fal",
+) -> str:
     """Process a YouTube video: download audio and handle subtitle."""
-    try:
-        cache_dir = BASE_CACHE_DIR / youtube.video_id
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        output_path = cache_dir / youtube.video_id
-        txt_path = output_path.with_suffix(".txt")
-        mp3_path = output_path.with_suffix(".mp3")
-        if txt_path.exists():
-            print(f"Subtitle txt file already exists: {txt_path}")
-            return read_text_file(txt_path)
-
-        download_audio(youtube, cache_dir, output_path)
-        process_subtitles(youtube, output_path, whisper_model)
-
-        with open(mp3_path, "rb") as audio_file:
-            audio_bytes = audio_file.read()
-
-        subtitle = read_text_file(txt_path)
-        formatted_subtitles = llm_format_text_audio(subtitle, audio_bytes)
-        write_text_file(txt_path, formatted_subtitles)
-        print(f"Formatted TXT: {txt_path}")
-
+    cache_dir = BASE_CACHE_DIR / youtube.video_id
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    output_path = cache_dir / youtube.video_id
+    txt_path = output_path.with_suffix(".txt")
+    mp3_path = output_path.with_suffix(".mp3")
+    if txt_path.exists():
+        print(f"Subtitle txt file already exists: {txt_path}")
         return read_text_file(txt_path)
 
-    except Exception as e:
-        error_message = f"Error processing video {youtube.title}: {str(e)}"
-        print(error_message)
-        return error_message
+    download_audio(youtube, cache_dir, output_path)
+    process_subtitles(youtube, output_path, whisper_model)
+
+    with open(mp3_path, "rb") as audio_file:
+        audio_bytes = audio_file.read()
+
+    subtitle = read_text_file(txt_path)
+    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
+    write_text_file(txt_path, formatted_subtitle)
+    print(f"Formatted TXT: {txt_path}")
+
+    return read_text_file(txt_path)
 
 
 # Main function
 
 
-def youtubeloader(url: str, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
+def youtubeloader(
+    url: str,
+    whisper_model: Literal["fal", "hf", "replicate"] = "fal",
+) -> str:
     """
     Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
@@ -154,11 +162,31 @@ def youtubeloader(url: str, whisper_model: Literal["fal", "hf", "replicate"] = "
         use_po_token=True,
         po_token_verifier=po_token_verifier,
     )
+
+    cache_dir = BASE_CACHE_DIR / youtube.video_id
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    output_path = cache_dir / youtube.video_id
+    txt_path = output_path.with_suffix(".txt")
+    mp3_path = output_path.with_suffix(".mp3")
+    if txt_path.exists():
+        print(f"Subtitle txt file already exists: {txt_path}")
+        return read_text_file(txt_path)
+
+    download_audio(youtube, cache_dir, output_path)
+    process_subtitles(youtube, output_path, whisper_model)
+
+    with open(mp3_path, "rb") as audio_file:
+        audio_bytes = audio_file.read()
+
+    subtitle = read_text_file(txt_path)
+    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
+    write_text_file(txt_path, formatted_subtitle)
+    print(f"Formatted TXT: {txt_path}")
+
     content = [
         "Answer the user's question based on the full content.",
         f"Title: {youtube.title}",
         f"Author: {youtube.author}",
-        "subtitle:",
-        url_to_subtitles(youtube, whisper_model),
+        f"subtitle:\n{formatted_subtitle}",
     ]
     return "\n".join(content)
