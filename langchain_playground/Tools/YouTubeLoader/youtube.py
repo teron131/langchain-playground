@@ -67,19 +67,19 @@ def download_subtitles(youtube: YouTube, output_path: Path) -> None:
                 print(f"Converted subtitle: {srt_path}")
             return
 
-    print("No suitable subtitles found for download.")
+    print("No suitable subtitle found for download.")
 
 
 def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -> None:
     """
-    Process subtitles: download or transcribe as needed.
+    Process subtitle: download or transcribe as needed.
     Give preference to the uploader's existing manual captions. If unavailable, use Whisper to transcribe the video, as English automatic captions are bad and nonexistent for Chinese.
     """
     mp3_path = output_path.with_suffix(".mp3")
     srt_path = output_path.with_suffix(".srt")
     txt_path = output_path.with_suffix(".txt")
     available_subtitles = youtube.captions
-    print(f"Available subtitles: {available_subtitles}")
+    print(f"Available subtitle: {available_subtitles}")
 
     if available_subtitles and any(lang in available_subtitles for lang in ["en", "zh-HK", "zh-CN"]):
         download_subtitles(youtube, output_path)
@@ -106,7 +106,7 @@ def process_subtitles(youtube: YouTube, output_path: Path, whisper_model: str) -
 
 
 def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
-    """Process a YouTube video: download audio and handle subtitles."""
+    """Process a YouTube video: download audio and handle subtitle."""
     try:
         cache_dir = BASE_CACHE_DIR / youtube.video_id
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -123,8 +123,8 @@ def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "repl
         with open(mp3_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
 
-        subtitles = read_text_file(txt_path)
-        formatted_subtitles = llm_format_text_audio(subtitles, audio_bytes)
+        subtitle = read_text_file(txt_path)
+        formatted_subtitles = llm_format_text_audio(subtitle, audio_bytes)
         write_text_file(txt_path, formatted_subtitles)
         print(f"Formatted TXT: {txt_path}")
 
@@ -141,24 +141,24 @@ def url_to_subtitles(youtube: YouTube, whisper_model: Literal["fal", "hf", "repl
 
 def youtubeloader(url: str, whisper_model: Literal["fal", "hf", "replicate"] = "fal") -> str:
     """
-    Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+    Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
         url (str): The YouTube video URL to load
 
     Returns:
-        str: Formatted string containing the video title, author and subtitles
+        str: Formatted string containing the video title, author and subtitle
     """
-    yt = YouTube(
+    youtube = YouTube(
         url,
         use_po_token=True,
         po_token_verifier=po_token_verifier,
     )
     content = [
         "Answer the user's question based on the full content.",
-        f"Title: {yt.title}",
-        f"Author: {yt.author}",
-        "Subtitles:",
-        url_to_subtitles(yt, whisper_model),
+        f"Title: {youtube.title}",
+        f"Author: {youtube.author}",
+        "subtitle:",
+        url_to_subtitles(youtube, whisper_model),
     ]
     return "\n".join(content)

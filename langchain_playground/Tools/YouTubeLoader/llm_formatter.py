@@ -10,7 +10,7 @@ from .utils import s2hk
 
 load_dotenv()
 
-PROMPT = """You are an expert subtitles editor. Your task is to refine a sequence of piecemeal subtitles derived from transcription. These subtitles may contain typos and lack proper punctuation. Follow the guidelines below to ensure high-quality subtitles:
+PROMPT = """You are an expert subtitle editor. Your task is to refine a sequence of piecemeal subtitle derived from transcription. These subtitle may contain typos and lack proper punctuation. Follow the guidelines below to ensure high-quality subtitle:
 
 Instructions:
 1. Make minimal contextual changes.
@@ -23,23 +23,23 @@ Original Subtitle: welcome back fellow history enthusiasts to our channel today 
 Refined Subtitle: Welcome back, fellow history enthusiasts, to our channel! Today, we embark on a thrilling expedition."""
 
 
-def llm_format_text(subtitles: str, chunk_size: int = 1000) -> str:
+def llm_format_text(subtitle: str, chunk_size: int = 1000) -> str:
     """
-    Format subtitles using LLM.
+    Format subtitle using LLM.
     Note that Chinese are longer than it seems.
 
     Args:
-        subtitles (str): The subtitles to format
+        subtitle (str): The subtitle to format
         chunk_size (int, optional): Size of chunks to process. Defaults to 1000.
 
     Returns:
-        str: The formatted subtitles
+        str: The formatted subtitle
     """
 
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", PROMPT),
-            ("human", "{subtitles}"),
+            ("human", "{subtitle}"),
         ]
     )
 
@@ -52,9 +52,9 @@ def llm_format_text(subtitles: str, chunk_size: int = 1000) -> str:
 
     chain = prompt | llm | StrOutputParser() | RunnableLambda(s2hk)
 
-    chunked_subtitles = [subtitles[i : i + chunk_size] for i in range(0, len(subtitles), chunk_size)]
-    formatted_subtitles = chain.batch([{"subtitles": chunk} for chunk in chunked_subtitles])
-    return "".join(formatted_subtitles)
+    subtitle_chunks = [subtitle[i : i + chunk_size] for i in range(0, len(subtitle), chunk_size)]
+    formatted_subtitle = chain.batch([{"subtitle": chunk} for chunk in subtitle_chunks])
+    return "".join(formatted_subtitle)
 
 
 import io
@@ -64,16 +64,16 @@ from google import genai
 from .utils import s2hk
 
 
-def llm_format_text_audio(subtitles: str, audio_bytes: bytes) -> str:
+def llm_format_text_audio(subtitle: str, audio_bytes: bytes) -> str:
     """
-    Format subtitles using LLM.
+    Format subtitle using LLM.
 
     Args:
-        subtitles (str): The subtitles to format
+        subtitle (str): The subtitle to format
         audio_bytes (bytes): The audio bytes to format
 
     Returns:
-        str: The formatted subtitles
+        str: The formatted subtitle
     """
     client = genai.Client()
 
@@ -83,12 +83,13 @@ def llm_format_text_audio(subtitles: str, audio_bytes: bytes) -> str:
             config={"mimeType": "audio/mp3"},
         )
 
-    prompt = PROMPT + "\n\nWith reference to the audio, refine the subtitles if necessary."
+    prompt = PROMPT + "\n\nWith reference to the audio, refine the subtitle if necessary."
 
     response = client.models.generate_content(
         model="gemini-2.0-flash",
-        contents=[prompt, subtitles, audio_file],
+        contents=[prompt, subtitle, audio_file],
     )
+
     client.files.delete(name=audio_file.name)
 
     return s2hk(response.text)

@@ -46,14 +46,14 @@ def url_to_subtitles(
     whisper_model: Literal["fal", "hf", "replicate"] = "fal",
     language: str = None,
 ) -> str:
-    """Process a YouTube video: download audio and handle subtitles."""
+    """Process a YouTube video: download audio and handle subtitle."""
     try:
         audio_bytes = youtube_to_audio_bytes(youtube)
         result = whisper_transcribe(audio_bytes, whisper_model, language)
         subtitle = result_to_txt(result)
-        formatted_content = llm_format_text_audio(subtitle, audio_bytes)
+        formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
         print(f"Formatted TXT: {youtube.title}")
-        return formatted_content
+        return formatted_subtitle
 
     except Exception as e:
         error_message = f"Error processing video {youtube.title}: {str(e)}"
@@ -69,24 +69,24 @@ def youtubeloader(
     whisper_model: Literal["fal", "replicate", "hf"] = "fal",
     language: str = None,
 ) -> str:
-    """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+    """Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
         url (str): The YouTube video URL to load
 
     Returns:
-        str: Formatted string containing the video title, author and subtitles
+        str: Formatted string containing the video title, author and subtitle
     """
-    yt = YouTube(
+    youtube = YouTube(
         url,
         use_po_token=True,
         po_token_verifier=po_token_verifier,
     )
     content = [
         "Answer the user's question based on the full content.",
-        f"Title: {yt.title}",
-        f"Author: {yt.author}",
-        "Subtitles:",
-        url_to_subtitles(yt, whisper_model, language),
+        f"Title: {youtube.title}",
+        f"Author: {youtube.author}",
+        "subtitle:",
+        url_to_subtitles(youtube, whisper_model, language),
     ]
     return "\n".join(content)
