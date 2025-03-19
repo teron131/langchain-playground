@@ -84,8 +84,8 @@ def llm_format_text_audio(subtitle: str, audio_bytes: bytes) -> str:
             config={"mimeType": "audio/mp3"},
         )
 
-    parts = PROMPT.split("\n\n")
-    prompt = parts[0] + "\n\nWith reference to the audio, refine the subtitle if there are typos or missing punctuation.\n\n" + "\n\n".join(parts[1:])
+    prompt_parts = PROMPT.split("\n\n")
+    prompt = prompt_parts[0] + "\n\nWith reference to the audio, refine the subtitle if there are typos or missing punctuation.\n\n" + "\n\n".join(prompt_parts[1:])
 
     response = client.models.generate_content(
         model="gemini-2.0-flash",
