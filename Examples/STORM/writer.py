@@ -55,15 +55,13 @@ section_writer_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are an expert Wikipedia writer. Complete your assigned WikiSection from the following outline:
+            """You are an expert Wikipedia writer. Complete your assigned WikiSection from the following outline:
 {outline}
 
 Cite your sources, using the following references:
 <Documents>
 {docs}
-</Documents>
-""",
+</Documents>""",
         ),
         ("user", "Write the full WikiSection for the {section} section."),
     ]
@@ -191,13 +189,11 @@ writer_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are an expert Wikipedia author. Write the complete wiki article on {topic} using the following section drafts:
+            """You are an expert Wikipedia author. Write the complete wiki article on {topic} using the following section drafts:
 {draft}
 
 Strictly follow Wikipedia format guidelines, but keep the content concise and focused.
-Aim to maintain clarity while being efficient with the content length.
-""",
+Aim to maintain clarity while being efficient with the content length.""",
         ),
         (
             "user",
@@ -211,13 +207,11 @@ simple_writer_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-Write a clear and concise Wikipedia article on {topic}. Use the following content as your source:
+            """Write a clear and concise Wikipedia article on {topic}. Use the following content as your source:
 {draft}
 
 Focus on presenting the key information in a straightforward manner.
-Keep the content brief but informative.
-""",
+Keep the content brief but informative.""",
         ),
         (
             "user",

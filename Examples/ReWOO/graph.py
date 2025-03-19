@@ -10,8 +10,7 @@ from typing_extensions import TypedDict
 
 load_dotenv()
 
-planner_prompt = """
-For the following task, make plans that can solve the problem step by step. For each plan, indicate which external tool together with tool input to retrieve evidence. You can store the evidence into a variable #E that can be called by later tools. (Plan, #E1, Plan, #E2, Plan, ...)
+planner_prompt = """For the following task, make plans that can solve the problem step by step. For each plan, indicate which external tool together with tool input to retrieve evidence. You can store the evidence into a variable #E that can be called by later tools. (Plan, #E1, Plan, #E2, Plan, ...)
 
 Tools can be one of the following:
 (1) Google[input]: Worker that searches results from Google. Useful when you need to find short and succinct answers about a specific topic. The input should be a search query.
@@ -26,19 +25,16 @@ Plan: Calculate the number of hours Rebecca worked. #E3 = Calculator[(2 ∗ #E2 
 Begin! 
 Describe your plans with rich details. Each Plan should be followed by only one #E.
 
-Task: {task}
-"""
+Task: {task}"""
 
-solver_prompt = """
-Solve the following task or problem. To solve the problem, we have made step-by-step Plan and retrieved corresponding Evidence to each Plan. Use them with caution since long evidence might contain irrelevant information.
+solver_prompt = """Solve the following task or problem. To solve the problem, we have made step-by-step Plan and retrieved corresponding Evidence to each Plan. Use them with caution since long evidence might contain irrelevant information.
 
 Plan: {plan}
 
 Now solve the question or task according to provided Evidence above. Respond with the answer directly with no extra words.
 
 Task: {task}
-Response:
-"""
+Response:"""
 
 
 class ReWOO(TypedDict):

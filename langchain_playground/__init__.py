@@ -1,6 +1,4 @@
-"""
-LangChain Playground - A collection of LangChain utilities and tools
-"""
+"""LangChain Playground - A collection of LangChain utilities and tools"""
 
 from dotenv import load_dotenv
 

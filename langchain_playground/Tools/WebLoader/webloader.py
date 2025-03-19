@@ -23,8 +23,7 @@ def webloader_langchain(url: str) -> str:
 
 
 def webloader_docling(url: str) -> str:
-    """
-    Load and process the content of a website from URL into a rich unified markdown representation.
+    """Load and process the content of a website from URL into a rich unified markdown representation.
 
     Args:
         url (str): The URL of the website to load
@@ -38,8 +37,7 @@ def webloader_docling(url: str) -> str:
 
 
 def webloader(url: str) -> str:
-    """
-    Load and process the content of a website from URL into a rich unified markdown representation.
+    """Load and process the content of a website from URL into a rich unified markdown representation.
 
     Args:
         url (str): The URL of the website to load

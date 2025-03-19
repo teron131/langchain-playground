@@ -13,8 +13,7 @@ direct_gen_outline_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are an expert Wikipedia writer. Create a detailed outline for a Wikipedia article about the given topic. Your outline should:
+            """You are an expert Wikipedia writer. Create a detailed outline for a Wikipedia article about the given topic. Your outline should:
 - Follow Wikipedia's standard article structure
 - Include all major aspects of the topic
 - Break down complex subjects into clear subsections
@@ -23,8 +22,7 @@ You are an expert Wikipedia writer. Create a detailed outline for a Wikipedia ar
 - Include sections for real-world applications or impact where relevant
 - Add sections for criticism or controversies if applicable
 
-Focus on creating a comprehensive yet well-organized structure that will guide the development of an authoritative article.
-""",
+Focus on creating a comprehensive yet well-organized structure that will guide the development of an authoritative article.""",
         ),
         ("user", "{topic}"),
     ]
@@ -70,8 +68,7 @@ async def get_initial_outline(topic: str):
 
 # Expand Topics
 gen_related_topics_prompt = ChatPromptTemplate.from_template(
-    """
-You are an expert Wikipedia researcher. Identify and recommend Wikipedia pages that are closely related to the given topic. Focus on:
+    """You are an expert Wikipedia researcher. Identify and recommend Wikipedia pages that are closely related to the given topic. Focus on:
 - Core concepts and foundational topics that provide essential context
 - Notable examples and applications that demonstrate real-world relevance
 - Related fields or domains that intersect with the main topic
@@ -80,8 +77,7 @@ You are an expert Wikipedia researcher. Identify and recommend Wikipedia pages t
 
 For each recommended page, provide both the subject and its Wikipedia URL. Aim to be comprehensive in your recommendations while ensuring each suggestion has a clear, meaningful connection to the main topic.
 
-Topic: {topic}
-"""
+Topic: {topic}"""
 )
 
 expand_chain = gen_related_topics_prompt | config.fast_llm.with_structured_output(RelatedSubjects)
@@ -103,8 +99,7 @@ gen_perspectives_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are an expert Wikipedia editor assembling a diverse team of editors to create a comprehensive article. Your task is to select 3-5 editors with distinct perspectives, expertise, and backgrounds related to the topic.
+            """You are an expert Wikipedia editor assembling a diverse team of editors to create a comprehensive article. Your task is to select 3-5 editors with distinct perspectives, expertise, and backgrounds related to the topic.
 
 Each editor should represent a unique viewpoint such as:
 - Academic/theoretical perspective
@@ -125,8 +120,7 @@ For each editor, provide:
 Use the following Wikipedia articles as inspiration for different perspectives and areas to cover:
 {examples}
 
-Ensure the editors' combined expertise will result in balanced, comprehensive coverage of the topic.
-""",
+Ensure the editors' combined expertise will result in balanced, comprehensive coverage of the topic.""",
         ),
         ("user", "Topic of interest: {topic}"),
     ]
@@ -187,8 +181,7 @@ refine_outline_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are a Wikipedia editor refining an article outline based on expert research and interviews. Your goal is to create a comprehensive, well-structured outline that will guide the article writing process.
+            """You are a Wikipedia editor refining an article outline based on expert research and interviews. Your goal is to create a comprehensive, well-structured outline that will guide the article writing process.
 
 Consider these key aspects:
 - Ensure all major topics and subtopics from the original outline are preserved or improved
@@ -200,13 +193,11 @@ Consider these key aspects:
 Topic: {topic}
 
 Original outline for reference:
-{old_outline}
-""",
+{old_outline}""",
         ),
         (
             "user",
-            """
-Review the expert conversations below and refine the outline to incorporate their insights:
+            """Review the expert conversations below and refine the outline to incorporate their insights:
 
 Conversations:
 {conversations}

@@ -111,8 +111,7 @@ def task_fulfillment_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> li
             [
                 (
                     "system",
-                    """
-You are an expert evaluator assessing how effectively an AI response fulfills the user's task instructions. Rate the response on a scale of 0-10 based on the following criteria:
+                    """You are an expert evaluator assessing how effectively an AI response fulfills the user's task instructions. Rate the response on a scale of 0-10 based on the following criteria:
 
 Completeness (0-4 points):
 - 0: Completely fails to address any requirements
@@ -133,8 +132,7 @@ Clarity (0-3 points):
 - 2: Minor clarity issues but generally understandable
 - 3: Crystal clear with no ambiguity
 
-Your final score should be the sum of these criteria. Be extremely critical and only award full points when the response is truly exceptional. Most responses should score in the lower half of the range.
-""",
+Your final score should be the sum of these criteria. Be extremely critical and only award full points when the response is truly exceptional. Most responses should score in the lower half of the range.""",
                 ),
                 ("human", "[Question:] {question}\n[Answer:] {answer}"),
             ]
@@ -164,8 +162,7 @@ def valid_reasoning_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> lis
             [
                 (
                     "system",
-                    """
-You are an expert evaluator assessing the quality of reasoning in AI responses. Rate the response on a scale of 0-10 based on the following strict criteria:
+                    """You are an expert evaluator assessing the quality of reasoning in AI responses. Rate the response on a scale of 0-10 based on the following strict criteria:
 
 Logical Coherence (0-3 points):
 - 0: Incoherent, riddled with contradictions and fallacies
@@ -192,8 +189,7 @@ Your final score should be the sum of the three criteria. Be extremely critical 
 - Demanding sophisticated treatment of edge cases
 - Requiring concrete examples and evidence
 
-Most responses should score in the lower half of the range. Reserve high scores for truly exceptional answers only.
-""",
+Most responses should score in the lower half of the range. Reserve high scores for truly exceptional answers only.""",
                 ),
                 ("human", "[Question:] {question}\n[Answer:] {answer}"),
             ]
@@ -227,8 +223,7 @@ def style_evaluator_pairwise(inputs: dict, outputs: list[dict]) -> list:
             [
                 (
                     "system",
-                    """
-You are an expert evaluator assessing the overall presentation of an AI response. Evaluate the answer on a scale of 0-10 based on the following criteria:
+                    """You are an expert evaluator assessing the overall presentation of an AI response. Evaluate the answer on a scale of 0-10 based on the following criteria:
 
 Formatting & Readability (0-4 points):
 - 0: Unreadable mess with no structure or organization
@@ -249,8 +244,7 @@ Originality vs Redundancy (0-4 points):
 - 3: Mostly original with slight repetition
 - 4: Entirely original and concise
 
-Be extremely critical. Most responses should score in the bottom half of each range. Reserve top scores for truly exceptional cases only.
-""",
+Be extremely critical. Most responses should score in the bottom half of each range. Reserve top scores for truly exceptional cases only.""",
                 ),
                 ("human", "[Question:] {question}\n[Answer:] {answer}"),
             ]

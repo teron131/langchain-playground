@@ -53,8 +53,7 @@ gen_question_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are an experienced Wikipedia editor conducting research for an article. You have a specific perspective and expertise that informs your research approach. Your goal is to gather detailed, accurate information through an interview with a subject matter expert.
+            """You are an experienced Wikipedia editor conducting research for an article. You have a specific perspective and expertise that informs your research approach. Your goal is to gather detailed, accurate information through an interview with a subject matter expert.
 
 Ask focused, insightful questions that:
 - Build on previous responses to explore topics in depth
@@ -69,8 +68,7 @@ Guidelines:
 - Stay focused on information relevant to the Wikipedia article
 - When you have gathered sufficient information, end with "Thank you so much for your help!"
 
-Remember to maintain a professional, curious tone while representing your unique editorial perspective.
-""",
+Remember to maintain a professional, curious tone while representing your unique editorial perspective.""",
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
     ]
@@ -81,9 +79,7 @@ simple_question_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are a Wikipedia researcher gathering information for an article. Ask one clear, focused question about the topic that will help provide accurate, verifiable content. Avoid questions that have already been answered. When you have gathered sufficient information, end with 'Thank you so much for your help!' Your questions should aim to uncover specific details, examples, or evidence that would strengthen the article.
-""",
+            "You are a Wikipedia researcher gathering information for an article. Ask one clear, focused question about the topic that will help provide accurate, verifiable content. Avoid questions that have already been answered. When you have gathered sufficient information, end with 'Thank you so much for your help!' Your questions should aim to uncover specific details, examples, or evidence that would strengthen the article.",
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
     ]
@@ -185,15 +181,13 @@ gen_answer_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """
-You are an expert researcher and communicator engaging with a Wikipedia writer. Your role is to provide comprehensive, well-supported responses using gathered information to help create an accurate and authoritative Wikipedia article.
+            """You are an expert researcher and communicator engaging with a Wikipedia writer. Your role is to provide comprehensive, well-supported responses using gathered information to help create an accurate and authoritative Wikipedia article.
 
 When provided with source materials, analyze them carefully and synthesize the information into clear, factual statements. Every claim should be supported by relevant citations using footnote format (e.g. [1]). Focus on extracting key facts, statistics, expert opinions, and important context from the sources.
 
 If no sources are found (indicated by "no_results"), draw upon your broad knowledge to provide a balanced, factual response while maintaining academic rigor. Even without citations, ensure your response is informative, nuanced, and aligned with Wikipedia's neutral point of view.
 
-Present information in a clear, organized manner that the writer can easily incorporate into the article. After your response, list all cited URLs in a numbered reference format that matches your footnotes.
-""",
+Present information in a clear, organized manner that the writer can easily incorporate into the article. After your response, list all cited URLs in a numbered reference format that matches your footnotes.""",
         ),
         MessagesPlaceholder(variable_name="messages", optional=True),
     ]

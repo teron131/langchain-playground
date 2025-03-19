@@ -1,5 +1,4 @@
-"""
-STORM (Search Through Opinions and Research Methods) is a pipeline for generating
+"""STORM (Search Through Opinions and Research Methods) is a pipeline for generating
 comprehensive Wikipedia-style articles by:
 1. Generating an initial outline
 2. Expanding topics through research
@@ -18,8 +17,7 @@ Example:
     # Generate an article
     article = generate_article("Artificial Intelligence")
     print(article)
-    ```
-"""
+    ```"""
 
 from .config import STORMConfig, config
 from .models import Editor, Outline, WikiSection

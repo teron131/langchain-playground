@@ -27,8 +27,7 @@ def text_to_sql(user_message: str) -> str:
     db = SQLDatabase.from_uri("sqlite:///databases/Chinook.db")
 
     prompt = PromptTemplate.from_template(
-        """
-You are a helpful assistant that can answer questions with reference to the SQL query result from the database.
+        """You are a helpful assistant that can answer questions with reference to the SQL query result from the database.
 Question:
 {question}
 Query:
