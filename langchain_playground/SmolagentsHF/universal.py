@@ -17,8 +17,7 @@ load_dotenv()
 
 class UniversalAgent:
     def __init__(self, model_id: str):
-        """
-        Initialize the UniversalAgent with a language model.
+        """Initialize the UniversalAgent with a language model.
 
         Args:
             model_id (str): The model ID in OpenRouter format.
@@ -36,8 +35,7 @@ class UniversalAgent:
     def create_agent(self) -> MultiStepAgent:
         @tool
         def web_search(query: str) -> str:
-            """
-            Search the web for information based on the query.
+            """Search the web for information based on the query.
 
             Args:
                 query: Search query string
@@ -46,8 +44,7 @@ class UniversalAgent:
 
         @tool
         def web_loader(url: str) -> str:
-            """
-            Load and process the content of a website from URL into a rich unified markdown representation.
+            """Load and process the content of a website from URL into a rich unified markdown representation.
 
             Args:
                 url: The URL of the website to load
@@ -56,8 +53,7 @@ class UniversalAgent:
 
         @tool
         def youtube_loader(url: str) -> str:
-            """
-            Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+            """Load and process a YouTube video's subtitles, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
             Args:
                 url: The YouTube video URL to load

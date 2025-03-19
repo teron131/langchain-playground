@@ -3,9 +3,8 @@ from typing import Dict, List
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from tqdm import tqdm
-
 from notion_api import NotionAPI
+from tqdm import tqdm
 from utils import is_rich_text_block
 
 
@@ -38,8 +37,7 @@ class BaseFormatter:
         raise NotImplementedError
 
     def process_block(self, block: Dict) -> Dict:
-        """
-        Process a block's content while preserving the block structure and formatting.
+        """Process a block's content while preserving the block structure and formatting.
 
         Args:
             block (Dict): A Notion block object to be processed
@@ -64,8 +62,7 @@ class BaseFormatter:
         return block
 
     def process_blocks(self, blocks: List[Dict]) -> None:
-        """
-        Process blocks and update them in Notion.
+        """Process blocks and update them in Notion.
 
         Args:
             blocks (List[Dict]): A list of Notion blocks to be processed
@@ -129,8 +126,7 @@ class Rephraser(BaseFormatter):
         return self.chain.invoke({"text": text}).content
 
     def process_rich_text(self, rich_text: Dict) -> List[Dict]:
-        """
-        Process rich text content by rephrasing it using a language model.
+        """Process rich text content by rephrasing it using a language model.
 
         Args:
             rich_text (Dict): A Notion rich text object containing text content and formatting

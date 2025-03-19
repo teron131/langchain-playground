@@ -265,8 +265,7 @@ class EquationBlockParser:
 
     @staticmethod
     def parse_math_environment(text: str) -> List[Dict]:
-        """
-        Parse a LaTeX math environment and convert it to equation blocks.
+        """Parse a LaTeX math environment and convert it to equation blocks.
 
         Args:
             text (str): The text containing the math environment
@@ -293,8 +292,7 @@ class EquationBlockParser:
 
     @staticmethod
     def parse_equation_block(lines: List[str], start_index: int) -> Tuple[Optional[Dict], int]:
-        """
-        Parse an equation block from the given lines starting at start_index.
+        """Parse an equation block from the given lines starting at start_index.
 
         Args:
             lines (List[str]): List of text lines

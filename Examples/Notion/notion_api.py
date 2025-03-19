@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
-
 from markdown import blocks_to_markdown
 from utils import is_rich_text_block
 
@@ -12,8 +11,7 @@ load_dotenv()
 
 class NotionAPI:
     def __init__(self, PAGE_ID: str = None):
-        """
-        Initialize NotionAPI client with authentication token and page ID.
+        """Initialize NotionAPI client with authentication token and page ID.
         Make sure to connect the page to the integration associated with the token.
         The schemas of the APIs are from https://developers.notion.com/reference
 
@@ -26,9 +24,7 @@ class NotionAPI:
         self.page_id = os.getenv("PAGE_ID") if PAGE_ID is None else PAGE_ID
 
     def read_blocks(self, block_id: Optional[str] = None) -> List[Dict]:
-        """
-        Recursively reads all blocks and their children from a Notion page using cursor-based pagination.
-        """
+        """Recursively reads all blocks and their children from a Notion page using cursor-based pagination."""
         if block_id is None:
             block_id = self.page_id
 
@@ -57,8 +53,7 @@ class NotionAPI:
         return blocks
 
     def read_blocks_markdown(self, block_id: Optional[str] = None) -> str:
-        """
-        Read all text content from a Notion page.
+        """Read all text content from a Notion page.
 
         Returns:
             str: A string containing the text content of the page.
@@ -71,8 +66,7 @@ class NotionAPI:
         return blocks_to_markdown(blocks)
 
     def write_blocks(self, new_blocks: List[Dict]) -> Dict:
-        """
-        Reference: https://developers.notion.com/reference/patch-block-children
+        """Reference: https://developers.notion.com/reference/patch-block-children
 
         Write blocks to a Notion page using the Notion API.
         Makes a PATCH request to append blocks as children of the specified page.
@@ -95,8 +89,7 @@ class NotionAPI:
         return response.json()
 
     def update_block_rich_text(self, block: Dict, new_rich_text: List[Dict]) -> Dict:
-        """
-        Reference: https://developers.notion.com/reference/update-a-block
+        """Reference: https://developers.notion.com/reference/update-a-block
 
         Updates the rich_text field of a block according to its type.
 

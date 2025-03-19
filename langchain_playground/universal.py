@@ -13,8 +13,7 @@ from .Tools import get_tools
 
 class UniversalChain:
     def __init__(self, model_id: str, llm: BaseChatModel = None):
-        """
-        Initialize the UniversalChain with a language model.
+        """Initialize the UniversalChain with a language model.
 
         Args:
             model_id (str): The model ID in OpenRouter format.
@@ -29,8 +28,7 @@ class UniversalChain:
         self.result: dict[str, list[BaseMessage]] = {}
 
     def create_chain(self) -> CompiledGraph:
-        """
-        Create a chain with the configured LLM and tools.
+        """Create a chain with the configured LLM and tools.
 
         Args:
             model_id (str): ID of the language model to use.
@@ -78,8 +76,7 @@ class UniversalChain:
         user_input: str,
         message_history: list[BaseMessage] = None,
     ) -> str:
-        """
-        Invoke the chain with the given input and message history.
+        """Invoke the chain with the given input and message history.
 
         Args:
             user_input (str): The input text.

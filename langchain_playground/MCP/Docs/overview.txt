@@ -348,8 +348,7 @@ The protocol layer handles message framing, request/response linking, and high-l
             request: RequestT,
             result_type: type[Result]
         ) -> Result:
-            """
-            Send request and wait for response. Raises McpError if response contains error.
+            """Send request and wait for response. Raises McpError if response contains error.
             """
             # Request handling implementation
 
@@ -2222,8 +2221,7 @@ You can implement custom transports for:
         read_stream: MemoryObjectReceiveStream[JSONRPCMessage | Exception],
         write_stream: MemoryObjectSendStream[JSONRPCMessage]
     ):
-        """
-        Transport interface for MCP.
+        """Transport interface for MCP.
 
         Args:
             read_stream: Stream to read incoming messages from
