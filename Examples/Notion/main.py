@@ -9,8 +9,7 @@ from notion_api import NotionAPI
 
 
 def process_with_formatters(blocks: List[dict], formatters: List[BaseFormatter]) -> None:
-    """
-    Process blocks through a sequence of formatters.
+    """Process blocks through a sequence of formatters.
 
     Args:
         blocks (List[dict]): Notion blocks to process

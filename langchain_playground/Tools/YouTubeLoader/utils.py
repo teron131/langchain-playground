@@ -28,8 +28,7 @@ def s2hk(content: str) -> str:
 
 
 def convert_time_to_hms(seconds_float: float) -> str:
-    """
-    Converts a time in seconds to 'hh:mm:ss,ms' format for SRT.
+    """Converts a time in seconds to 'hh:mm:ss,ms' format for SRT.
 
     Args:
         seconds_float (float): Time in seconds.
@@ -44,8 +43,7 @@ def convert_time_to_hms(seconds_float: float) -> str:
 
 
 def result_to_srt(result: dict) -> str:
-    """
-    Convert the specific transcription  API response into SRT format string.
+    """Convert the specific transcription  API response into SRT format string.
 
     Args:
         result (Dict): The transcription result from the Whisper model.
@@ -68,8 +66,7 @@ def result_to_srt(result: dict) -> str:
 
 
 def result_to_txt(result: dict) -> str:
-    """
-    Convert the specific transcription API response into plain text format.
+    """Convert the specific transcription API response into plain text format.
 
     Args:
         result (Dict): The transcription result from the Whisper model.
@@ -81,8 +78,7 @@ def result_to_txt(result: dict) -> str:
 
 
 def srt_to_txt(srt_content: str) -> str:
-    """
-    Convert SRT format content to plain text.
+    """Convert SRT format content to plain text.
 
     Args:
         srt_content (str): The SRT formatted content

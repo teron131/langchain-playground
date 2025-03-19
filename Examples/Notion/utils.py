@@ -15,8 +15,7 @@ RICH_TEXT_BLOCKS = frozenset(
 
 
 def is_rich_text_block(block_type: str) -> bool:
-    """
-    Check if a block type supports rich text according to Notion API.
+    """Check if a block type supports rich text according to Notion API.
 
     Args:
         block_type (str): The type of the block to check

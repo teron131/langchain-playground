@@ -26,8 +26,7 @@ async def with_retries(
     success_message: Optional[str] = None,
     **kwargs: Any,
 ) -> T:
-    """
-    Execute an async function with exponential backoff retry logic.
+    """Execute an async function with exponential backoff retry logic.
 
     Args:
         func: The async function to execute
@@ -72,8 +71,7 @@ async def with_retries(
 
 
 def with_fallback(fallback_value: T) -> Callable[[Callable[..., T]], Callable[..., T]]:
-    """
-    Decorator that provides a fallback value if the function fails.
+    """Decorator that provides a fallback value if the function fails.
 
     Args:
         fallback_value: Value to return if the function fails

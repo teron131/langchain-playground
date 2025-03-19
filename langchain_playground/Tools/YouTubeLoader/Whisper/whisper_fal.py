@@ -10,8 +10,7 @@ def whisper_fal(
     audio: Path | bytes,
     language: str = None,
 ) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
-    """
-    Transcribe an audio file using Fal model.
+    """Transcribe an audio file using Fal model.
     https://fal.ai/models/fal-ai/whisper
 
     This function uploads the audio file, subscribes to the transcription service,

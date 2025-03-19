@@ -40,8 +40,7 @@ class FilePaths:
 
 
 def read_text_file(file_path: Path) -> str:
-    """
-    Read text from a file with UTF-8 encoding.
+    """Read text from a file with UTF-8 encoding.
 
     Args:
         file_path (Path): Path to the text file to read
@@ -53,8 +52,7 @@ def read_text_file(file_path: Path) -> str:
 
 
 def write_text_file(file_path: Path, content: str) -> None:
-    """
-    Write text to a file with UTF-8 encoding.
+    """Write text to a file with UTF-8 encoding.
 
     Args:
         file_path (Path): Path to the text file to write
@@ -96,8 +94,7 @@ def download_subtitles(youtube: YouTube) -> None:
 
 
 def process_subtitles(youtube: YouTube, whisper_model: str) -> None:
-    """
-    Process subtitle: download or transcribe as needed.
+    """Process subtitle: download or transcribe as needed.
     Give preference to the uploader's existing manual captions. If unavailable, use Whisper to transcribe the video, as English automatic captions are bad and nonexistent for Chinese.
     """
     paths = FilePaths.from_youtube(youtube)
@@ -150,8 +147,7 @@ def youtubeloader(
     url: str,
     whisper_model: Literal["fal", "hf", "replicate"] = "fal",
 ) -> str:
-    """
-    Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+    """Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
         url (str): The YouTube video URL to load

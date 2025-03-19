@@ -6,9 +6,7 @@ from utils import is_rich_text_block
 
 ## BLOCK TO MARKDOWN
 def blocks_to_markdown(blocks: List[Dict], level: int = 0, number_stack: List[int] = None) -> str:
-    """
-    Convert Notion blocks to markdown while maintaining proper list numbering and nesting.
-    """
+    """Convert Notion blocks to markdown while maintaining proper list numbering and nesting."""
     markdown_list = []
     if number_stack is None:
         number_stack = [0] * 10  # Support up to 10 levels of nesting
@@ -162,8 +160,7 @@ def create_equation_block(lines: List[str], start_index: int) -> Dict:
 
 # Text parsing functions
 def annotate_text(text: str, added_equations: set) -> List[Dict]:
-    """
-    Parse text for markdown formatting annotations and convert to rich text objects, handling bold formatting and other annotations.
+    """Parse text for markdown formatting annotations and convert to rich text objects, handling bold formatting and other annotations.
 
     Args:
         text (str): The text to parse for formatting annotations
@@ -207,8 +204,7 @@ def annotate_text(text: str, added_equations: set) -> List[Dict]:
 
 
 def markdown_to_rich_text(text: str) -> List[Dict]:
-    """
-    Parse inline markdown formatting and convert to rich text objects.
+    """Parse inline markdown formatting and convert to rich text objects.
 
     Args:
         text (str): The markdown text to parse
@@ -415,8 +411,7 @@ class TextBlockParser:
 
 
 def markdown_to_block(line: str) -> Dict:
-    """
-    Parse a single line of markdown text and convert it to a Notion block.
+    """Parse a single line of markdown text and convert it to a Notion block.
 
     Args:
         line (str): A line of markdown text to parse
@@ -441,8 +436,7 @@ def markdown_to_block(line: str) -> Dict:
 
 
 def markdown_to_blocks(markdown: str) -> List[Dict]:
-    """
-    Convert markdown text to Notion blocks.
+    """Convert markdown text to Notion blocks.
 
     Args:
         markdown (str): The markdown text to convert

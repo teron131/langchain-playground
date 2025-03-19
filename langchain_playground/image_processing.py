@@ -36,8 +36,7 @@ def image_to_base64(img: Image.Image, format: str = "JPEG") -> str:
 
 
 def resize_base64_image(image_source: Union[str, Image.Image], max_size: Tuple[int, int] = (512, 512)) -> str:
-    """
-    Resize an image from a URL, local file, or PIL Image and return the result as a base64 string.
+    """Resize an image from a URL, local file, or PIL Image and return the result as a base64 string.
 
     Args:
     image_source (str or Image.Image): URL, local file path, or PIL Image of the image to resize.

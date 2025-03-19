@@ -11,8 +11,7 @@ load_dotenv()
 
 
 def whisper_hf(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
-    """
-    Transcribe audio file using whisper-large-v3-turbo model with Hugging Face optimization.
+    """Transcribe audio file using whisper-large-v3-turbo model with Hugging Face optimization.
 
     Args:
         audio (Path | bytes): The audio file / data to be transcribed.

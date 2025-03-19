@@ -11,8 +11,7 @@ from .utils import data_to_table, format_query
 
 
 def text_to_sql_react(user_message: str) -> str:
-    """
-    Query a SQLite database using natural language and return formatted results.
+    """Query a SQLite database using natural language and return formatted results.
 
     Uses a prebuilt ReAct agent with SQLDatabaseToolkit to:
     1. Parse natural language into SQL queries

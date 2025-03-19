@@ -9,8 +9,7 @@ from .utils import data_to_table, format_query
 
 
 def text_to_sql(user_message: str) -> str:
-    """
-    Query a SQLite database using natural language and return formatted results.
+    """Query a SQLite database using natural language and return formatted results.
 
     Uses a simple pipeline chain that:
     1. Converts natural language to SQL query

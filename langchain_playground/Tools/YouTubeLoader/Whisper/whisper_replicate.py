@@ -8,8 +8,7 @@ load_dotenv()
 
 
 def whisper_replicate(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
-    """
-    Transcribe an audio file using Replicate model.
+    """Transcribe an audio file using Replicate model.
     https://replicate.com/vaibhavs10/incredibly-fast-whisper
 
     This function converts the audio file to base64 URI, and returns the transcription result.

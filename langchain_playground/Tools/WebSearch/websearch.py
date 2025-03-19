@@ -18,8 +18,7 @@ class WebSearchArgs:
 
 
 def tavily_search(websearch_args: WebSearchArgs) -> dict:
-    """
-    Execute a Tavily search query.
+    """Execute a Tavily search query.
 
     args:
         websearch_args (WebSearchArgs): Search arguments containing query and max_results
@@ -39,8 +38,7 @@ def tavily_search(websearch_args: WebSearchArgs) -> dict:
 
 
 def filter_garbage(text: str) -> str:
-    """
-    Removes garbage characters while keeping printable ASCII, Chinese characters, and emojis intact.
+    """Removes garbage characters while keeping printable ASCII, Chinese characters, and emojis intact.
 
     args:
         text (str): The input string containing various characters
@@ -90,8 +88,7 @@ def _summarize_content(response: dict) -> None:
 
 
 def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
-    """
-    Process Tavily search response by filtering results and cleaning content.
+    """Process Tavily search response by filtering results and cleaning content.
 
     args:
         response (dict): Raw Tavily API response
@@ -135,8 +132,7 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
 
 
 def websearch(query: str) -> str:
-    """
-    Search the web for information based on the query.
+    """Search the web for information based on the query.
 
     Args:
         query (str): Search query string

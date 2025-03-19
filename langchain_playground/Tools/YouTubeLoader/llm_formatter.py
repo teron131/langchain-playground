@@ -24,8 +24,7 @@ Refined Subtitle: Welcome back, fellow history enthusiasts, to our channel! Toda
 
 
 def llm_format_text(subtitle: str, chunk_size: int = 1000) -> str:
-    """
-    Format subtitle using LLM.
+    """Format subtitle using LLM.
     Note that Chinese are longer than it seems.
 
     Args:
@@ -66,8 +65,7 @@ from .utils import s2hk
 
 
 def llm_format_text_audio(subtitle: str, audio_bytes: bytes) -> str:
-    """
-    Format subtitle using LLM.
+    """Format subtitle using LLM.
 
     Args:
         subtitle (str): The subtitle to format
