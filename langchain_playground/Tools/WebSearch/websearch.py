@@ -26,7 +26,7 @@ def tavily_search(websearch_args: WebSearchArgs) -> dict:
     Returns:
         dict: Raw Tavily API response
     """
-    tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+    tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
     return tavily_client.search(
         websearch_args.query,
         max_results=websearch_args.max_results,
@@ -49,9 +49,9 @@ def filter_garbage(text: str) -> str:
     PRINTABLE_ASCII = lambda c: 32 <= ord(c) <= 126
     CONTROL_CHARS = "\n\t\r"
     CHINESE = lambda c: "\u4e00" <= c <= "\u9fff"
-    MISC_SYMBOLS = lambda c: "\u2600" <= c <= "\u26FF"
-    DINGBATS = lambda c: "\u2700" <= c <= "\u27BF"
-    EMOJIS = lambda c: "\U0001F300" <= c <= "\U0001F9FF"
+    MISC_SYMBOLS = lambda c: "\u2600" <= c <= "\u26ff"
+    DINGBATS = lambda c: "\u2700" <= c <= "\u27bf"
+    EMOJIS = lambda c: "\U0001f300" <= c <= "\U0001f9ff"
 
     def is_valid_char(c):
         return PRINTABLE_ASCII(c) or c in CONTROL_CHARS or CHINESE(c) or MISC_SYMBOLS(c) or DINGBATS(c) or EMOJIS(c)
