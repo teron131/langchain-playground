@@ -2,6 +2,9 @@ import base64
 from pathlib import Path
 
 import replicate
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def whisper_replicate(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
