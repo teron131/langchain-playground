@@ -1,15 +1,19 @@
+# Store
 fal-client
-google-genai
-ipython
-more-itertools
-numpy
 openai-whisper
 opencc-python-reimplemented
-optimum
-pytubefix
+pydub
 python-dotenv
+pytubefix
 replicate
 tiktoken
 torch
 transformers
-tqdm
+
+# In Memory
+fal-client
+pydub
+python-dotenv
+pytubefix
+replicate
+tiktoken

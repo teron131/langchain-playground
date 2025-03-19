@@ -7,7 +7,7 @@ from pytubefix import Buffer, YouTube
 
 from .llm_formatter import llm_format_text, llm_format_text_audio
 from .utils import po_token_verifier, result_to_txt
-from .Whisper import whisper_transcribe
+from .Whisper import whisper_fal
 
 load_dotenv()
 
@@ -60,7 +60,7 @@ def youtubeloader(
     )
 
     audio_bytes = youtube_to_audio_bytes(youtube)
-    result = whisper_transcribe(audio_bytes, whisper_model, language)
+    result = whisper_fal(audio_bytes, language)
     subtitle = result_to_txt(result)
     formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
     print(f"Formatted TXT: {youtube.title}")
