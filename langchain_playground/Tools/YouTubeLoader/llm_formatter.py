@@ -52,6 +52,7 @@ def llm_format_text(subtitle: str, chunk_size: int = 1000) -> str:
 
     chain = prompt | llm | StrOutputParser() | RunnableLambda(s2hk)
 
+    # Chunking for the output token limit
     subtitle_chunks = [subtitle[i : i + chunk_size] for i in range(0, len(subtitle), chunk_size)]
     formatted_subtitle = chain.batch([{"subtitle": chunk} for chunk in subtitle_chunks])
     return "".join(formatted_subtitle)

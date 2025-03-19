@@ -176,7 +176,7 @@ def youtubeloader(
         audio_bytes = audio_file.read()
 
     subtitle = read_text_file(paths.txt_path)
-    formatted_subtitle = llm_format_text(subtitle)
+    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
     write_text_file(paths.txt_path, formatted_subtitle)
     print(f"Formatted TXT: {paths.txt_path}")
 
