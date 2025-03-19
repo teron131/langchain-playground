@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from pydub import AudioSegment
 from pytubefix import Buffer, YouTube
 
-from .llm_formatter import llm_format_text, llm_format_text_audio
+from .llm_formatter import llm_format
 from .utils import po_token_verifier, result_to_txt
 from .Whisper import whisper_fal
 
@@ -38,12 +38,17 @@ def youtube_to_audio_bytes(youtube: YouTube) -> bytes:
         return output_buffer.getvalue()
 
 
+def youtube_to_subtitle(youtube: YouTube, language: str = None) -> str:
+    """Process a YouTube video: download audio and handle subtitle."""
+    audio_bytes = youtube_to_audio_bytes(youtube)
+    result = whisper_fal(audio_bytes, language)
+    subtitle = result_to_txt(result)
+    formatted_subtitle = llm_format(subtitle, audio_bytes)
+    print(f"Formatted TXT: {youtube.title}")
+
+
 # Main function
-def youtubeloader(
-    url: str,
-    whisper_model: Literal["fal", "replicate", "hf"] = "fal",
-    language: str = None,
-) -> str:
+def youtubeloader(url: str) -> str:
     """Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
@@ -58,11 +63,7 @@ def youtubeloader(
         po_token_verifier=po_token_verifier,
     )
 
-    audio_bytes = youtube_to_audio_bytes(youtube)
-    result = whisper_fal(audio_bytes, language)
-    subtitle = result_to_txt(result)
-    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
-    print(f"Formatted TXT: {youtube.title}")
+    formatted_subtitle = youtube_to_subtitle(youtube, language=None)
 
     content = [
         "Answer the user's question based on the full content.",

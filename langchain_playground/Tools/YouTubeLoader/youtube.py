@@ -5,7 +5,7 @@ from typing import Literal
 from dotenv import load_dotenv
 from pytubefix import YouTube
 
-from .llm_formatter import llm_format_text, llm_format_text_audio
+from .llm_formatter import llm_format
 from .utils import po_token_verifier, result_to_srt, result_to_txt, s2hk, srt_to_txt
 from .Whisper import whisper_transcribe
 
@@ -136,7 +136,7 @@ def youtube_to_subtitle(
         audio_bytes = audio_file.read()
 
     subtitle = read_text_file(paths.txt_path)
-    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
+    formatted_subtitle = llm_format(subtitle, audio_bytes)
     write_text_file(paths.txt_path, formatted_subtitle)
     print(f"Formatted TXT: {paths.txt_path}")
 
@@ -160,21 +160,8 @@ def youtubeloader(
         use_po_token=True,
         po_token_verifier=po_token_verifier,
     )
-    paths = FilePaths.from_youtube(youtube)
-    if paths.txt_path.exists():
-        print(f"Subtitle txt file already exists: {paths.txt_path}")
-        return read_text_file(paths.txt_path)
 
-    download_audio(youtube)
-    process_subtitles(youtube, whisper_model)
-
-    with open(paths.mp3_path, "rb") as audio_file:
-        audio_bytes = audio_file.read()
-
-    subtitle = read_text_file(paths.txt_path)
-    formatted_subtitle = llm_format_text_audio(subtitle, audio_bytes)
-    write_text_file(paths.txt_path, formatted_subtitle)
-    print(f"Formatted TXT: {paths.txt_path}")
+    formatted_subtitle = youtube_to_subtitle(youtube, whisper_model="fal")
 
     content = [
         "Answer the user's question based on the full content.",
