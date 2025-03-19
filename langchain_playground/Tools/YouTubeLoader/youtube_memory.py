@@ -44,7 +44,7 @@ def youtube_to_subtitle(youtube: YouTube, language: str = None) -> str:
     result = whisper_fal(audio_bytes, language)
     subtitle = result_to_txt(result)
     formatted_subtitle = llm_format(subtitle, audio_bytes)
-    print(f"Formatted TXT: {youtube.title}")
+    return formatted_subtitle
 
 
 # Main function
