@@ -66,9 +66,9 @@ def webloader(url: str) -> str:
         str: Formatted string in markdown containing the website URL followed by the processed content
     """
     # Try each loader in sequence, falling back to the next if one fails
-    loaders = [webloader_docling, webloader_langchain, webloader_tavily]
+    webloaders = [webloader_docling, webloader_langchain, webloader_tavily]
 
-    for loader in loaders:
+    for loader in webloaders:
         try:
             return loader(url)
         except Exception:
