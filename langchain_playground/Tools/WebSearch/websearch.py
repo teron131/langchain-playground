@@ -172,7 +172,7 @@ def websearch(query: str) -> str:
     """
     websearch_args = WebSearchArgs(
         query=query,
-        max_results=5,
+        max_results=10,
         filter_score=0.5,
         summarize_content=True,
         suggested_answer=True,
