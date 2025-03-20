@@ -1,7 +1,12 @@
+import os
 import re
 
 from docling.document_converter import DocumentConverter
+from dotenv import load_dotenv
 from langchain_community.document_loaders import WebBaseLoader
+from tavily import TavilyClient
+
+load_dotenv()
 
 
 def webloader_langchain(url: str) -> str:
@@ -15,11 +20,7 @@ def webloader_langchain(url: str) -> str:
     """
     docs = WebBaseLoader(url).load()
     docs = [re.sub(r"\n{3,}", r"\n\n", re.sub(r" {2,}", " ", doc.page_content)) for doc in docs]
-    content = [
-        f"Website: {url}",
-        *docs,
-    ]
-    return "\n\n".join(content)
+    return "\n\n".join(docs)
 
 
 def webloader_docling(url: str) -> str:
@@ -36,6 +37,25 @@ def webloader_docling(url: str) -> str:
     return result.document.export_to_markdown()
 
 
+def webloader_tavily(url: str) -> str:
+    """Execute a Tavily search query.
+    https://docs.tavily.com/documentation/api-reference/endpoint/search
+
+    args:
+        websearch_args (WebSearchArgs): Search arguments containing query and max_results
+
+    Returns:
+        dict: Raw Tavily API response
+    """
+    tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+    response = tavily_client.extract(
+        urls=url,
+        include_images=False,
+        search_depth="advanced",
+    )
+    return response["results"][0]["raw_content"]
+
+
 def webloader(url: str) -> str:
     """Load and process the content of a website from URL into a rich unified markdown representation.
 
@@ -45,7 +65,14 @@ def webloader(url: str) -> str:
     Returns:
         str: Formatted string in markdown containing the website URL followed by the processed content
     """
-    try:
-        return webloader_docling(url)
-    except Exception as e:
-        return webloader_langchain(url)
+    # Try each loader in sequence, falling back to the next if one fails
+    loaders = [webloader_docling, webloader_langchain, webloader_tavily]
+
+    for loader in loaders:
+        try:
+            return loader(url)
+        except Exception:
+            continue
+
+    # If all loaders fail, return an error message
+    return f"Failed to load content from {url} using all available methods."
