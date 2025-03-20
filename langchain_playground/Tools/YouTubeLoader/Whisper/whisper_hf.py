@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore")
 load_dotenv()
 
 
-def whisper_hf(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
+def whisper_hf(audio: Path | bytes) -> dict:
     """Transcribe audio file using whisper-large-v3-turbo model with Hugging Face optimization.
 
     Args:

@@ -22,7 +22,7 @@ fal-client
 # Media Processing
 pillow
 pytubefix
-pydub
+pydubxphoto
 openai-whisper
 transformers
 torch

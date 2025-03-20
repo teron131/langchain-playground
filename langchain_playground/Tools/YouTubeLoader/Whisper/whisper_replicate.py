@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def whisper_replicate(audio: Path | bytes) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
+def whisper_replicate(audio: Path | bytes) -> dict:
     """Transcribe an audio file using Replicate model.
     https://replicate.com/vaibhavs10/incredibly-fast-whisper
 

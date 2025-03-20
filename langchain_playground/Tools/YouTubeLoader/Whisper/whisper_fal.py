@@ -9,7 +9,7 @@ load_dotenv()
 def whisper_fal(
     audio: Path | bytes,
     language: str = None,
-) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
+) -> dict:
     """Transcribe an audio file using Fal model.
     https://fal.ai/models/fal-ai/whisper
 

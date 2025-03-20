@@ -10,7 +10,7 @@ def whisper_transcribe(
     audio: Path | bytes,
     whisper_model: Literal["fal", "replicate", "hf"] = "fal",
     language: str = None,
-) -> dict[str, str | list[dict[str, tuple[float] | str]]]:
+) -> dict:
     """Transcribe audio file using specified whisper model.
 
     Args:

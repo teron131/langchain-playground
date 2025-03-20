@@ -19,6 +19,7 @@ class WebSearchArgs:
 
 def tavily_search(websearch_args: WebSearchArgs) -> dict:
     """Execute a Tavily search query.
+    https://docs.tavily.com/documentation/api-reference/endpoint/search
 
     args:
         websearch_args (WebSearchArgs): Search arguments containing query and max_results
@@ -68,13 +69,21 @@ def _summarize_content(response: dict) -> None:
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_openai import ChatOpenAI
 
-    summarizer = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", "Summarize the following content in 200 words: {raw_content}"),
+            ("system", "Summarize the following content in 200 words."),
+            ("human", "{raw_content}"),
         ]
     )
-    chain = prompt | summarizer
+
+    llm = ChatOpenAI(
+        model="google/gemini-2.0-flash-001",
+        temperature=0,
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        base_url="https://openrouter.ai/api/v1",
+    )
+
+    chain = prompt | llm
 
     raw_content_list = [result["raw_content"] for result in response["results"]]
     none_idx = [i for i, content in enumerate(raw_content_list) if content is None]

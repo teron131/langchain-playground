@@ -3,7 +3,7 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "langchain-playground"
+name = "langchain_playground"
 version = "0.1.0"
 description = "LangChain Playground for my personal use."
 readme = "README.md"
@@ -45,6 +45,7 @@ dependencies = [
     "optimum",
     "pillow",
     "pytubefix",
+    "pydub",
     "tiktoken",
     "torch",
     "transformers",

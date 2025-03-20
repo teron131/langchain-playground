@@ -93,7 +93,10 @@ def download_subtitles(youtube: YouTube) -> None:
     print("No suitable subtitle found for download.")
 
 
-def process_subtitles(youtube: YouTube, whisper_model: str) -> None:
+def process_subtitles(
+    youtube: YouTube,
+    whisper_model: Literal["fal", "hf", "replicate"] = "fal",
+) -> None:
     """Process subtitle: download or transcribe as needed.
     Give preference to the uploader's existing manual captions. If unavailable, use Whisper to transcribe the video, as English automatic captions are bad and nonexistent for Chinese.
     """
@@ -143,10 +146,7 @@ def youtube_to_subtitle(
     return read_text_file(paths.txt_path)
 
 
-def youtubeloader(
-    url: str,
-    whisper_model: Literal["fal", "hf", "replicate"] = "fal",
-) -> str:
+def youtubeloader(url: str) -> str:
     """Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
