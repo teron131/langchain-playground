@@ -3,6 +3,9 @@ import re
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
+from langchain_core.messages import BaseMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from tavily import TavilyClient
 
 load_dotenv()
@@ -64,11 +67,15 @@ def filter_garbage(text: str) -> str:
     return cleaned_text
 
 
-def _summarize_content(response: dict) -> None:
-    """Helper function to summarize content using LLM."""
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_openai import ChatOpenAI
+def summarize_content(raw_content_list: list[str]) -> list[str]:
+    """Batch summarize content.
 
+    Args:
+        raw_content_list (list[str]): List of raw content strings to summarize
+
+    Returns:
+        list[str]: List of summarized content strings
+    """
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "Summarize the following content in 200 words."),
@@ -85,26 +92,19 @@ def _summarize_content(response: dict) -> None:
 
     chain = prompt | llm
 
-    raw_content_list = [result["raw_content"] for result in response["results"]]
-    none_idx = [i for i, content in enumerate(raw_content_list) if content is None]
-
-    summarized_content_list = chain.batch(raw_content_list)
-    content_list = [None if i in none_idx else msg.content for i, msg in enumerate(summarized_content_list)]
-
-    for i, result in enumerate(response["results"]):
-        if content_list[i] is not None:
-            result["content"] = content_list[i]
+    results = chain.batch(raw_content_list)
+    return [result.content for result in results]
 
 
-def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
-    """Process Tavily search response by filtering results and cleaning content.
+def process_response(response: dict, websearch_args: WebSearchArgs) -> dict:
+    """Process Tavily search response by filtering results, cleaning content, and summarizing.
 
     args:
         response (dict): Raw Tavily API response
         websearch_args (WebSearchArgs): Search arguments containing processing options
 
     Returns:
-        str: Formatted string containing filtered and processed search results
+        dict: Processed response
     """
     # Filter results by score
     response["results"] = [result for result in response["results"] if result["score"] >= websearch_args.filter_score]
@@ -118,15 +118,34 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
 
     # Summarize "raw_content" to replace "content"
     if websearch_args.summarize_content:
-        _summarize_content(response)
+        raw_content_list = [result["raw_content"] for result in response["results"]]
+        none_idx = [i for i, content in enumerate(raw_content_list) if content is None]
 
-    content = [
+        summary_list = summarize_content(raw_content_list)
+        content_list = [None if i in none_idx else summary for i, summary in enumerate(summary_list)]
+
+        for i, result in enumerate(response["results"]):
+            if content_list[i] is not None:
+                result["content"] = content_list[i]
+
+
+def format_response(response: dict, websearch_args: WebSearchArgs) -> str:
+    """Format the processed response into a string.
+
+    Args:
+        response (dict): Processed response
+        websearch_args (WebSearchArgs): Search arguments
+
+    Returns:
+        str: Formatted string containing filtered and processed search results
+    """
+    formatted_output = [
         f"Query: {response['query']}\n",
         "Sources:\n",
     ]
 
     for result in response["results"]:
-        content.extend(
+        formatted_output.extend(
             [
                 f"Relevance Score: {result['score']}",
                 f"URL: {result['url']}",
@@ -135,9 +154,9 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> str:
         )
 
     if websearch_args.suggested_answer:
-        content.append(f"Suggested Answer: {response['answer']}")
+        formatted_output.append(f"Suggested Answer: {response['answer']}")
 
-    return "\n".join(content)
+    return "\n".join(formatted_output)
 
 
 def websearch(query: str) -> str:
@@ -157,4 +176,6 @@ def websearch(query: str) -> str:
         suggested_answer=True,
     )
     response = tavily_search(websearch_args)
-    return process_response(response, websearch_args)
+    processed_response = process_response(response, websearch_args)
+    formatted_response = format_response(processed_response, websearch_args)
+    return formatted_response
