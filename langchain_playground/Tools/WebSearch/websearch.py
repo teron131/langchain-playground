@@ -128,6 +128,8 @@ def process_response(response: dict, websearch_args: WebSearchArgs) -> dict:
             if content_list[i] is not None:
                 result["content"] = content_list[i]
 
+    return response
+
 
 def format_response(response: dict, websearch_args: WebSearchArgs) -> str:
     """Format the processed response into a string.
