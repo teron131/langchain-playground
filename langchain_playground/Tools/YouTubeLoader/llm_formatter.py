@@ -1,6 +1,8 @@
+import io
 import os
 
 from dotenv import load_dotenv
+from google import genai
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda
@@ -55,13 +57,6 @@ def llm_format_langchain(subtitle: str, chunk_size: int = 1000) -> str:
     subtitle_chunks = [subtitle[i : i + chunk_size] for i in range(0, len(subtitle), chunk_size)]
     formatted_subtitle = chain.batch([{"subtitle": chunk} for chunk in subtitle_chunks])
     return "".join(formatted_subtitle)
-
-
-import io
-
-from google import genai
-
-from .utils import s2hk
 
 
 def llm_format_gemini(subtitle: str, audio_bytes: bytes) -> str:
