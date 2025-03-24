@@ -12,23 +12,17 @@ def download_youtube_audio(url: str) -> str:
     Returns:
         str: Path to the downloaded audio file
     """
-    # Create audio directory if it doesn't exist
     audio_dir = Path("audio")
     audio_dir.mkdir(exist_ok=True)
 
-    # Initialize YouTube object
     youtube = YouTube(url)
-
-    # Get video ID for filename
     video_title = youtube.title
     mp3_path = audio_dir / f"{video_title}.mp3"
 
-    # Check if file already exists
     if mp3_path.exists():
         print(f"Audio file already exists: {mp3_path}")
         return str(mp3_path)
 
-    # Download audio
     youtube.streams.get_audio_only().download(output_path=str(audio_dir), filename=f"{video_title}.mp3")
     print(f"Downloaded audio: {mp3_path}")
 

@@ -24,6 +24,14 @@ def po_token_verifier() -> Tuple[str, str]:
 
 @lru_cache(maxsize=None)
 def s2hk(content: str) -> str:
+    """Convert Simplified Chinese to Traditional Chinese.
+
+    Args:
+        content (str): The content to convert
+
+    Returns:
+        str: The converted content
+    """
     return OpenCC("s2hk").convert(content)
 
 
@@ -54,13 +62,17 @@ def result_to_srt(result: dict) -> str:
     srt_entries = []
     for counter, chunk in enumerate(result["chunks"], 1):
         chunk: dict
-        start_time = chunk.get("timestamp", [0])[0]
-        end_time = chunk.get("timestamp", [0, start_time + 2.0])[1]  # Add 2 seconds to fade out
+        timestamp: list[float] = chunk.get("timestamp")
+        subtitle: str = chunk.get("text")
+
+        start_time = timestamp[0]
+        end_time = timestamp[1] if timestamp[1] is not None else start_time + 2.0
+
         start_time_hms = convert_time_to_hms(start_time)
         end_time_hms = convert_time_to_hms(end_time)
-        transcript = chunk["text"].strip()
-        transcript = s2hk(transcript)
-        srt_entry = f"{counter}\n{start_time_hms} --> {end_time_hms}\n{transcript}\n\n"
+
+        subtitle = s2hk(subtitle.strip())
+        srt_entry = f"{counter}\n{start_time_hms} --> {end_time_hms}\n{subtitle}\n\n"
         srt_entries.append(srt_entry)
     return "".join(srt_entries)
 
