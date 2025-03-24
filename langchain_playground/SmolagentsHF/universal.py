@@ -22,15 +22,12 @@ class UniversalAgent:
         Args:
             model_id (str): The model ID in OpenRouter format.
         """
-        self.model = self.create_model(model_id)
-        self.agent = self.create_agent()
-
-    def create_model(self, model_id: str) -> Model:
-        return LiteLLMModel(
+        self.model = LiteLLMModel(
             model_id=f"openrouter/{model_id}",
             api_base="https://openrouter.ai/api/v1",
             api_key=os.getenv("OPENROUTER_API_KEY"),
         )
+        self.agent = self.create_agent()
 
     def create_agent(self) -> MultiStepAgent:
         @tool
