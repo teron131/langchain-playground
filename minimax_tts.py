@@ -2,6 +2,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Literal
 
 import requests
 from dotenv import load_dotenv
@@ -86,8 +87,9 @@ def run_tts(
     text: str,
     speed: float = 1.25,
     voice_id: str = "Cantonese_WiselProfessor",
-    emotion: str = "neutral",
+    emotion: Literal["happy", "sad", "angry", "fearful", "disgusted", "surprised", "neutral"] = "neutral",
     language_boost: str = "Chinese,Yue",
+    pause_sec: float = 0.4,
     **kwargs,
 ) -> bytes:
     """Run TTS (Text-to-Speech) using Minimax API.
@@ -112,7 +114,7 @@ def run_tts(
 
     data = {
         "model": kwargs.get("model", "speech-01-hd"),
-        "text": add_pause(text),
+        "text": add_pause(text, pause_sec=pause_sec / speed),
         "voice_setting": {
             "speed": speed,
             "vol": kwargs.get("vol", 1.0),
