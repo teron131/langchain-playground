@@ -82,7 +82,14 @@ def add_pause(text: str, pause_sec: float = 0.5) -> str:
     return DELIMITER.join(text_parts)
 
 
-def run_tts(text: str) -> bytes:
+def run_tts(
+    text: str,
+    speed: float = 1.25,
+    voice_id: str = "Cantonese_WiselProfessor",
+    emotion: str = "neutral",
+    language_boost: str = "Chinese,Yue",
+    **kwargs,
+) -> bytes:
     """Run TTS (Text-to-Speech) using Minimax API.
 
     https://www.minimax.io/platform/document/T2A%20V2?key=66719005a427f0c8a5701643
@@ -95,7 +102,6 @@ def run_tts(text: str) -> bytes:
     """
     MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID")
     MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY")
-    text = add_pause(text)
 
     url = f"https://api.minimaxi.chat/v1/t2a_v2?GroupId={MINIMAX_GROUP_ID}"
 
@@ -105,12 +111,29 @@ def run_tts(text: str) -> bytes:
     }
 
     data = {
-        "model": "speech-01-hd",
-        "text": text,
+        "model": kwargs.get("model", "speech-01-hd"),
+        "text": add_pause(text),
         "voice_setting": {
-            "voice_id": "Cantonese_WiselProfessor",
+            "speed": speed,
+            "vol": kwargs.get("vol", 1.0),
+            "pitch": kwargs.get("pitch", 0),
+            "voice_id": voice_id,
+            "emotion": emotion,
+            "english_normalization": kwargs.get("english_normalization", False),
         },
-        "language_boost": "Chinese,Yue",
+        "audio_setting": {
+            "sample_rate": kwargs.get("sample_rate", 32000),
+            "bitrate": kwargs.get("bitrate", 128000),
+            "format": kwargs.get("format", "mp3"),
+            "channel": kwargs.get("channel", 1),
+        },
+        "pronunciation_dict": {
+            "tone": kwargs.get("pronunciation_tone", []),
+        },
+        "stream": kwargs.get("stream", False),
+        "language_boost": language_boost,
+        "subtitle_enable": kwargs.get("subtitle_enable", False),
+        "output_format": kwargs.get("output_format", "hex"),
     }
 
     response = requests.post(url, headers=headers, json=data)
