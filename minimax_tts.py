@@ -121,7 +121,7 @@ def run_tts(text: str) -> bytes:
 
     # Display the audio in ipynb for playback, if not in ipynb, save to file
     if get_ipython() is not None:
-        display(Audio(data=audio_binary, rate=32000))
+        display(Audio(data=audio_binary, rate=32000))  # Default rate is 32000
     else:
         timestamp = int(time.time())
         file_name = OUTPUT_DIR / f"output_{timestamp}.mp3"
