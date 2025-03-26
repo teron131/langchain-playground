@@ -4,50 +4,13 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import END, START, MessagesState, StateGraph, add_messages
+from langgraph.graph import MessagesState, add_messages
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.store.memory import InMemoryStore
 
 from .Tools import get_tools
 from .utils import load_image_base64
-
-
-class State(MessagesState):
-    model_id: str = "google/gemini-2.0-flash-001"
-
-
-def invoke_react_agent(state: State) -> State:
-    print(state)
-    llm = ChatOpenAI(
-        model=state["model_id"],
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        base_url="https://openrouter.ai/api/v1",
-    )
-    chain = create_react_agent(
-        llm,
-        tools=get_tools(),
-        version="v2",
-    )
-    # Invoke the chain with the messages
-    response = chain.invoke({"messages": state["messages"]})
-    # Return a dictionary with the updated state
-    print(response)
-    return {"messages": response["messages"]}
-
-
-builder = StateGraph(State)
-builder.add_node("invoke_react_agent", invoke_react_agent)
-builder.add_edge(START, "invoke_react_agent")
-builder.add_edge("invoke_react_agent", END)
-graph = builder.compile()
-
-# graph.invoke(
-#     {
-#         "model_id": "google/gemini-2.0-flash-001",
-#         "messages": [HumanMessage(content="Hello, world!")],
-#     }
-# )
 
 
 class UniversalChain:
