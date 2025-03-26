@@ -40,8 +40,8 @@ def get_tools() -> List[BaseTool]:
     tools = [websearch_tool, webloader_tool, youtubeloader_tool]
 
     # Print info for all tools
-    for tool_func in tools:
-        print_tool_info(tool_func)
+    # for tool_func in tools:
+    #     print_tool_info(tool_func)
 
     return tools
 
