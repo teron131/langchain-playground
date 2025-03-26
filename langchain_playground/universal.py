@@ -46,7 +46,7 @@ class UniversalChain:
             base_url="https://openrouter.ai/api/v1",
         )
         self.chain: CompiledGraph = self.create_chain()
-        self.result: dict[str, list[BaseMessage]] = {}
+        self.result: MessagesState = {}
 
     def create_chain(self) -> CompiledGraph:
         """Create a chain with the configured LLM and tools.
