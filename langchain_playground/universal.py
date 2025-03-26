@@ -15,13 +15,13 @@ from .Tools import get_tools
 
 class State(BaseModel):
     model_id: str
-    input_content: str
+    input_text: str
     response: str = ""  # Set default empty string to make it optional during initialization
 
 
 def run_graph(state: State) -> State:
     chain = UniversalChain(state.model_id)
-    state.response = chain.invoke(input_content=state.input_content)
+    state.response = chain.invoke(input_text=state.input_text)
     return state
 
 
@@ -68,8 +68,8 @@ class UniversalChain:
 
     def get_response(
         self,
-        input_content: str,
-        message_history: list[BaseMessage] = None,
+        input_text: str,
+        history_messages: list[BaseMessage] = None,
     ) -> MessagesState:
         """Generate a response to the given input text."""
         # Required for checkpointer and store
@@ -77,25 +77,25 @@ class UniversalChain:
 
         # Include message history if provided, otherwise just the current input
         # Specialized for Open WebUI as the LangChain memory would get lost, likely due to session management, but it has a variable: messages (list[tuple[str, str]])
-        messages = message_history or []
-        messages = add_messages(messages, HumanMessage(content=input_content))
+        messages = history_messages or []
+        messages = add_messages(messages, HumanMessage(content=input_text))
         return self.chain.invoke({"messages": messages}, config)
 
     def invoke(
         self,
-        input_content: str,
-        message_history: list[BaseMessage] = None,
+        input_text: str,
+        history_messages: list[BaseMessage] = None,
     ) -> str:
         """Invoke the chain with the given input and message history.
 
         Args:
-            input_content (str): The input text.
-            message_history (list[BaseMessage], optional): The message history. Defaults to None.
+            input_text (str): The input text.
+            history_messages (list[BaseMessage], optional): The message history. Defaults to None.
 
         Returns:
             str: The response string.
         """
-        self.get_response(input_content, message_history)
+        self.get_response(input_text, history_messages)
         return _extract_answer_message(self.result).content
 
 
