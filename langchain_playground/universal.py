@@ -8,29 +8,46 @@ from langgraph.graph import END, START, MessagesState, StateGraph, add_messages
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.store.memory import InMemoryStore
-from pydantic import BaseModel
 
 from .Tools import get_tools
 from .utils import load_image_base64
 
 
-class State(BaseModel):
-    model_id: str
-    input_text: str
-    response: str = ""  # Set default empty string to make it optional during initialization
+class State(MessagesState):
+    model_id: str = "google/gemini-2.0-flash-001"
 
 
-def run_graph(state: State) -> State:
-    chain = UniversalChain(state.model_id)
-    state.response = chain.invoke(input_text=state.input_text)
-    return state
+def invoke_react_agent(state: State) -> State:
+    print(state)
+    llm = ChatOpenAI(
+        model=state["model_id"],
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        base_url="https://openrouter.ai/api/v1",
+    )
+    chain = create_react_agent(
+        llm,
+        tools=get_tools(),
+        version="v2",
+    )
+    # Invoke the chain with the messages
+    response = chain.invoke({"messages": state["messages"]})
+    # Return a dictionary with the updated state
+    print(response)
+    return {"messages": response["messages"]}
 
 
 builder = StateGraph(State)
-builder.add_node("run_graph", run_graph)
-builder.add_edge(START, "run_graph")
-builder.add_edge("run_graph", END)
+builder.add_node("invoke_react_agent", invoke_react_agent)
+builder.add_edge(START, "invoke_react_agent")
+builder.add_edge("invoke_react_agent", END)
 graph = builder.compile()
+
+# graph.invoke(
+#     {
+#         "model_id": "google/gemini-2.0-flash-001",
+#         "messages": [HumanMessage(content="Hello, world!")],
+#     }
+# )
 
 
 class UniversalChain:
@@ -70,13 +87,13 @@ class UniversalChain:
     def create_input_message(
         self,
         input_text: str,
-        input_image_path_url: str = None,
+        input_image: str = None,
     ) -> HumanMessage:
         """Create a human message with text and optional image content.
 
         Args:
             input_text (str): The text input from the user
-            input_image_path_url (str, optional): Path or URL to an image to include
+            input_image (str, optional): Path or URL to an image to include
 
         Returns:
             HumanMessage: A formatted message object containing text and optional image
@@ -84,27 +101,31 @@ class UniversalChain:
         content = []
         if input_text:
             content.append({"type": "text", "text": input_text})
-        if input_image_path_url:
-            image_base64 = load_image_base64(input_image_path_url)
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
-                }
-            )
+        if input_image:
+            try:
+                image_base64 = load_image_base64(input_image)
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+                    }
+                )
+            except Exception as e:
+                print(f"Error loading image: {e}")
+                print("Skipping image")
         return HumanMessage(content)
 
     def get_response(
         self,
         input_text: str,
-        input_image_path_url: str = None,
+        input_image: str = None,
         history_messages: list[BaseMessage] = None,
     ) -> MessagesState:
         """Generate a response from the ReAct chain.
 
         Args:
             input_text (str): The input text.
-            input_image_path_url (str, optional): Path or URL to an image to include.
+            input_image (str, optional): Path or URL to an image to include.
             history_messages (list[BaseMessage], optional): Previous conversation messages.
 
         Returns:
@@ -115,27 +136,27 @@ class UniversalChain:
         # Specialized for Open WebUI as the LangChain memory would get lost, likely due to session management, but it has a variable: messages (list[tuple[str, str]])
         messages = history_messages or []
 
-        input_message = self.create_input_message(input_text, input_image_path_url)
+        input_message = self.create_input_message(input_text, input_image)
         messages = add_messages(messages, input_message)
         return self.chain.invoke({"messages": messages}, config)
 
     def invoke(
         self,
         input_text: str,
-        input_image_path_url: str = None,
+        input_image: str = None,
         history_messages: list[BaseMessage] = None,
     ) -> str:
         """Invoke the chain with the given input and message history.
 
         Args:
             input_text (str): The input text.
-            input_image_path_url (str, optional): Path or URL to an image to include.
+            input_image (str, optional): Path or URL to an image to include.
             history_messages (list[BaseMessage], optional): Previous conversation messages.
 
         Returns:
             str: The response string.
         """
-        self.get_response(input_text, input_image_path_url, history_messages)
+        self.get_response(input_text, input_image, history_messages)
         return _extract_answer_message(self.result).content
 
 
