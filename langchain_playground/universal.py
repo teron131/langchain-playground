@@ -11,6 +11,7 @@ from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel
 
 from .Tools import get_tools
+from .utils import load_image_base64
 
 
 class State(BaseModel):
@@ -66,36 +67,75 @@ class UniversalChain:
             version="v2",
         )
 
+    def create_input_message(
+        self,
+        input_text: str,
+        input_image_path_url: str = None,
+    ) -> HumanMessage:
+        """Create a human message with text and optional image content.
+
+        Args:
+            input_text (str): The text input from the user
+            input_image_path_url (str, optional): Path or URL to an image to include
+
+        Returns:
+            HumanMessage: A formatted message object containing text and optional image
+        """
+        content = []
+        if input_text:
+            content.append({"type": "text", "text": input_text})
+        if input_image_path_url:
+            image_base64 = load_image_base64(input_image_path_url)
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+                }
+            )
+        return HumanMessage(content)
+
     def get_response(
         self,
         input_text: str,
+        input_image_path_url: str = None,
         history_messages: list[BaseMessage] = None,
     ) -> MessagesState:
-        """Generate a response to the given input text."""
-        # Required for checkpointer and store
-        config = {"configurable": {"thread_id": "universal-chain-session"}}
+        """Generate a response from the ReAct chain.
 
+        Args:
+            input_text (str): The input text.
+            input_image_path_url (str, optional): Path or URL to an image to include.
+            history_messages (list[BaseMessage], optional): Previous conversation messages.
+
+        Returns:
+            MessagesState: The updated message state after processing.
+        """
+        config = {"configurable": {"thread_id": "universal-chain-session"}}
         # Include message history if provided, otherwise just the current input
         # Specialized for Open WebUI as the LangChain memory would get lost, likely due to session management, but it has a variable: messages (list[tuple[str, str]])
         messages = history_messages or []
-        messages = add_messages(messages, HumanMessage(content=input_text))
+
+        input_message = self.create_input_message(input_text, input_image_path_url)
+        messages = add_messages(messages, input_message)
         return self.chain.invoke({"messages": messages}, config)
 
     def invoke(
         self,
         input_text: str,
+        input_image_path_url: str = None,
         history_messages: list[BaseMessage] = None,
     ) -> str:
         """Invoke the chain with the given input and message history.
 
         Args:
             input_text (str): The input text.
-            history_messages (list[BaseMessage], optional): The message history. Defaults to None.
+            input_image_path_url (str, optional): Path or URL to an image to include.
+            history_messages (list[BaseMessage], optional): Previous conversation messages.
 
         Returns:
             str: The response string.
         """
-        self.get_response(input_text, history_messages)
+        self.get_response(input_text, input_image_path_url, history_messages)
         return _extract_answer_message(self.result).content
 
 
