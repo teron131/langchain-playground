@@ -28,7 +28,7 @@ def youtube_to_audio_bytes(youtube: YouTube) -> bytes:
     buffer.download_in_buffer(youtube_stream)
     audio_data = buffer.read()
 
-    # Use AudioSegment to load from memory buffer
+    # Use AudioSegment to decode from memory buffer
     with io.BytesIO(audio_data) as in_memory_file:
         audio_segment: AudioSegment = AudioSegment.from_file(in_memory_file)
 
