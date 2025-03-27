@@ -4,8 +4,7 @@ from dotenv import load_dotenv
 
 from .SmolagentsHF import UniversalAgent
 from .Tools import get_tools
-from .universal_chain import UniversalChain
-from .universal_graph import graph
+from .universal import UniversalChain, graph
 
 load_dotenv()
 
