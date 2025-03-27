@@ -5,9 +5,8 @@ from dotenv import load_dotenv
 from langchain_community.chat_models import ChatLiteLLM
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, MessagesState, StateGraph, add_messages
-from langgraph.graph.state import CompiledGraph, CompiledStateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.pregel import RetryPolicy
 from rich import print
