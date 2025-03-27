@@ -6,14 +6,17 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, MessagesState, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
+from langgraph.pregel import RetryPolicy
 from rich import print
 
 from .Tools import get_tools
-from .utils import load_image_base64, s2hk
+from .utils import load_image_base64
 
 
 class AgentState(MessagesState):
     model_id: str = "google/gemini-2.0-flash-001"
+    # From inheritance:
+    # messages: Annotated[list[AnyMessage], add_messages]
 
 
 def invoke_react_agent(state: AgentState) -> AgentState:
@@ -25,7 +28,6 @@ def invoke_react_agent(state: AgentState) -> AgentState:
     Returns:
         State: The updated state of the messages.
     """
-    state: AgentState
     llm = ChatOpenAI(
         model=state["model_id"],
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -37,12 +39,14 @@ def invoke_react_agent(state: AgentState) -> AgentState:
         version="v2",
     )
     response = chain.invoke({"messages": state["messages"]})
+    # In deployment, the history is automatically handled by the add_messages function in between the nodes
+    # In chain, the history is manually handled by the calling the add_messages function
     return {"messages": response["messages"]}
 
 
 def create_graph() -> CompiledStateGraph:
     builder = StateGraph(AgentState)
-    builder.add_node("invoke_react_agent", invoke_react_agent)
+    builder.add_node("invoke_react_agent", invoke_react_agent, retry=RetryPolicy(max_attempts=3))
     builder.add_edge(START, "invoke_react_agent")
     builder.add_edge("invoke_react_agent", END)
     return builder.compile()
@@ -90,8 +94,8 @@ class UniversalChain:
 
         messages = history_messages or self.messages
 
-        message = _create_message(text, image)
-        messages = add_messages(messages, message)
+        message = create_message(text, image)
+        messages = add_messages(messages, message)  # Append only, auto handles the duplicates
 
         self.result = self.graph.invoke(
             {
@@ -122,7 +126,7 @@ class UniversalChain:
         return self.messages[-1].content
 
 
-def _create_message(text: str, image: str = None) -> HumanMessage:
+def create_message(text: str, image: str = None) -> HumanMessage:
     """Create a human message with text and optional image content.
 
     Args:
