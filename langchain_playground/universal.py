@@ -45,13 +45,13 @@ def invoke_react_agent(state: AgentState) -> AgentState:
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
     )
 
-    chain: CompiledGraph = create_react_agent(
+    agent = create_react_agent(
         model=llm,
         tools=get_tools(),
         version="v2",
     )
 
-    response = chain.invoke({"messages": state["messages"]})
+    response = agent.invoke({"messages": state["messages"]})
     # In deployment, the history is automatically handled by the add_messages function in between the nodes
     # In chain, the history is manually handled by the calling the add_messages function
     return {"messages": response["messages"]}
