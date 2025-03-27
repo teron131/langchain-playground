@@ -59,7 +59,7 @@ def youtubeloader(url: str) -> str:
     """
     youtube = YouTube(
         url,
-        # use_po_token=True,
+        use_po_token=True,
         # po_token_verifier=po_token_verifier,
     )
 
