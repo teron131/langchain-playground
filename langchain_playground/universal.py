@@ -1,6 +1,8 @@
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
+from langchain_community.chat_models import ChatLiteLLM
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_openai import ChatOpenAI
@@ -13,18 +15,18 @@ from rich import print
 from .Tools import get_tools
 from .utils import load_image_base64
 
+load_dotenv()
+
 
 class AgentState(MessagesState):
-    """State for the agent, extending MessagesState with model information."""
+    """State for the agent, extending MessagesState with model information.
 
-    model_id: str = "google/gemini-2.0-flash-001"
-    llm: BaseChatModel = ChatOpenAI(
-        model=model_id,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        base_url="https://openrouter.ai/api/v1",
-    )
-    # From inheritance:
-    # messages: Annotated[list[AnyMessage], add_messages]
+    Args:
+        model_id (str): The model ID in LiteLLM format.
+        messages (list[BaseMessage]): The list of messages, inherited from MessagesState.
+    """
+
+    model_id: str = "openrouter/google/gemini-2.0-flash-001"
 
 
 def invoke_react_agent(state: AgentState) -> AgentState:
@@ -36,8 +38,15 @@ def invoke_react_agent(state: AgentState) -> AgentState:
     Returns:
         AgentState: The updated state of the messages.
     """
+    llm = ChatLiteLLM(
+        model=state["model_id"],
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        gemini_api_key=os.getenv("GEMINI_API_KEY"),
+        openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
+
     chain: CompiledGraph = create_react_agent(
-        model=state["llm"],
+        model=llm,
         tools=get_tools(),
         version="v2",
     )
@@ -66,15 +75,10 @@ class UniversalChain:
         """Initialize the UniversalChain with a language model.
 
         Args:
-            model_id (str): The model ID in OpenRouter format.
+            model_id (str): The model ID in LiteLLM format.
             llm (BaseChatModel, optional): For overriding the default BaseChatModel.
         """
         self.model_id = model_id
-        self.llm = llm or ChatOpenAI(
-            model=model_id,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url="https://openrouter.ai/api/v1",
-        )
         self.graph: CompiledStateGraph = create_graph()
         self.result: MessagesState = {"messages": []}
 
@@ -103,7 +107,6 @@ class UniversalChain:
         self.result = self.graph.invoke(
             {
                 "model_id": self.model_id,
-                "llm": self.llm,
                 "messages": messages,
             },
             config,
