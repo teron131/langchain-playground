@@ -29,7 +29,6 @@ dependencies = [
     "pydub",
     "python-dotenv",
     "pytubefix",
-    "replicate",
     "rich",
     "tavily-python",
     "tqdm",
@@ -37,21 +36,18 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
-# Explicitly exclude openai-whisper or specify a compatible version
-# to avoid the dependency on numba which doesn't support Python 3.12
-whisper = ["openai-whisper<20240930"]
+
 
 [build-system]
 requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["langgraph.templates.react_agent", "react_agent", "Tools"]
+packages = ["universal", "Tools"]
 
 [tool.setuptools.package-dir]
-"langgraph.templates.react_agent" = "src/react_agent"
-"react_agent" = "src/react_agent"
-"Tools" = "src/Tools"
+"universal" = "./universal"
+"Tools" = "./Tools"
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]

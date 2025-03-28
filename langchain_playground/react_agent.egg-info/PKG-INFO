@@ -1,0 +1,35 @@
+Metadata-Version: 2.4
+Name: react-agent
+Version: 0.1.0
+Summary: Deployment of LangChain Playground
+Author-email: Teron <t3ron.ay@gmail.com>
+License-Expression: MIT
+Requires-Python: <3.12,>=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: docling
+Requires-Dist: fal-client
+Requires-Dist: google-genai
+Requires-Dist: httpx
+Requires-Dist: ipython
+Requires-Dist: langchain
+Requires-Dist: langchain-community
+Requires-Dist: langchain-google-genai
+Requires-Dist: langchain-openai
+Requires-Dist: langgraph
+Requires-Dist: langgraph-prebuilt
+Requires-Dist: langsmith
+Requires-Dist: more-itertools
+Requires-Dist: numpy
+Requires-Dist: opencc-python-reimplemented
+Requires-Dist: pandas
+Requires-Dist: pydantic
+Requires-Dist: pydub
+Requires-Dist: python-dotenv
+Requires-Dist: pytubefix
+Requires-Dist: replicate
+Requires-Dist: rich
+Requires-Dist: tavily-python
+Requires-Dist: tqdm
+Provides-Extra: dev
+Requires-Dist: mypy>=1.11.1; extra == "dev"
+Requires-Dist: ruff>=0.6.1; extra == "dev"
