@@ -11,9 +11,10 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.pregel import RetryPolicy
 from rich import print
-from Tools import get_tools
-from universal.configuration import Configuration
-from universal.utils import load_image_base64
+
+from langchain_playground.Deployment.configuration import Configuration
+from langchain_playground.Deployment.utils import load_image_base64
+from langchain_playground.Tools import get_tools
 
 load_dotenv()
 

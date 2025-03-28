@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "langchain_playground"
+version = "0.1.0"
+description = "LangChain Playground for my personal use."
+readme = "README.md"
+authors = [
+    {name = "Teron", email = "teron131@gmail.com"},
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # Core Dependencies
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+
+    # LLM Frameworks
+    "langchain",
+    "langchain-community",
+    "langchain-google-genai",
+    "langchain-openai",
+    "langgraph",
+    "langsmith",
+    "openai",
+    "smolagents",
+
+    # Providers
+    "fal-client",
+    "google-genai",
+
+    # Media Processing
+    "pillow",
+    "pytubefix",
+    "pydub",
+
+    # Document Processing
+    "docling",
+    "opencc-python-reimplemented",
+    "tavily-python",
+
+    # Utilities
+    "httpx",
+    "ipython",
+    "more-itertools",
+    "tqdm",
+    "tiktoken",
+]
+
+[project.optional-dependencies]
+whisper = [
+    "replicate",
+    "optimum",
+    "torch",
+    "transformers",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/teron131/langchain-playground"
+"Bug Tracker" = "https://github.com/teron131/langchain-playground/issues"
+
+[tool.setuptools.packages.find]
+include = ["langchain_playground"]

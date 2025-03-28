@@ -1,3 +1,44 @@
+Metadata-Version: 2.4
+Name: react-agent
+Version: 0.1.0
+Summary: Deployment of LangChain Playground
+Author-email: Teron <t3ron.ay@gmail.com>
+License-Expression: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: pydantic
+Requires-Dist: python-dotenv
+Requires-Dist: langchain
+Requires-Dist: langchain-community
+Requires-Dist: langchain-google-genai
+Requires-Dist: langchain-openai
+Requires-Dist: langgraph
+Requires-Dist: langsmith
+Requires-Dist: openai
+Requires-Dist: smolagents
+Requires-Dist: fal-client
+Requires-Dist: google-genai
+Requires-Dist: pillow
+Requires-Dist: pytubefix
+Requires-Dist: pydub
+Requires-Dist: docling
+Requires-Dist: opencc-python-reimplemented
+Requires-Dist: tavily-python
+Requires-Dist: httpx
+Requires-Dist: ipython
+Requires-Dist: more-itertools
+Requires-Dist: tqdm
+Requires-Dist: tiktoken
+Provides-Extra: whisper
+Requires-Dist: replicate; extra == "whisper"
+Requires-Dist: optimum; extra == "whisper"
+Requires-Dist: torch; extra == "whisper"
+Requires-Dist: transformers; extra == "whisper"
+Dynamic: license-file
+
 # LangChain Playground
 
 A collection of LangChain utilities and tools for experimental, prototyping, and personal use.
@@ -8,10 +49,7 @@ You can install this package directly from GitHub:
 
 ```bash
 git clone https://github.com/teron131/langchain-playground.git
-# Use
 pip install -U ./langchain-playground
-# Use and develop
-pip install -e .
 ```
 
 ## Modules

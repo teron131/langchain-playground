@@ -23,7 +23,6 @@ fal-client
 pillow
 pytubefix
 pydub
-openai-whisper
 transformers
 torch
 optimum

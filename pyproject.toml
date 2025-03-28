@@ -1,24 +1,13 @@
-[build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "langchain_playground"
+name = "react-agent"
 version = "0.1.0"
-description = "LangChain Playground for my personal use."
-readme = "README.md"
+description = "Deployment of LangChain Playground"
 authors = [
-    {name = "Teron", email = "teron131@gmail.com"},
+    { name = "Teron", email = "t3ron.ay@gmail.com" },
 ]
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
 dependencies = [
     # Core Dependencies
     "numpy",
@@ -26,7 +15,7 @@ dependencies = [
     "pydantic",
     "python-dotenv",
 
-    # LangChain Framework
+    # LLM Frameworks
     "langchain",
     "langchain-community",
     "langchain-google-genai",
@@ -34,21 +23,16 @@ dependencies = [
     "langgraph",
     "langsmith",
     "openai",
+    "smolagents",
 
     # Providers
     "fal-client",
     "google-genai",
-    "replicate",
 
     # Media Processing
-    "openai-whisper",
-    "optimum",
     "pillow",
     "pytubefix",
     "pydub",
-    "tiktoken",
-    "torch",
-    "transformers",
 
     # Document Processing
     "docling",
@@ -60,11 +44,58 @@ dependencies = [
     "ipython",
     "more-itertools",
     "tqdm",
+    "tiktoken",
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/teron131/langchain-playground"
-"Bug Tracker" = "https://github.com/teron131/langchain-playground/issues"
+[project.optional-dependencies]
+whisper = [
+    "replicate",
+    "optimum",
+    "torch",
+    "transformers",
+]
 
-[tool.setuptools.packages.find]
-include = ["langchain_playground"]
+[build-system]
+requires = ["setuptools>=73.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["Deployment", "Tools"]
+
+[tool.setuptools.package-dir]
+"Deployment" = "./langchain_playground/Deployment"
+"Tools" = "./langchain_playground/Tools"
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.ruff]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "D",    # pydocstyle
+    "D401", # First line should be in imperative mood
+    "T201",
+    "UP",
+]
+ignore = [
+    "UP006",
+    "UP007",
+    # We actually do want to import from typing_extensions
+    "UP035",
+    # Relax the convention by _not_ requiring documentation for every function parameter.
+    "D417",
+    "E501",
+]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["D", "UP"]
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[dependency-groups]
+dev = [
+    "langgraph-cli[inmem]",
+]
