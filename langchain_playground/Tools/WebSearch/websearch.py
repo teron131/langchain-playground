@@ -3,7 +3,6 @@ import re
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from tavily import TavilyClient
