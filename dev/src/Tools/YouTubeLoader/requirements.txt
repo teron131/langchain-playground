@@ -1,0 +1,19 @@
+# Store
+fal-client
+openai-whisper
+opencc-python-reimplemented
+pydub
+python-dotenv
+pytubefix
+replicate
+tiktoken
+torch
+transformers
+
+# In Memory
+fal-client
+pydub
+python-dotenv
+pytubefix
+replicate
+tiktoken
