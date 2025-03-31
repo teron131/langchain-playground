@@ -1,5 +1,5 @@
 [project]
-name = "react-agent"
+name = "langchain-playground"
 version = "0.1.0"
 description = "Deployment of LangChain Playground"
 authors = [
