@@ -20,15 +20,21 @@ from langchain_playground.Tools import get_tools
 load_dotenv()
 
 
-def get_llm_from_configuration(configuration: Configuration) -> BaseChatModel:
+def load_config(config: Configuration | RunnableConfig) -> Configuration:
+    """Helper function to unambiguously load a Configuration from a RunnableConfig."""
+    return config if isinstance(config, Configuration) else Configuration.from_runnable_config(config)
+
+
+def get_llm_from_config(config: Configuration | RunnableConfig) -> BaseChatModel:
     """Get the LLM from the configuration.
 
     Args:
-        config (RunnableConfig): The configuration to get the LLM from.
+        config (Configuration | RunnableConfig): The configuration to get the LLM from.
 
     Returns:
         BaseChatModel: The LLM.
     """
+    configuration = load_config(config)
     model = configuration.suggested_model or configuration.custom_model
     if configuration.provider == "OpenAI":
         return ChatOpenAI(
@@ -59,9 +65,22 @@ def invoke_react_agent(state: MessagesState, config: RunnableConfig) -> Messages
     """
     configuration = Configuration.from_runnable_config(config)
 
+    model = get_llm_from_config(configuration)
+
+    tools = get_tools()
+    enabled_tools = []
+    if configuration.WebSearch == "Yes":
+        enabled_tools.append("websearch_tool")
+    if configuration.WebLoader == "Yes":
+        enabled_tools.append("webloader_tool")
+    if configuration.YouTubeLoader == "Yes":
+        enabled_tools.append("youtubeloader_tool")
+    tools = [tool for tool in tools if tool.name in enabled_tools]
+
     agent = create_react_agent(
-        model=get_llm_from_configuration(configuration),
-        tools=get_tools(),
+        model=model,
+        tools=tools,
+        prompt=configuration.system_prompt,
         version="v2",
     )
 

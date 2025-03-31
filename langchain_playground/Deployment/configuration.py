@@ -1,7 +1,5 @@
 """Define the configurable parameters for the agent."""
 
-from __future__ import annotations
-
 from typing import Literal, Optional
 
 from langchain_core.runnables import RunnableConfig, ensure_config
@@ -32,22 +30,32 @@ class Configuration(BaseModel):
 
     suggested_model: Literal[*MODELS] = Field(  # type: ignore
         default="openai/gpt-4o-mini",
-        description="The model ID in OpenRouter format to use for the agent's main interactions.",
+        description="The model ID in OpenRouter format.",
     )
 
     custom_model: str = Field(
         default="",
-        description="The model ID in OpenRouter format to use for the agent's main interactions.",
+        description="The model ID in OpenRouter format. If not provided, the suggested model will be used.",
+    )
+
+    WebSearch: Literal["Yes", "No"] = Field(
+        default="Yes",
+        description="Whether to use the WebSearch tool.",
+    )
+
+    WebLoader: Literal["Yes", "No"] = Field(
+        default="Yes",
+        description="Whether to use the WebLoader tool.",
+    )
+
+    YouTubeLoader: Literal["Yes", "No"] = Field(
+        default="Yes",
+        description="Whether to use the YouTubeLoader tool.",
     )
 
     system_prompt: str = Field(
         default="",
-        description="The system prompt to use for the agent's interactions. This prompt sets the context and behavior for the agent.",
-    )
-
-    max_search_results: int = Field(
-        default=10,
-        description="The maximum number of search results to return for each search query.",
+        description="The system prompt to sets the context and behavior for the agent.",
     )
 
     @classmethod
