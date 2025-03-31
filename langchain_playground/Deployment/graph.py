@@ -6,14 +6,14 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langchain_playground.Deployment.configuration import Configuration
+from langchain_playground.Deployment.utils import load_image_base64
 from langgraph.graph import END, START, MessagesState, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.pregel import RetryPolicy
 from rich import print
 
-from langchain_playground.Deployment.configuration import Configuration
-from langchain_playground.Deployment.utils import load_image_base64
 from langchain_playground.Tools import get_tools
 
 load_dotenv()
@@ -31,7 +31,7 @@ def invoke_react_agent(state: MessagesState, config: RunnableConfig) -> Messages
     configuration = Configuration.from_runnable_config(config)
 
     llm = ChatOpenAI(
-        model=configuration.model,
+        model=configuration.suggested_model or configuration.custom_model,
         api_key=os.getenv("OPENROUTER_API_KEY"),
         base_url="https://openrouter.ai/api/v1",
     )

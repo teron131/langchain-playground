@@ -25,19 +25,14 @@ MODELS = sorted(
 class Configuration(BaseModel):
     """The configuration for the agent."""
 
-    provider: Literal["OpenAI", "Google", "OpenRouter"] = Field(
-        default="OpenAI",
-        description="The provider to use for the agent's interactions. Should be one of: OpenAI, Google, OpenRouter.",
-    )
-
     suggested_model: Literal[*MODELS] = Field(  # type: ignore
         default="openai/gpt-4o-mini",
-        description="The name of the language model to use for the agent's main interactions. Should be in the form: provider/model-name.",
+        description="The model ID in OpenRouter format to use for the agent's main interactions.",
     )
 
     custom_model: str = Field(
         default="",
-        description="The name of the language model to use for the agent's main interactions. Should be in the form: provider/model-name.",
+        description="The model ID in OpenRouter format to use for the agent's main interactions.",
     )
 
     system_prompt: str = Field(
