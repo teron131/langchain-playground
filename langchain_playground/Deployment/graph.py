@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langchain_playground.Deployment.configuration import Configuration
 from langchain_playground.Deployment.utils import load_image_base64
@@ -19,6 +20,34 @@ from langchain_playground.Tools import get_tools
 load_dotenv()
 
 
+def get_llm_from_configuration(configuration: Configuration) -> BaseChatModel:
+    """Get the LLM from the configuration.
+
+    Args:
+        config (RunnableConfig): The configuration to get the LLM from.
+
+    Returns:
+        BaseChatModel: The LLM.
+    """
+    model = configuration.suggested_model or configuration.custom_model
+    if configuration.provider == "OpenAI":
+        return ChatOpenAI(
+            model=model,
+            api_key=os.getenv("OPENAI_API_KEY"),
+        )
+    elif configuration.provider == "Google":
+        return ChatGoogleGenerativeAI(
+            model=model,
+            api_key=os.getenv("GOOGLE_API_KEY"),
+        )
+    elif configuration.provider == "OpenRouter":
+        return ChatOpenAI(
+            model=model,
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url="https://openrouter.ai/api/v1",
+        )
+
+
 def invoke_react_agent(state: MessagesState, config: RunnableConfig) -> MessagesState:
     """Create the ReAct agent and invoke it with the messages.
 
@@ -30,14 +59,8 @@ def invoke_react_agent(state: MessagesState, config: RunnableConfig) -> Messages
     """
     configuration = Configuration.from_runnable_config(config)
 
-    llm = ChatOpenAI(
-        model=configuration.suggested_model or configuration.custom_model,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        base_url="https://openrouter.ai/api/v1",
-    )
-
     agent = create_react_agent(
-        model=llm,
+        model=get_llm_from_configuration(configuration),
         tools=get_tools(),
         version="v2",
     )

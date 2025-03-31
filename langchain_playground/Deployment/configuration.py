@@ -25,6 +25,11 @@ MODELS = sorted(
 class Configuration(BaseModel):
     """The configuration for the agent."""
 
+    provider: Literal["OpenAI", "Google", "OpenRouter"] = Field(
+        default="OpenRouter",
+        description="The provider to call the model from.",
+    )
+
     suggested_model: Literal[*MODELS] = Field(  # type: ignore
         default="openai/gpt-4o-mini",
         description="The model ID in OpenRouter format to use for the agent's main interactions.",
