@@ -10,11 +10,11 @@ warnings.filterwarnings("ignore")
 load_dotenv()
 
 
-def whisper_hf(audio: Path | bytes) -> dict:
+def whisper_hf(audio: str | bytes) -> dict:
     """Transcribe audio file using whisper-large-v3-turbo model with Hugging Face optimization.
 
     Args:
-        audio (Path | bytes): The audio file / data to be transcribed.
+        audio (str | bytes): The audio file path string or bytes data to be transcribed.
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {
