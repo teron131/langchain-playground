@@ -90,7 +90,7 @@ def llm_format_gemini(subtitle: str, audio_bytes: bytes) -> str:
     return s2hk(response.text)
 
 
-def llm_format(subtitle: str, audio_bytes: bytes, chunk_size: int = 1000) -> str:
+def llm_format(subtitle: str, audio_bytes: bytes = None, chunk_size: int = 1000) -> str:
     """Format subtitle using LLM.
 
     Args:
