@@ -71,10 +71,11 @@ def result_to_srt(result: dict) -> str:
         start_time_hms = convert_time_to_hms(start_time)
         end_time_hms = convert_time_to_hms(end_time)
 
-        subtitle = s2hk(subtitle.strip())
+        subtitle = subtitle.strip()
         srt_entry = f"{counter}\n{start_time_hms} --> {end_time_hms}\n{subtitle}\n\n"
         srt_entries.append(srt_entry)
-    return "".join(srt_entries)
+    srt_content = "".join(srt_entries)
+    return s2hk(srt_content)
 
 
 def result_to_txt(result: dict) -> str:
@@ -86,7 +87,8 @@ def result_to_txt(result: dict) -> str:
     Returns:
         str: Plain text formatted string with each chunk on a new line
     """
-    return "\n".join(s2hk(cast(str, chunk["text"]).strip()) for chunk in result["chunks"])
+    txt_content = "\n".join(cast(str, chunk["text"]).strip() for chunk in result["chunks"])
+    return s2hk(txt_content)
 
 
 def srt_to_txt(srt_content: str) -> str:
@@ -98,4 +100,5 @@ def srt_to_txt(srt_content: str) -> str:
     Returns:
         str: Plain text with only the transcript lines
     """
-    return "\n".join(s2hk(line.strip()) for line in srt_content.splitlines() if not line.strip().isdigit() and "-->" not in line and line.strip())
+    txt_content = "\n".join(line.strip() for line in srt_content.splitlines() if not line.strip().isdigit() and "-->" not in line and line.strip())
+    return s2hk(txt_content)
