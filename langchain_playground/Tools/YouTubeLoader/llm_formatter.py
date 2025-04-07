@@ -25,13 +25,13 @@ Original Subtitle: welcome back fellow history enthusiasts to our channel today 
 Refined Subtitle: Welcome back, fellow history enthusiasts, to our channel! Today, we embark on a thrilling expedition."""
 
 
-def llm_format_langchain(subtitle: str, chunk_size: int = 1000) -> str:
+def llm_format_langchain(subtitle: str, chunk_size: int = 4096) -> str:
     """Format subtitle using LLM.
     Note that Chinese are longer than it seems.
 
     Args:
         subtitle (str): The subtitle to format
-        chunk_size (int, optional): Size of chunks to process. Defaults to 1000.
+        chunk_size (int, optional): Size of chunks to process.
 
     Returns:
         str: The formatted subtitle
@@ -90,13 +90,13 @@ def llm_format_gemini(subtitle: str, audio_bytes: bytes) -> str:
     return s2hk(response.text)
 
 
-def llm_format(subtitle: str, audio_bytes: bytes = None, chunk_size: int = 1000) -> str:
+def llm_format(subtitle: str, audio_bytes: bytes = None, chunk_size: int = 4096) -> str:
     """Format subtitle using LLM.
 
     Args:
         subtitle (str): The subtitle to format
         audio_bytes (bytes): The audio bytes to format
-        chunk_size (int, optional): Size of chunks to process. Defaults to 1000.
+        chunk_size (int, optional): Size of chunks to process.
 
     Returns:
         str: The formatted subtitle
