@@ -15,6 +15,7 @@ def whisper_replicate(audio: Path | bytes) -> dict:
 
     Args:
         audio (Path | bytes): The audio file / data to be transcribed.
+        
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {

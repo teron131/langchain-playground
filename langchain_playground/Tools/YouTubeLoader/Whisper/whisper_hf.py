@@ -15,6 +15,7 @@ def whisper_hf(audio: str | bytes) -> dict:
 
     Args:
         audio (str | bytes): The audio file path string or bytes data to be transcribed.
+        
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {

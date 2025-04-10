@@ -18,6 +18,7 @@ def whisper_fal(audio: Path | bytes, language: str = None) -> dict:
     Args:
         audio (Path | bytes): The audio file / data to be transcribed.
         language (str): The language of the audio file. Defaults to "en".
+        
     Returns:
         dict: A dictionary containing the transcription result with the following structure:
             {
