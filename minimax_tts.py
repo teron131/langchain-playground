@@ -3,12 +3,9 @@ import re
 import tarfile
 import time
 from pathlib import Path
-from typing import Literal
 
 import requests
 from dotenv import load_dotenv
-from IPython import get_ipython
-from IPython.display import Audio, display
 
 load_dotenv()
 
