@@ -4,14 +4,49 @@ A collection of LangChain utilities and tools for experimental, prototyping, and
 
 ## Installation
 
-You can install this package directly from GitHub:
+### Prerequisites
 
+- Python >= 3.12
+- uv (recommended) or pip
+
+### Basic Installation
+
+**Using uv (recommended):**
 ```bash
 git clone https://github.com/teron131/langchain-playground.git
-# Use
-pip install -U ./langchain-playground
-# Use and develop
+cd langchain-playground
+uv sync
+```
+
+**Using pip:**
+```bash
+git clone https://github.com/teron131/langchain-playground.git
+cd langchain-playground
 pip install -e .
+```
+
+### Optional Dependencies
+
+The package includes optional dependencies for specific features:
+
+**Whisper (Audio/Speech Processing):**
+```bash
+# With uv
+uv sync --extra whisper
+
+# With pip
+pip install -e .[whisper]
+```
+
+### Development Installation
+
+For development with all dependencies:
+```bash
+# With uv (recommended)
+uv sync --all-extras
+
+# With pip
+pip install -e .[whisper]
 ```
 
 ## Modules
@@ -57,7 +92,7 @@ Utilities for image processing and manipulation, such as loading, resizing, and 
 
 ## Requirements
 
-- Python >= 3.9
+- Python >= 3.12
 - Dependencies are automatically installed during package installation
 
 ## Environment Variables
