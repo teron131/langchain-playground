@@ -40,7 +40,7 @@ def invoke_react_agent(state: AgentState) -> AgentState:
     llm = ChatLiteLLM(
         model=state["model_id"],
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY"),
+        GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY"),
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
     )
 
