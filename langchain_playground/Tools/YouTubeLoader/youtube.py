@@ -48,7 +48,7 @@ def youtube_to_subtitle(youtube: YouTube, language: str = None) -> str:
 
 
 # Main function
-def youtubeloader(url: str) -> str:
+def youtube_loader(url: str) -> str:
     """Load and process a YouTube video's subtitle, title, and author information from a URL. Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
 
     Args:
@@ -60,7 +60,7 @@ def youtubeloader(url: str) -> str:
     youtube = YouTube(
         url,
         use_po_token=True,
-        # po_token_verifier=po_token_verifier,
+        po_token_verifier=po_token_verifier,
     )
 
     formatted_subtitle = youtube_to_subtitle(youtube, language=None)

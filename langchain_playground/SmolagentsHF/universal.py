@@ -10,7 +10,7 @@ from smolagents import (
     tool,
 )
 
-from langchain_playground.Tools import webloader, websearch, youtubeloader
+from langchain_playground.Tools import webloader, websearch, youtube_loader
 
 load_dotenv()
 

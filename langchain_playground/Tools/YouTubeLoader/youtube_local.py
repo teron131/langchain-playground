@@ -168,7 +168,7 @@ class YouTubeProcessor:
         return FileUtils.read_text(self.paths.txt_path)
 
 
-def youtubeloader(
+def youtube_loader(
     url: str,
     whisper_model: Literal["fal", "hf", "replicate"] = "fal",
 ) -> str:

@@ -81,6 +81,7 @@ Agent framework with code interpreter capabilities.
 
 - **WebSearch**: Tools for performing web searches.
 - **YouTubeLoader**: Tools for processing YouTube content, including transcription using Whisper.
+  - Install [youtube-po-token-generator](https://github.com/YunzheZJU/youtube-po-token-generator) to get the PO token.
 
 ### gemini.py
 

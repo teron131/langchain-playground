@@ -1,3 +1,3 @@
-from .youtube import youtubeloader
+from .youtube import youtube_loader
 
-__all__ = ["youtubeloader"]
+__all__ = ["youtube_loader"]

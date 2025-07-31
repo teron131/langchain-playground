@@ -6,7 +6,7 @@ from rich import print
 
 from .WebLoader import webloader
 from .WebSearch import websearch
-from .YouTubeLoader import youtubeloader
+from .YouTubeLoader import youtube_loader
 
 
 def print_tool_info(tool_func: BaseTool) -> None:
@@ -33,9 +33,9 @@ def get_tools() -> List[BaseTool]:
         return webloader(url)
 
     @tool
-    @wraps(youtubeloader)
+    @wraps(youtube_loader)
     def youtubeloader_tool(url: str) -> str:
-        return youtubeloader(url)
+        return youtube_loader(url)
 
     tools = [websearch_tool, webloader_tool, youtubeloader_tool]
 
@@ -50,5 +50,5 @@ __all__ = [
     "get_tools",
     "websearch",
     "webloader",
-    "youtubeloader",
+    "youtube_loader",
 ]
