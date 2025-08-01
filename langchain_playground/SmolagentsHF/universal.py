@@ -55,7 +55,7 @@ class UniversalAgent:
             Args:
                 url: The YouTube video URL to load
             """
-            return youtubeloader(url)
+            return youtube_loader(url)
 
         return CodeAgent(
             tools=[web_search, web_loader, youtube_loader],

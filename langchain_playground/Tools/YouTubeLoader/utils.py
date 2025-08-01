@@ -1,25 +1,90 @@
 import json
+import os
 import subprocess
+import time
 from functools import lru_cache
-from typing import Tuple, cast
+from typing import Optional, Tuple, cast
 
+from dotenv import load_dotenv
 from opencc import OpenCC
 
+load_dotenv()
 
-# npm install -g npm@11.1.0
+# Cache for tokens with expiration
+_token_cache = {"tokens": None, "timestamp": 0, "expires_in": 3600}  # 1 hour
+
+
+def get_cached_tokens() -> Optional[Tuple[str, str]]:
+    """Get cached tokens if they haven't expired."""
+    if _token_cache["tokens"] and (time.time() - _token_cache["timestamp"]) < _token_cache["expires_in"]:
+        return _token_cache["tokens"]
+    return None
+
+
+def set_cached_tokens(tokens: Tuple[str, str]) -> None:
+    """Cache tokens with current timestamp."""
+    _token_cache["tokens"] = tokens
+    _token_cache["timestamp"] = time.time()
+
+
+def generate_tokens_from_cli() -> Tuple[str, str]:
+    """Generate tokens using the CLI tool."""
+    try:
+        result = subprocess.run(
+            ["youtube-po-token-generator"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            tokens = json.loads(result.stdout.strip())
+            return tokens["visitorData"], tokens["poToken"]
+        else:
+            raise RuntimeError(f"CLI tool failed: {result.stderr}")
+    except Exception as e:
+        print(f"CLI token generation failed: {e}")
+        # Fallback to node.js method
+        result = subprocess.run(
+            [
+                "node",
+                "-e",
+                "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        tokens = json.loads(result.stdout)
+        return tokens["visitorData"], tokens["poToken"]
+
+
 def po_token_verifier() -> Tuple[str, str]:
-    """Get YouTube authentication tokens using node.js generator and return as tuple."""
-    result = subprocess.run(
-        [
-            "node",
-            "-e",
-            "const{generate}=require('youtube-po-token-generator');generate().then(t=>console.log(JSON.stringify(t)));",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    tokens = json.loads(result.stdout)
-    return tokens["visitorData"], tokens["poToken"]
+    """Get YouTube authentication tokens with proper caching and fallback strategies."""
+    # Check for environment variables first
+    visitor_data = os.getenv("YOUTUBE_VISITOR_DATA")
+    po_token = os.getenv("YOUTUBE_PO_TOKEN")
+
+    if visitor_data and po_token:
+        print("Using tokens from environment variables")
+        return visitor_data, po_token
+
+    # Check cache
+    cached_tokens = get_cached_tokens()
+    if cached_tokens:
+        print("Using cached tokens")
+        return cached_tokens
+
+    # Generate new tokens
+    print("Generating new tokens...")
+    try:
+        tokens = generate_tokens_from_cli()
+        set_cached_tokens(tokens)
+        print("Successfully generated and cached new tokens")
+        return tokens
+    except Exception as e:
+        print(f"Token generation failed: {e}")
+        # Return empty tokens as fallback - pytubefix will work without them sometimes
+        return "", ""
 
 
 @lru_cache(maxsize=None)
