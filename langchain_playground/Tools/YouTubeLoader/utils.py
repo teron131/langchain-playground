@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import time
 from functools import lru_cache
@@ -115,7 +116,7 @@ def convert_time_to_hms(seconds_float: float) -> str:
     return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
 
 
-def result_to_srt(result: dict) -> str:
+def whisper_result_to_srt(result: dict) -> str:
     """Convert the specific transcription  API response into SRT format string.
 
     Args:
@@ -143,7 +144,7 @@ def result_to_srt(result: dict) -> str:
     return s2hk(srt_content)
 
 
-def result_to_txt(result: dict) -> str:
+def whisper_result_to_txt(result: dict) -> str:
     """Convert the specific transcription API response into plain text format.
 
     Args:
@@ -154,6 +155,41 @@ def result_to_txt(result: dict) -> str:
     """
     txt_content = "\n".join(cast(str, chunk["text"]).strip() for chunk in result["chunks"])
     return s2hk(txt_content)
+
+
+def parse_youtube_json_captions(json_content: str) -> str:
+    """Parse YouTube's JSON timedtext format and extract plain text.
+
+    Args:
+        json_content: Raw JSON string from YouTube timedtext API
+
+    Returns:
+        Plain text without timestamps
+    """
+    try:
+        # Parse the JSON
+        data = json.loads(json_content)
+
+        # Extract text from events
+        text_parts = []
+        if "events" in data:
+            for event in data["events"]:
+                if "segs" in event:
+                    for seg in event["segs"]:
+                        if "utf8" in seg:
+                            text_parts.append(seg["utf8"])
+
+        # Join all text parts
+        full_text = "".join(text_parts)
+
+        # Clean up the text (remove extra whitespace, normalize)
+        full_text = re.sub(r"\s+", " ", full_text).strip()
+
+        return full_text
+
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"⚠️ Failed to parse JSON captions: {e}")
+        return json_content  # Return original if parsing fails
 
 
 def srt_to_txt(srt_content: str) -> str:

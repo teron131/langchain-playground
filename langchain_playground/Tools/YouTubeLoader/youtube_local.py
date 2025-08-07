@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from pytubefix import YouTube
 
 from .llm_formatter import llm_format
-from .utils import po_token_verifier, result_to_srt, result_to_txt, s2hk, srt_to_txt
+from .utils import s2hk, srt_to_txt, whisper_result_to_srt, whisper_result_to_txt
 from .Whisper import whisper_transcribe
 
 load_dotenv()
@@ -132,10 +132,10 @@ class YouTubeProcessor:
 
         print(result)
 
-        FileUtils.write_text(self.paths.srt_path, result_to_srt(result))
+        FileUtils.write_text(self.paths.srt_path, whisper_result_to_srt(result))
         print(f"Transcribed SRT: {self.paths.srt_path}")
 
-        subtitle = result_to_txt(result)
+        subtitle = whisper_result_to_txt(result)
         FileUtils.write_text(self.paths.txt_path, subtitle)
         print(f"Transcribed TXT: {self.paths.txt_path}")
 

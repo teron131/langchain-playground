@@ -1,223 +1,420 @@
 import io
-import time
 
+import requests
+import yt_dlp
 from dotenv import load_dotenv
 from pydub import AudioSegment
-from pytubefix import Buffer, YouTube
 
-from .llm_formatter import llm_format
-from .utils import po_token_verifier, result_to_txt
-from .Whisper import whisper_fal
+from langchain_playground.Tools.YouTubeLoader.llm_formatter import llm_format
+from langchain_playground.Tools.YouTubeLoader.utils import (
+    parse_youtube_json_captions,
+    s2hk,
+    srt_to_txt,
+    whisper_result_to_txt,
+)
+from langchain_playground.Tools.YouTubeLoader.Whisper import whisper_fal
 
 load_dotenv()
 
 
-def create_youtube_object(url: str, use_tokens: bool = True) -> YouTube:
-    """Create YouTube object with proper token handling and error recovery."""
-    if use_tokens:
-        try:
-            visitor_data, po_token = po_token_verifier()
-            if visitor_data and po_token:
-                return YouTube(
-                    url,
-                    use_po_token=True,
-                    po_token_verifier=lambda: (visitor_data, po_token),
-                )
-            else:
-                print("No valid tokens available, trying without tokens...")
-                return YouTube(url)
-        except Exception as e:
-            print(f"Failed to create YouTube object with tokens: {e}")
-            print("Falling back to no-token approach...")
-            return YouTube(url)
-    else:
-        return YouTube(url)
+def extract_video_info(url: str) -> dict:
+    """Extract video information using yt-dlp with advanced anti-detection and cookie support."""
+    import os
+    import random
+    import time
 
+    # Detect if running in cloud environment (Vercel, etc.)
+    is_cloud_env = any(
+        [
+            os.getenv("VERCEL"),
+            os.getenv("AWS_LAMBDA_FUNCTION_NAME"),
+            os.getenv("FUNCTIONS_WORKER_RUNTIME"),  # Azure Functions
+            os.getenv("GOOGLE_CLOUD_PROJECT"),  # Google Cloud
+            "/tmp" in os.getcwd(),  # Common in serverless
+        ]
+    )
 
-def get_best_audio_stream(youtube: YouTube, attempt: int = 0):
-    """Get the best available audio stream with multiple fallback strategies."""
-    strategies = [
-        # Strategy 1: Get highest quality audio-only stream
-        lambda: youtube.streams.get_audio_only(),
-        # Strategy 2: Filter audio-only and get highest bitrate (with validation)
-        lambda: youtube.streams.filter(only_audio=True).filter(lambda s: s.abr is not None).order_by("abr").desc().first(),
-        # Strategy 3: Get any audio-only stream
-        lambda: youtube.streams.filter(only_audio=True).first(),
-        # Strategy 4: Get lowest bitrate audio (most reliable)
-        lambda: youtube.streams.filter(only_audio=True).filter(lambda s: s.abr is not None).order_by("abr").asc().first(),
-        # Strategy 5: Get any stream with audio (including video+audio)
-        lambda: youtube.streams.filter(adaptive=False).filter(lambda s: s.includes_audio_track).first(),
+    if is_cloud_env:
+        print("🌐 Detected cloud environment - using enhanced anti-detection strategies")
+
+    # Rotate through different user agents to avoid detection patterns
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
     ]
 
-    # Try strategies in order, cycling through them on retries
-    strategy_index = attempt % len(strategies)
+    # Enhanced progressive fallback strategies optimized for cloud environments
+    base_strategies = [
+        # Strategy 1: Try with cookies from Chrome (local environments)
+        {
+            "cookies_from_browser": ["chrome"],
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        },
+        # Strategy 2: Try with cookies from Firefox (local environments)
+        {
+            "cookies_from_browser": ["firefox"],
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        },
+        # Strategy 3: iOS client (often bypasses cloud detection)
+        {
+            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            "extractor_args": {"youtube": {"player_client": ["ios"]}},
+        },
+        # Strategy 4: Android TV client (different detection patterns)
+        {
+            "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
+            "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
+        },
+        # Strategy 5: Android client with embed context
+        {
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android_embedded"]}},
+        },
+        # Strategy 6: Web client with smart TV user agent
+        {
+            "user_agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.5) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.2 Chrome/63.0.3239.84 TV Safari/537.36",
+            "extractor_args": {"youtube": {"player_client": ["web"]}},
+        },
+        # Strategy 7: Multiple client fallback with aggressive options
+        {
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
+        },
+        # Strategy 8: Basic Android with conservative settings
+        {
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android"]}},
+        },
+        # Strategy 9: Final fallback with enhanced headers only
+        {
+            "user_agent": random.choice(user_agents),
+        },
+        # Strategy 10: Aggressive cloud bypass (experimental)
+        {
+            "user_agent": "Mozilla/5.0 (PlayStation 5 5.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Safari/605.1.15",
+            "extractor_args": {"youtube": {"player_client": ["android_testsuite"]}},
+        },
+        # Strategy 11: Music client bypass
+        {
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android_music"]}},
+        },
+        # Strategy 12: Creator studio bypass
+        {
+            "user_agent": random.choice(user_agents),
+            "extractor_args": {"youtube": {"player_client": ["android_creator"]}},
+        },
+        # Strategy 13: Final nuclear option (experimental flags)
+        {
+            "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36",
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android"],
+                    "skip": ["dash", "hls"],
+                }
+            },
+        },
+    ]
 
-    for i in range(len(strategies)):
-        current_strategy = (strategy_index + i) % len(strategies)
+    # Reorder strategies based on environment
+    if is_cloud_env:
+        # For cloud environments, prioritize most aggressive strategies first
+        strategies = [
+            base_strategies[9],  # PlayStation 5 + testsuite (most aggressive)
+            base_strategies[10],  # Android Music client
+            base_strategies[11],  # Android Creator client
+            base_strategies[12],  # Nuclear option with experimental flags
+            base_strategies[2],  # iOS client
+            base_strategies[3],  # Android TV
+            base_strategies[4],  # Android embedded
+            base_strategies[5],  # Smart TV user agent
+            base_strategies[6],  # Multiple client fallback
+            base_strategies[7],  # Basic Android
+            base_strategies[8],  # Final fallback
+            base_strategies[0],  # Chrome cookies (may not exist)
+            base_strategies[1],  # Firefox cookies (may not exist)
+        ]
+    else:
+        # For local environments, use original order (cookies first)
+        strategies = base_strategies
+
+    last_error = None
+
+    for i, strategy in enumerate(strategies):
+        print(f"Trying strategy {i + 1}/{len(strategies)}...")
+
+        # Build yt-dlp options with current strategy
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+            "user_agent": strategy["user_agent"],
+            "referer": "https://www.youtube.com/",
+            "headers": {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "DNT": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Linux"',
+                "X-Forwarded-For": f"{random.randint(100, 199)}.{random.randint(1, 255)}.{random.randint(1, 255)}.{random.randint(1, 255)}",
+            },
+            # Rate limiting to avoid triggering anti-bot measures
+            "sleep_interval": random.uniform(1, 3),
+            "max_sleep_interval": 8,
+            "writesubtitles": False,
+            "writeautomaticsub": False,
+            # Additional options for cloud environments
+            "prefer_insecure": False,
+            "no_check_certificate": False,
+            "geo_bypass": True,
+            "socket_timeout": 30,
+        }
+
+        # Add aggressive cloud-specific options
+        if is_cloud_env and i >= 2:  # Apply to strategies 3+ for cloud
+            ydl_opts.update(
+                {
+                    # Experimental options for stubborn cloud blocking
+                    "extractor_retries": 3,
+                    "fragment_retries": 5,
+                    "retry_sleep": "exp",
+                    "force_json": True,
+                    "no_color": True,
+                    # Potentially bypass some checks
+                    "youtube_include_dash_manifest": False,
+                    "mark_watched": False,
+                }
+            )
+
+        # Add strategy-specific options
+        if "cookies_from_browser" in strategy:
+            ydl_opts["cookiesfrombrowser"] = strategy["cookies_from_browser"]
+            print(f"Using cookies from: {strategy['cookies_from_browser']}")
+
+        if "extractor_args" in strategy:
+            ydl_opts["extractor_args"] = strategy["extractor_args"]
+            print(f"Using extractor args: {strategy['extractor_args']}")
+
+        # Add progressive delays for cloud environments (more aggressive than local)
+        if i > 0:
+            # Longer delays for cloud environments to avoid detection patterns
+            base_delay = 3 if i <= 2 else 5  # Shorter delays for first few attempts
+            delay = random.uniform(base_delay, base_delay + 4)
+            print(f"Waiting {delay:.1f}s before retry...")
+            time.sleep(delay)
+
         try:
-            print(f"Trying stream strategy {current_strategy + 1}")
-            stream = strategies[current_strategy]()
-
-            if stream:
-                print(f"Found stream: {stream}")
-                print(f"  - Codec: {getattr(stream, 'codecs', 'Unknown')}")
-                print(f"  - Bitrate: {getattr(stream, 'abr', 'Unknown')}")
-                print(f"  - File size: {getattr(stream, 'filesize', 'Unknown')}")
-                return stream
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                print(f"✅ Strategy {i + 1} succeeded!")
+                return info
 
         except Exception as e:
-            print(f"Strategy {current_strategy + 1} failed: {e}")
+            error_msg = str(e)
+            last_error = e
+            print(f"❌ Strategy {i + 1} failed: {error_msg}")
+
+            # If this is a non-bot-detection error, fail fast
+            if any(keyword in error_msg.lower() for keyword in ["private video", "video unavailable", "age-restricted", "not available on this app", "watch on the latest version"]):
+                print(f"Non-retriable error detected, stopping attempts")
+                break
+
+            # Continue to next strategy for bot detection and other retriable errors
             continue
 
+    # All strategies failed, raise the final error
+    if last_error:
+        error_msg = str(last_error)
+        print(f"All strategies failed. Final error: {error_msg}")
+
+        # Enhanced error handling with more helpful messages
+        if "Sign in to confirm you're not a bot" in error_msg or "--cookies-from-browser" in error_msg:
+            print(f"⚠️ YouTube bot detection triggered")
+            raise RuntimeError("YouTube is blocking automated requests. This is often temporary. Try again in a few minutes, or use a video that's more publicly accessible.")
+        elif "not available on this app" in error_msg or "Watch on the latest version of YouTube" in error_msg:
+            print(f"⚠️ YouTube app restriction")
+            raise RuntimeError("This video is restricted by YouTube and cannot be processed through third-party applications. Please try a different video.")
+        elif "Private video" in error_msg:
+            raise RuntimeError("This video is private and cannot be accessed. Please use a public video.")
+        elif "Video unavailable" in error_msg:
+            raise RuntimeError("This video is unavailable or has been removed from YouTube.")
+        elif "age-restricted" in error_msg.lower():
+            raise RuntimeError("This video is age-restricted and cannot be processed without authentication.")
+        else:
+            raise RuntimeError(f"Failed to access video after trying multiple methods: {error_msg}")
+    else:
+        raise RuntimeError("Unknown error occurred while processing YouTube video.")
+
+
+def download_audio_from_url(audio_url: str) -> bytes:
+    """Download audio from URL and return as bytes with progress logging."""
+    try:
+        print(f"🌐 Starting download from: {audio_url[:50]}...")
+        response = requests.get(audio_url, stream=True)
+        response.raise_for_status()
+
+        # Get file size if available
+        total_size = response.headers.get("content-length")
+        if total_size:
+            total_size = int(total_size)
+            print(f"📊 File size: {total_size:,} bytes ({total_size/1024/1024:.1f} MB)")
+        else:
+            print("📊 File size: Unknown")
+
+        # Download with progress tracking
+        downloaded = 0
+        chunks = []
+        chunk_size = 8192  # 8KB chunks
+
+        for chunk in response.iter_content(chunk_size=chunk_size):
+            if chunk:
+                chunks.append(chunk)
+                downloaded += len(chunk)
+
+                # Show progress every MB
+                if downloaded % (1024 * 1024) < chunk_size:
+                    if total_size:
+                        progress = (downloaded / total_size) * 100
+                        print(f"⬇️  Downloaded: {downloaded:,} bytes ({progress:.1f}%)")
+                    else:
+                        print(f"⬇️  Downloaded: {downloaded:,} bytes")
+
+        audio_data = b"".join(chunks)
+        print(f"✅ Download complete: {len(audio_data):,} bytes")
+        return audio_data
+
+    except Exception as e:
+        print(f"❌ Download failed: {e}")
+        raise RuntimeError(f"Failed to download audio: {e}")
+
+
+def download_audio_bytes(info: dict) -> bytes:
+    """Download audio from YouTube video info and convert to MP3 bytes."""
+    # Get best audio format
+    formats = info.get("formats", [])
+    audio_format = None
+
+    # Look for audio-only formats first
+    for fmt in formats:
+        if fmt.get("vcodec") == "none" and fmt.get("acodec") != "none":
+            audio_format = fmt
+            break
+
+    # Fallback to any format with audio
+    if not audio_format:
+        for fmt in formats:
+            if fmt.get("acodec") != "none":
+                audio_format = fmt
+                break
+
+    if not audio_format:
+        raise RuntimeError("No audio format available")
+
+    # Download audio from URL
+    audio_url = audio_format["url"]
+    audio_data = download_audio_from_url(audio_url)
+
+    if not audio_data:
+        raise RuntimeError("Downloaded audio data is empty")
+
+    # Try to process with AudioSegment and convert to MP3
+    try:
+        with io.BytesIO(audio_data) as in_memory_file:
+            try:
+                # Try to detect format from audio_format info
+                format_name = audio_format.get("ext", "mp4")
+                audio_segment = AudioSegment.from_file(in_memory_file, format=format_name)
+            except Exception:
+                # Fallback: let AudioSegment auto-detect
+                in_memory_file.seek(0)
+                audio_segment = AudioSegment.from_file(in_memory_file)
+
+        # Export to MP3 bytes
+        with io.BytesIO() as output_buffer:
+            audio_segment.export(output_buffer, format="mp3", bitrate="32k", parameters=["-ac", "1"])
+            return output_buffer.getvalue()
+
+    except Exception as e:
+        print(f"AudioSegment conversion failed: {e}")
+        print("Falling back to raw audio bytes (Fal API can handle various formats)")
+        # Return raw audio bytes - Fal API can handle various audio formats
+        return audio_data
+
+
+def get_subtitle_from_captions(info: dict) -> str:
+    """Try to get existing subtitle from yt-dlp extracted info."""
+    # Check for manual subtitles only (skip automatic captions)
+    subtitles = info.get("subtitles", {})
+    print(f"Available manual subtitles: {list(subtitles.keys())}")
+
+    # Priority languages for manual subtitles only
+    for lang in ["zh-HK", "zh-CN", "en"]:
+        if lang in subtitles:
+            print(f"Found manual subtitle in {lang}")
+            subtitle_info = subtitles[lang][0]  # Get first subtitle format
+
+            # Download subtitle content
+            subtitle_url = subtitle_info["url"]
+            print(f"🔗 Downloading subtitle from: {subtitle_url[:50]}...")
+            response = requests.get(subtitle_url)
+            raw_content = response.text
+
+            # Convert zh-CN to zh-HK if needed
+            if lang == "zh-CN":
+                raw_content = s2hk(raw_content)
+                print("Converted zh-CN to zh-HK")
+
+            # Detect format and convert to plain text
+            print("🔄 Converting to plain text...")
+            if raw_content.strip().startswith("{"):
+                # JSON format from YouTube timedtext API
+                print("📋 Detected JSON format, parsing...")
+                plain_text = parse_youtube_json_captions(raw_content)
+            else:
+                # SRT format
+                print("📋 Detected SRT format, converting...")
+                plain_text = srt_to_txt(raw_content)
+
+            print(f"📝 Converted text (first 200 chars): {plain_text[:200]}...")
+
+            return plain_text
+
+    # Skip automatic captions - they're often unreliable
+    # Only show relevant automatic caption languages to avoid overwhelming output
+    automatic_captions = info.get("automatic_captions", {})
+    relevant_auto_langs = [lang for lang in ["en", "en-orig", "zh-Hans", "zh-Hant"] if lang in automatic_captions]
+    print(f"Available automatic captions (relevant): {relevant_auto_langs} (skipping - will transcribe instead)")
+
+    print("No suitable manual captions found, will transcribe audio")
     return None
 
 
-def youtube_to_audio_bytes(youtube: YouTube, max_retries: int = 5) -> bytes:
-    """Get audio bytes from YouTube object with enhanced retry logic.
-    Args:
-        youtube (YouTube): YouTube object
-        max_retries (int): Maximum number of retry attempts
-    Returns:
-        bytes: Audio bytes
-    """
-    last_exception = None
+def youtube_loader(url: str) -> str:
+    """Load and process a YouTube video's subtitle, title, and author information.
 
-    for attempt in range(max_retries):
-        try:
-            print(f"\n--- Audio Download Attempt {attempt + 1}/{max_retries} ---")
-
-            # Get audio stream with intelligent fallback
-            youtube_stream = get_best_audio_stream(youtube, attempt)
-
-            if not youtube_stream:
-                raise RuntimeError("No audio stream available after trying all strategies")
-
-            print(f"Selected stream: {youtube_stream}")
-
-            # Validate stream properties before download
-            if hasattr(youtube_stream, "filesize") and youtube_stream.filesize:
-                print(f"Expected download size: {youtube_stream.filesize / 1024 / 1024:.1f} MB")
-
-            # Download with progress indication and error isolation
-            print("Downloading audio stream...")
-            try:
-                buffer = Buffer()
-
-                # Add pre-download validation to catch NoneType issues early
-                if hasattr(youtube_stream, "url") and youtube_stream.url:
-                    print(f"Stream URL available: {youtube_stream.url[:50]}...")
-                else:
-                    raise RuntimeError("Stream URL is None or invalid")
-
-                # Check for problematic None values that cause int() errors
-                stream_props = ["filesize", "fps", "resolution", "abr"]
-                for prop in stream_props:
-                    if hasattr(youtube_stream, prop):
-                        value = getattr(youtube_stream, prop)
-                        if value is None and prop in ["filesize"]:  # filesize being None causes issues
-                            print(f"⚠️ Warning: {prop} is None, may cause download issues")
-
-                buffer.download_in_buffer(youtube_stream)
-                audio_data = buffer.read()
-
-            except Exception as download_e:
-                # More specific error handling for the download step
-                error_msg = str(download_e)
-                if "int() argument must be a string" in error_msg and "NoneType" in error_msg:
-                    raise RuntimeError(f"Download failed due to None value in stream properties. This often happens with token-based streams. Original error: {error_msg}")
-                else:
-                    raise RuntimeError(f"Download failed: {error_msg}")
-
-            if not audio_data:
-                raise RuntimeError("Downloaded audio data is empty")
-
-            print(f"Downloaded {len(audio_data)} bytes of audio data")
-
-            # Process audio with error handling
-            print("Processing audio with AudioSegment...")
-            try:
-                with io.BytesIO(audio_data) as in_memory_file:
-                    # Try different format hints for AudioSegment
-                    audio_segment = None
-                    format_hints = ["mp4", "webm", "m4a", None]  # None = auto-detect
-
-                    for fmt in format_hints:
-                        try:
-                            if fmt:
-                                audio_segment = AudioSegment.from_file(in_memory_file, format=fmt)
-                            else:
-                                audio_segment = AudioSegment.from_file(in_memory_file)
-                            print(f"Successfully processed audio with format hint: {fmt or 'auto-detect'}")
-                            break
-                        except Exception as fmt_e:
-                            print(f"Format {fmt or 'auto-detect'} failed: {fmt_e}")
-                            in_memory_file.seek(0)  # Reset for next attempt
-                            continue
-
-                    if not audio_segment:
-                        raise RuntimeError("Could not process audio with any format")
-
-            except Exception as audio_e:
-                raise RuntimeError(f"AudioSegment processing failed: {audio_e}")
-
-            # Export to MP3 with validation
-            print("Exporting to MP3...")
-            try:
-                with io.BytesIO() as output_buffer:
-                    # Use more conservative export settings
-                    export_kwargs = {"format": "mp3", "bitrate": "32k", "parameters": ["-ac", "1"]}  # Lower bitrate for reliability  # Force mono to reduce size
-
-                    audio_segment.export(output_buffer, **export_kwargs)
-                    result = output_buffer.getvalue()
-
-                    if not result:
-                        raise RuntimeError("Export produced empty result")
-
-                    print(f"Successfully exported {len(result)} bytes of MP3 data")
-                    return result
-
-            except Exception as export_e:
-                raise RuntimeError(f"MP3 export failed: {export_e}")
-
-        except Exception as e:
-            last_exception = e
-            print(f"Attempt {attempt + 1} failed: {e}")
-
-            if attempt < max_retries - 1:
-                # Progressive wait time with some randomization
-                base_wait = min(2**attempt, 10)  # Cap at 10 seconds
-                wait_time = base_wait + (attempt * 2)  # Add progressive component
-                print(f"Waiting {wait_time} seconds before retry...")
-                time.sleep(wait_time)
-
-                # Force refresh the YouTube object streams on some attempts
-                if attempt % 2 == 1:
-                    try:
-                        print("Refreshing stream information...")
-                        youtube.check_availability()
-                    except:
-                        pass  # Ignore refresh errors
-
-    raise RuntimeError(f"Failed to download audio after {max_retries} attempts. Last error: {last_exception}")
-
-
-def youtube_to_subtitle(youtube: YouTube, language: str = None) -> str:
-    """Process a YouTube video: download audio and handle subtitle."""
-    audio_bytes = youtube_to_audio_bytes(youtube)
-    result = whisper_fal(audio_bytes, language)
-    subtitle = result_to_txt(result)
-    formatted_subtitle = llm_format(subtitle, audio_bytes)
-    return formatted_subtitle
-
-
-# Main function
-def youtube_loader(url: str, max_retries: int = 3) -> str:
-    """Load and process a YouTube video's subtitle, title, and author information from a URL.
-    Accepts various YouTube URL formats including standard watch URLs and shortened youtu.be links.
+    Process:
+    1. Extract video info using yt-dlp
+    2. Check for existing captions in [zh-HK, zh-CN, en]
+    3. If no captions, download audio and transcribe with Fal
+    4. Format subtitle with Gemini LLM
+    5. Return formatted content
 
     Args:
         url (str): The YouTube video URL to load
-        max_retries (int): Maximum number of retry attempts for the entire process
 
     Returns:
         str: Formatted string containing the video title, author and subtitle
@@ -225,98 +422,64 @@ def youtube_loader(url: str, max_retries: int = 3) -> str:
     print(f"\n🎬 Loading YouTube video: {url}")
     print("=" * 50)
 
-    last_exception = None
+    # Extract video information using yt-dlp
+    print("📋 Extracting video information...")
+    info = extract_video_info(url)
 
-    for attempt in range(max_retries):
-        try:
-            print(f"\n📡 MAIN ATTEMPT {attempt + 1}/{max_retries}")
+    title = info.get("title", "Unknown")
+    author = info.get("uploader", "Unknown")
+    duration = info.get("duration", "Unknown")
 
-            # Try with tokens first, then without if that fails
-            token_strategies = [True, False] if attempt == 0 else [False]
+    print(f"✅ Video accessible:")
+    print(f"   📺 Title: {title}")
+    print(f"   👤 Author: {author}")
+    print(f"   ⏱️  Duration: {duration}s")
 
-            for use_tokens in token_strategies:
-                try:
-                    strategy_name = "with tokens" if use_tokens else "without tokens"
-                    print(f"🔑 Trying {strategy_name}...")
+    # Try to get existing subtitle first
+    subtitle = get_subtitle_from_captions(info)
+    audio_bytes = None
 
-                    youtube = create_youtube_object(url, use_tokens=use_tokens)
+    if not subtitle:
+        print("🎯 No suitable captions found, transcribing audio...")
 
-                    # Get video metadata first to check if the video is accessible
-                    print("📋 Fetching video metadata...")
-                    title = youtube.title
-                    author = youtube.author
-                    duration = getattr(youtube, "length", "Unknown")
+        # Download audio
+        print("📥 Downloading audio...")
+        audio_bytes = download_audio_bytes(info)
+        print(f"Downloaded {len(audio_bytes)} bytes of audio")
 
-                    print(f"✅ Video accessible:")
-                    print(f"   📺 Title: {title}")
-                    print(f"   👤 Author: {author}")
-                    print(f"   ⏱️  Duration: {duration}s")
+        # Detect language for transcription
+        automatic_captions = info.get("automatic_captions", {})
+        language = "en" if "a.en" in automatic_captions or "en" in automatic_captions else "zh"
+        print(f"Transcribing in language: {language}")
 
-                    # Show available streams for debugging and detect problematic streams
-                    try:
-                        all_streams = youtube.streams.filter(only_audio=True)
-                        print(f"🎵 Found {len(all_streams)} audio streams")
+        # Transcribe with Fal
+        print("🎤 Transcribing with Fal API...")
+        result = whisper_fal(audio_bytes, language)
+        subtitle = whisper_result_to_txt(result)
+        print("✅ Transcription completed")
+    else:
+        print("✅ Using existing captions")
+        # Still need audio for LLM formatting
+        print("📥 Downloading audio for LLM formatting...")
+        audio_bytes = download_audio_bytes(info)
 
-                        # Check for problematic stream conditions that cause NoneType errors
-                        problematic_streams = 0
-                        for i, stream in enumerate(all_streams[:3]):  # Show first 3
-                            print(f"   Stream {i+1}: {stream}")
+    # Format subtitle with LLM
+    print("🤖 Formatting subtitle with Gemini...")
+    formatted_subtitle = llm_format(subtitle, audio_bytes)
+    print("✅ Subtitle formatted")
 
-                            # Check for conditions that often cause NoneType errors with tokens
-                            if hasattr(stream, "sabr") and stream.sabr == True:
-                                problematic_streams += 1
+    # Return formatted content
+    content = [
+        "Answer the user's question based on the full content.",
+        f"Title: {title}",
+        f"Author: {author}",
+        f"subtitle:\n{formatted_subtitle}",
+    ]
 
-                        # If most streams are problematic and we're using tokens, suggest fallback
-                        if use_tokens and problematic_streams >= 2:
-                            print("⚠️  Detected many streams with 'sabr=True' - these often cause NoneType errors with tokens")
-                            print("💡 Recommendation: Skip to no-token approach for faster success")
-                            raise RuntimeError("Preemptive fallback due to problematic stream conditions")
+    print("✅ SUCCESS: Video processed successfully!")
+    return "\n".join(content)
 
-                    except Exception as stream_e:
-                        if "Preemptive fallback" in str(stream_e):
-                            raise stream_e  # Re-raise our intentional fallback
-                        print("⚠️  Could not enumerate streams")
 
-                    # Now try to get the subtitle with enhanced audio processing
-                    print("\n🎯 Starting audio processing...")
-                    formatted_subtitle = youtube_to_subtitle(youtube, language=None)
-
-                    content = [
-                        "Answer the user's question based on the full content.",
-                        f"Title: {title}",
-                        f"Author: {author}",
-                        f"subtitle:\n{formatted_subtitle}",
-                    ]
-
-                    print("✅ SUCCESS: Video processed successfully!")
-                    return "\n".join(content)
-
-                except Exception as e:
-                    error_msg = str(e)
-                    print(f"❌ Strategy failed ({strategy_name}): {error_msg}")
-
-                    # Don't immediately fail if using tokens - try without tokens
-                    if use_tokens:
-                        print("🔄 Falling back to no-token approach...")
-                        continue
-                    else:
-                        # Both strategies failed for this attempt
-                        raise e
-
-        except Exception as e:
-            last_exception = e
-            print(f"💥 FULL ATTEMPT {attempt + 1} FAILED: {e}")
-
-            if attempt < max_retries - 1:
-                # Intelligent wait time with backoff
-                base_wait = 3 + (attempt * 2)  # 3, 5, 7 seconds
-                wait_time = base_wait + min(attempt * 3, 10)  # Add progressive component, cap at 10
-                print(f"⏳ Waiting {wait_time} seconds before next attempt...")
-                time.sleep(wait_time)
-
-                # Add some buffer time for YouTube's rate limiting
-                if attempt > 0:
-                    print("🛡️  Adding buffer time for rate limiting...")
-                    time.sleep(2)
-
-    raise RuntimeError(f"Failed to load YouTube video after {max_retries} attempts. Last error: {last_exception}")
+if __name__ == "__main__":
+    url = "https://youtu.be/6Nn4MJYmv4A"
+    print(youtube_loader(url))

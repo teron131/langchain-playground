@@ -15,10 +15,11 @@ load_dotenv()
 PROMPT = """You are an expert subtitle editor. Your task is to refine a sequence of piecemeal subtitle derived from transcription. These subtitle may contain typos and lack proper punctuation.
 
 Follow the guidelines below to ensure high-quality subtitle:
-1. Make minimal contextual changes.
-2. Only make contextual changes if you are highly confident.
-3. Add punctuation appropriately.
-4. Separate into paragraphs by an empty new line.
+1. Follow the original language of the subtitle.
+2. Make minimal contextual changes.
+3. Only make contextual changes if you are highly confident.
+4. Add punctuation appropriately.
+5. Separate into paragraphs by an empty new line.
 
 Example:
 Original Subtitle: welcome back fellow history enthusiasts to our channel today we embark on a thrilling expedition
@@ -45,7 +46,7 @@ def llm_format_langchain(subtitle: str, chunk_size: int = 4096) -> str:
     )
 
     llm = ChatOpenAI(
-        model="google/gemini-2.0-flash-001",
+        model="google/gemini-2.5-flash-lite",
         temperature=0,
         api_key=os.getenv("OPENROUTER_API_KEY"),
         base_url="https://openrouter.ai/api/v1",
@@ -81,7 +82,7 @@ def llm_format_gemini(subtitle: str, audio_bytes: bytes) -> str:
     prompt = prompt_parts[0] + "\n\nWith reference to the audio, refine the subtitle if there are typos or missing punctuation.\n\n" + "\n\n".join(prompt_parts[1:])
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash-lite",
         contents=[prompt, subtitle, audio_file],
     )
 

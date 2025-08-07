@@ -1,0 +1,24 @@
+# Minimal dependencies for Vercel deployment (API only)
+# Core API dependencies
+fastapi>=0.116.1
+uvicorn>=0.35.0
+python-dotenv>=1.1.0
+pydantic>=2.11.5
+
+# AI and processing - Gemini (lightweight)
+google-genai>=1.23.0
+
+# YouTube processing - using yt-dlp
+yt-dlp>=2025.7.21
+
+# Transcription service (lightweight)
+fal-client>=0.7.0
+
+# Chinese text processing (lightweight)
+opencc-python-reimplemented>=0.1.7
+
+# HTTP requests
+requests>=2.32.3
+
+# Chromium automation - optional, checked at runtime
+pyppeteer>=0.0.25
