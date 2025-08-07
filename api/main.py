@@ -87,6 +87,7 @@ def is_container_env() -> bool:
             os.getenv("DOCKER_CONTAINER"),
             Path("/.dockerenv").exists(),
             os.getenv("KUBERNETES_SERVICE_HOST"),
+            "/opt/render" in os.getcwd(),  # Render.com specific
         ]
     )
 
@@ -115,8 +116,27 @@ class BrowserSessionManager:
     """Manage persistent browser sessions for better YouTube authentication."""
 
     def __init__(self):
-        self.cache_dir = Path("/app/.cache/browser-profiles") if is_container_env() else Path.cwd() / ".cache" / "browser-profiles"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # Use safe cache directory path for different environments
+        if os.getenv("RENDER"):
+            # Render.com uses /opt/render/project/src as working directory
+            self.cache_dir = Path(os.getcwd()) / ".cache" / "browser-profiles"
+        elif is_container_env():
+            # Generic container environment
+            self.cache_dir = Path("/tmp") / ".cache" / "browser-profiles"
+        else:
+            # Local development
+            self.cache_dir = Path.cwd() / ".cache" / "browser-profiles"
+
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ Browser cache directory created: {self.cache_dir}")
+        except PermissionError as e:
+            print(f"⚠️ Cannot create cache directory {self.cache_dir}: {e}")
+            # Fallback to /tmp for browser profiles
+            self.cache_dir = Path("/tmp") / "browser-profiles"
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ Using fallback cache directory: {self.cache_dir}")
+
         self.active_sessions = {}
 
     def get_profile_path(self, session_id: str = "default") -> Path:

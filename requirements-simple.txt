@@ -1,0 +1,14 @@
+# Simplified requirements for initial Render.com deployment testing
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+requests>=2.31.0
+yt-dlp>=2023.12.30
+google-generativeai>=0.3.2
+fal-client>=0.4.0
+opencc-python-reimplemented>=0.1.7
+
+# Browser dependencies - commented out for initial testing
+# playwright>=1.40.0
+# pyppeteer>=1.0.2
