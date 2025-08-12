@@ -9,7 +9,7 @@ yt-dlp>=2024.8.6
 pydub>=0.25.1
 requests>=2.31.0
 
-# LLM and AI processing
+# LLM and AI processing  
 google-genai>=0.4.0
 langchain>=0.3.25
 langchain-openai>=0.2.8
@@ -19,6 +19,7 @@ fal-client>=0.6.0
 # Text processing and utilities
 opencc>=1.1.7
 python-dotenv>=1.0.0
+rich>=13.0.0
 
 # Audio processing system dependencies (for pydub)
 # Note: ffmpeg needs to be installed separately on the system
