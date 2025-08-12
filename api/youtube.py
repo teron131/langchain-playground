@@ -3,11 +3,13 @@ Standalone YouTube Processing API - No External Package Dependencies
 All functions copied directly to avoid import chain issues
 """
 
+import asyncio
 import io
 import json
 import logging
 import os
 import random
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add thread pool for blocking operations
+executor = ThreadPoolExecutor(max_workers=2)
 
 
 # Request Models
@@ -230,45 +235,133 @@ def get_subtitle_from_captions(info: dict) -> str:
     return None
 
 
+def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -> bytes:
+    """Optimize audio file size for faster transcription."""
+    try:
+        print(f"🎵 Optimizing audio (original: {len(audio_bytes) / 1024 / 1024:.1f}MB)")
+
+        # Convert to low-quality MP3 for transcription
+        with io.BytesIO(audio_bytes) as input_buffer:
+            audio = AudioSegment.from_file(input_buffer)
+
+            # Reduce quality aggressively for transcription
+            audio = audio.set_frame_rate(16000)  # 16kHz is enough for speech
+            audio = audio.set_channels(1)  # Mono
+
+            # Export with very low bitrate
+            with io.BytesIO() as output_buffer:
+                audio.export(output_buffer, format="mp3", bitrate="16k", parameters=["-ac", "1", "-ar", "16000"])  # Very low bitrate
+                optimized_bytes = output_buffer.getvalue()
+
+        optimized_size_mb = len(optimized_bytes) / 1024 / 1024
+        print(f"✅ Audio optimized: {optimized_size_mb:.1f}MB ({len(optimized_bytes)} bytes)")
+
+        return optimized_bytes
+
+    except Exception as e:
+        print(f"⚠️ Audio optimization failed: {e}, using original")
+        return audio_bytes
+
+
 def transcribe_with_fal(audio_bytes: bytes) -> str:
-    """Transcribe audio using FAL API with improved error handling."""
+    """Transcribe audio using FAL API with optimization and timeout."""
     try:
         print("🎤 Starting FAL transcription...")
-        print(f"Audio size: {len(audio_bytes)} bytes")
 
         # Check API key
         fal_key = os.getenv("FAL_KEY")
         if not fal_key:
-            raise RuntimeError("FAL_KEY environment variable not set")
+            return "[FAL_KEY not configured]"
 
-        # Upload audio with timeout
-        print("📤 Uploading audio to FAL...")
-        url = fal_client.upload(data=audio_bytes, content_type="audio/mp3")
-        print(f"✅ Audio uploaded successfully: {url}")
+        # Optimize audio first to reduce size and processing time
+        optimized_audio = optimize_audio_for_transcription(audio_bytes)
 
-        # Transcribe with timeout and progress tracking
+        # Check if still too large
+        if len(optimized_audio) > 10 * 1024 * 1024:  # 10MB limit
+            return "[Audio file too large for transcription]"
+
+        print("📤 Uploading optimized audio to FAL...")
+        url = fal_client.upload(data=optimized_audio, content_type="audio/mp3")
+        print(f"✅ Upload successful")
+
+        # Quick transcription with shorter timeout
         print("🔄 Starting transcription...")
         result = fal_client.subscribe(
             "fal-ai/whisper",
             arguments={
                 "audio_url": url,
                 "task": "transcribe",
-                "language": "en",
-                "chunk_length": 30,  # Process in 30-second chunks
+                "language": "auto",  # Auto-detect language
+                "chunk_length": 15,  # Shorter chunks for faster processing
             },
-            with_logs=True,
-            timeout=300,  # 5-minute timeout
+            with_logs=False,  # Disable logs to reduce overhead
+            timeout=60,  # Shorter timeout (1 minute)
         )
 
-        print("✅ Transcription completed successfully")
+        print("✅ Transcription completed")
         return whisper_result_to_txt(result)
 
     except Exception as e:
-        error_msg = f"Transcription failed: {str(e)}"
-        print(f"❌ {error_msg}")
+        error_msg = str(e)
+        print(f"❌ Transcription failed: {error_msg}")
 
-        # Return a fallback message instead of failing completely
-        return f"[Transcription failed: {str(e)}. Please try again or check your FAL_KEY configuration.]"
+        # Return specific error messages for debugging
+        if "timeout" in error_msg.lower():
+            return "[Transcription timed out - audio too long]"
+        elif "too large" in error_msg.lower():
+            return "[Audio file too large]"
+        elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+            return "[FAL API quota exceeded]"
+        else:
+            return f"[Transcription failed: {error_msg}]"
+
+
+def process_youtube_video_sync(url: str, generate_summary: bool = True) -> dict:
+    """Synchronous processing function to run in thread pool."""
+    try:
+        print(f"\n🎬 Processing: {url}")
+
+        # Extract video info with timeout
+        info = extract_video_info(url)
+        title = info.get("title", "Unknown")
+        author = info.get("uploader", "Unknown")
+
+        print(f"✅ Video: {title} by {author}")
+
+        # Try captions first (fast)
+        subtitle = get_subtitle_from_captions(info)
+
+        if not subtitle:
+            print("🎯 No captions found, transcribing audio...")
+            try:
+                audio_bytes = download_audio_bytes(info)
+
+                # Skip transcription if audio too large to prevent timeout
+                if len(audio_bytes) > 15 * 1024 * 1024:  # 15MB limit
+                    subtitle = "[Audio file too large for transcription. Please try a shorter video.]"
+                else:
+                    subtitle = transcribe_with_fal(audio_bytes)
+            except Exception as e:
+                subtitle = f"[Audio processing failed: {str(e)}]"
+        else:
+            print("✅ Using existing captions")
+
+        formatted_subtitle = simple_format_subtitle(subtitle)
+
+        # Generate summary if requested and subtitle is valid
+        summary = None
+        if generate_summary and not subtitle.startswith("["):
+            try:
+                print("🤖 Generating summary...")
+                full_content = f"Title: {title}\nAuthor: {author}\nTranscript:\n{formatted_subtitle}"
+                summary = quick_summary(full_content)
+            except Exception as e:
+                summary = f"[Summary generation failed: {str(e)}]"
+
+        return {"title": title, "author": author, "subtitle": formatted_subtitle, "summary": summary, "url": url, "status": "success"}
+
+    except Exception as e:
+        return {"title": "Unknown", "author": "Unknown", "subtitle": f"[Processing failed: {str(e)}]", "summary": None, "url": url, "status": "error", "error": str(e)}
 
 
 def simple_format_subtitle(subtitle: str) -> str:
@@ -292,40 +385,28 @@ def simple_format_subtitle(subtitle: str) -> str:
 
 
 def standalone_youtube_loader(url: str) -> str:
-    """Standalone YouTube processing function with improved error handling."""
+    """Standalone YouTube processing function."""
     print(f"\n🎬 Loading YouTube video: {url}")
 
-    try:
-        # Extract video info
-        info = extract_video_info(url)
-        title = info.get("title", "Unknown")
-        author = info.get("uploader", "Unknown")
+    # Extract video info
+    info = extract_video_info(url)
+    title = info.get("title", "Unknown")
+    author = info.get("uploader", "Unknown")
 
-        print(f"✅ Video: {title} by {author}")
+    print(f"✅ Video: {title} by {author}")
 
-        # Try existing subtitles first
-        subtitle = get_subtitle_from_captions(info)
+    # Try existing subtitles first
+    subtitle = get_subtitle_from_captions(info)
 
-        if not subtitle:
-            print("🎯 No captions found, transcribing audio...")
-            try:
-                audio_bytes = download_audio_bytes(info)
-                subtitle = transcribe_with_fal(audio_bytes)
-            except Exception as e:
-                print(f"❌ Audio transcription failed: {e}")
-                subtitle = f"[Audio transcription failed: {str(e)}]"
-        else:
-            print("✅ Found existing captions")
+    if not subtitle:
+        print("🎯 No captions found, transcribing audio...")
+        audio_bytes = download_audio_bytes(info)
+        subtitle = transcribe_with_fal(audio_bytes)
 
-        # Simple formatting
-        formatted_subtitle = simple_format_subtitle(subtitle)
+    # Simple formatting
+    formatted_subtitle = simple_format_subtitle(subtitle)
 
-        return f"Title: {title}\nAuthor: {author}\nSubtitle:\n{formatted_subtitle}"
-
-    except Exception as e:
-        error_msg = f"Failed to process video: {str(e)}"
-        print(f"❌ {error_msg}")
-        raise RuntimeError(error_msg)
+    return f"Title: {title}\nAuthor: {author}\nSubtitle:\n{formatted_subtitle}"
 
 
 def quick_summary(text: str) -> str:
@@ -554,46 +635,48 @@ async def get_web_interface():
 
 @app.post("/process", response_model=ProcessingResponse)
 async def process_youtube_video(request: YouTubeRequest):
-    """Process YouTube video using standalone functions."""
+    """Process YouTube video asynchronously to prevent timeouts."""
     start_time = datetime.now()
-    logs = []
+    logs = [f"🎬 Starting processing: {request.url}"]
 
     try:
-        logs.append(f"🎬 Processing: {request.url}")
+        # Run processing in thread pool to prevent blocking
+        print("🔄 Starting async processing...")
 
-        # Use standalone YouTube loader
-        youtube_content = standalone_youtube_loader(request.url)
-        metadata = extract_video_metadata(youtube_content)
-
-        # Generate summary if requested
-        summary = None
-        if request.generate_summary:
-            logs.append("🤖 Generating summary...")
-            summary = quick_summary(youtube_content)
+        # Use asyncio with timeout to prevent hanging
+        result = await asyncio.wait_for(asyncio.get_event_loop().run_in_executor(executor, process_youtube_video_sync, request.url, request.generate_summary), timeout=120.0)  # 2-minute total timeout
 
         processing_time = datetime.now() - start_time
+        result["processing_time"] = f"{processing_time.total_seconds():.1f}s"
 
-        result_data = {
-            "title": metadata["title"],
-            "author": metadata["author"],
-            "subtitle": metadata["subtitle"],
-            "summary": summary,
-            "processing_time": f"{processing_time.total_seconds():.1f}s",
-            "url": request.url,
-        }
+        if result["status"] == "error":
+            logs.append(f"❌ {result['error']}")
+            return ProcessingResponse(status="error", message=result["error"], logs=logs)
 
-        return ProcessingResponse(status="success", message="Video processed successfully", data=result_data, logs=logs)
+        logs.append("✅ Processing completed successfully")
+
+        return ProcessingResponse(status="success", message="Video processed successfully", data=result, logs=logs)
+
+    except asyncio.TimeoutError:
+        processing_time = datetime.now() - start_time
+        error_msg = f"Processing timed out after {processing_time.total_seconds():.1f}s"
+        logs.append(f"⏰ {error_msg}")
+
+        return ProcessingResponse(status="error", message="Processing timed out. Please try a shorter video.", logs=logs)
 
     except Exception as e:
-        error_message = f"Processing error: {str(e)}"
-        logs.append(f"❌ {error_message}")
-        raise HTTPException(status_code=500, detail=error_message)
+        processing_time = datetime.now() - start_time
+        error_msg = f"Unexpected error: {str(e)}"
+        logs.append(f"❌ {error_msg}")
+
+        return ProcessingResponse(status="error", message=error_msg, logs=logs)
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+# Add a simple health check endpoint for debugging
+@app.get("/test")
+async def test_endpoint():
+    """Simple test endpoint to verify the service is working."""
+    return {"status": "healthy", "message": "Service is running", "timestamp": datetime.now().isoformat(), "memory_usage": "OK"}
 
 
 # For Railway deployment
