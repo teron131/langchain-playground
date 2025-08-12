@@ -660,7 +660,7 @@ async def process_youtube_video(request: YouTubeRequest):
             logs.append("🎯 No captions found")
 
             # For now, skip transcription to test if that's the issue
-            if True:  # Temporarily disable transcription
+            if False:  # Enable transcription now
                 logs.append("⏭️ Skipping transcription for debugging")
                 formatted_subtitle = "[No captions available. Transcription temporarily disabled for debugging.]"
             else:
@@ -672,12 +672,21 @@ async def process_youtube_video(request: YouTubeRequest):
                     audio_size_mb = len(audio_bytes) / 1024 / 1024
                     logs.append(f"📊 Audio size: {audio_size_mb:.1f}MB")
 
-                    if audio_size_mb > 10:  # Skip large files
+                    if audio_size_mb > 8:  # 8MB limit for transcription
+                        logs.append(f"⚠️ Audio too large ({audio_size_mb:.1f}MB) - skipping transcription")
                         formatted_subtitle = f"[Audio too large: {audio_size_mb:.1f}MB. Please try a shorter video.]"
                     else:
-                        logs.append("📋 Step 4: Starting transcription...")
-                        subtitle = transcribe_with_fal(audio_bytes)
+                        logs.append("📋 Step 4: Optimizing and transcribing audio...")
+
+                        # Optimize audio before transcription
+                        optimized_audio = optimize_audio_for_transcription(audio_bytes)
+                        optimized_size_mb = len(optimized_audio) / 1024 / 1024
+                        logs.append(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
+
+                        # Transcribe with timeout
+                        subtitle = transcribe_with_fal(optimized_audio)
                         formatted_subtitle = simple_format_subtitle(subtitle)
+                        logs.append("✅ Transcription completed")
 
                 except Exception as audio_error:
                     logs.append(f"❌ Audio processing failed: {str(audio_error)}")
