@@ -635,41 +635,87 @@ async def get_web_interface():
 
 @app.post("/process", response_model=ProcessingResponse)
 async def process_youtube_video(request: YouTubeRequest):
-    """Process YouTube video asynchronously to prevent timeouts."""
+    """Process YouTube video with simplified robust approach."""
     start_time = datetime.now()
     logs = [f"🎬 Starting processing: {request.url}"]
 
     try:
-        # Run processing in thread pool to prevent blocking
-        print("🔄 Starting async processing...")
+        logs.append("📋 Step 1: Extracting video info...")
 
-        # Use asyncio with timeout to prevent hanging
-        result = await asyncio.wait_for(asyncio.get_event_loop().run_in_executor(executor, process_youtube_video_sync, request.url, request.generate_summary), timeout=120.0)  # 2-minute total timeout
+        # Extract video info
+        info = extract_video_info(request.url)
+        title = info.get("title", "Unknown")
+        author = info.get("uploader", "Unknown")
+
+        logs.append(f"✅ Video found: {title} by {author}")
+
+        # Try captions first (fast and reliable)
+        logs.append("📋 Step 2: Checking for existing captions...")
+        subtitle = get_subtitle_from_captions(info)
+
+        if subtitle:
+            logs.append("✅ Found existing captions - skipping transcription")
+            formatted_subtitle = simple_format_subtitle(subtitle)
+        else:
+            logs.append("🎯 No captions found")
+
+            # For now, skip transcription to test if that's the issue
+            if True:  # Temporarily disable transcription
+                logs.append("⏭️ Skipping transcription for debugging")
+                formatted_subtitle = "[No captions available. Transcription temporarily disabled for debugging.]"
+            else:
+                try:
+                    logs.append("📋 Step 3: Downloading audio...")
+                    audio_bytes = download_audio_bytes(info)
+
+                    # Check size before transcription
+                    audio_size_mb = len(audio_bytes) / 1024 / 1024
+                    logs.append(f"📊 Audio size: {audio_size_mb:.1f}MB")
+
+                    if audio_size_mb > 10:  # Skip large files
+                        formatted_subtitle = f"[Audio too large: {audio_size_mb:.1f}MB. Please try a shorter video.]"
+                    else:
+                        logs.append("📋 Step 4: Starting transcription...")
+                        subtitle = transcribe_with_fal(audio_bytes)
+                        formatted_subtitle = simple_format_subtitle(subtitle)
+
+                except Exception as audio_error:
+                    logs.append(f"❌ Audio processing failed: {str(audio_error)}")
+                    formatted_subtitle = f"[Audio processing failed: {str(audio_error)}]"
+
+        # Generate summary if requested
+        summary = None
+        if request.generate_summary and not formatted_subtitle.startswith("["):
+            try:
+                logs.append("📋 Step 5: Generating summary...")
+                full_content = f"Title: {title}\nAuthor: {author}\nTranscript:\n{formatted_subtitle}"
+                summary = quick_summary(full_content)
+                logs.append("✅ Summary generated")
+            except Exception as summary_error:
+                logs.append(f"❌ Summary generation failed: {str(summary_error)}")
+                summary = f"[Summary generation failed: {str(summary_error)}]"
 
         processing_time = datetime.now() - start_time
-        result["processing_time"] = f"{processing_time.total_seconds():.1f}s"
+        logs.append(f"✅ Processing completed in {processing_time.total_seconds():.1f}s")
 
-        if result["status"] == "error":
-            logs.append(f"❌ {result['error']}")
-            return ProcessingResponse(status="error", message=result["error"], logs=logs)
+        result_data = {
+            "title": title,
+            "author": author,
+            "subtitle": formatted_subtitle,
+            "summary": summary,
+            "processing_time": f"{processing_time.total_seconds():.1f}s",
+            "url": request.url,
+        }
 
-        logs.append("✅ Processing completed successfully")
-
-        return ProcessingResponse(status="success", message="Video processed successfully", data=result, logs=logs)
-
-    except asyncio.TimeoutError:
-        processing_time = datetime.now() - start_time
-        error_msg = f"Processing timed out after {processing_time.total_seconds():.1f}s"
-        logs.append(f"⏰ {error_msg}")
-
-        return ProcessingResponse(status="error", message="Processing timed out. Please try a shorter video.", logs=logs)
+        return ProcessingResponse(status="success", message="Video processed successfully", data=result_data, logs=logs)
 
     except Exception as e:
         processing_time = datetime.now() - start_time
-        error_msg = f"Unexpected error: {str(e)}"
-        logs.append(f"❌ {error_msg}")
+        error_message = f"Processing error: {str(e)}"
+        logs.append(f"❌ {error_message}")
+        logs.append(f"💔 Failed after {processing_time.total_seconds():.1f}s")
 
-        return ProcessingResponse(status="error", message=error_msg, logs=logs)
+        return ProcessingResponse(status="error", message=error_message, logs=logs)
 
 
 # Add a simple health check endpoint for debugging
