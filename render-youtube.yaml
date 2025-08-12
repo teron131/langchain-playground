@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: youtube-summarizer-standalone
+    name: youtube-summarizer-ui
     runtime: python
     region: singapore
     plan: starter
     buildCommand: "pip install --upgrade pip && pip install -r requirements-youtube.txt"
-    startCommand: "uvicorn api.youtube_standalone:app --host 0.0.0.0 --port $PORT"
+    startCommand: "uvicorn api.youtube_with_ui:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
       - key: PYTHONUNBUFFERED
