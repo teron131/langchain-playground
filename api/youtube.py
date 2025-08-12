@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import random
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -17,7 +18,7 @@ import fal_client
 import requests
 import yt_dlp
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from google.genai import Client, types
@@ -27,9 +28,17 @@ from pydub import AudioSegment
 
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging for Railway stdout visibility
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stdout)])
 logger = logging.getLogger(__name__)
+
+
+def log_and_print(message: str):
+    """Log and print message to ensure visibility in Railway."""
+    print(message, flush=True)
+    logger.info(message)
+    sys.stdout.flush()
+
 
 # Initialize FastAPI
 app = FastAPI(title="YouTube Processor", description="Standalone YouTube processing with transcription & summarization")
@@ -113,7 +122,7 @@ def extract_video_info(url: str) -> dict:
     )
 
     if is_cloud_env:
-        print("🌐 Detected cloud environment - using optimized strategies")
+        log_and_print("🌐 Detected cloud environment - using optimized strategies")
 
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -142,7 +151,7 @@ def extract_video_info(url: str) -> dict:
     last_error = None
 
     for i, strategy in enumerate(strategies):
-        print(f"Trying strategy {i + 1}/{len(strategies)}...")
+        log_and_print(f"Trying strategy {i + 1}/{len(strategies)}...")
 
         ydl_opts = {
             "quiet": True,
@@ -157,12 +166,12 @@ def extract_video_info(url: str) -> dict:
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-                print(f"✅ Strategy {i + 1} succeeded!")
+                log_and_print(f"✅ Strategy {i + 1} succeeded!")
                 return info
         except Exception as e:
             error_msg = str(e)
             last_error = e
-            print(f"❌ Strategy {i + 1} failed: {error_msg}")
+            log_and_print(f"❌ Strategy {i + 1} failed: {error_msg}")
 
             if any(keyword in error_msg.lower() for keyword in ["private video", "video unavailable"]):
                 break
@@ -196,11 +205,11 @@ def download_audio_bytes(info: dict) -> bytes:
 
     # Download audio
     audio_url = audio_format["url"]
-    response = requests.get(audio_url, stream=True)
+    response = requests.get(audio_url, stream=True, timeout=30)
     response.raise_for_status()
 
     audio_data = b"".join(chunk for chunk in response.iter_content(chunk_size=8192) if chunk)
-    print(f"Downloaded {len(audio_data)} bytes of audio")
+    log_and_print(f"Downloaded {len(audio_data)} bytes of audio")
 
     # Convert to MP3 if possible
     try:
@@ -210,7 +219,8 @@ def download_audio_bytes(info: dict) -> bytes:
         with io.BytesIO() as output_buffer:
             audio_segment.export(output_buffer, format="mp3", bitrate="32k", parameters=["-ac", "1"])
             return output_buffer.getvalue()
-    except Exception:
+    except Exception as e:
+        log_and_print(f"⚠️ Audio conversion failed: {e}, using raw audio")
         return audio_data  # Return raw if conversion fails
 
 
@@ -238,7 +248,7 @@ def get_subtitle_from_captions(info: dict) -> str:
 def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -> bytes:
     """Optimize audio file size for faster transcription."""
     try:
-        print(f"🎵 Optimizing audio (original: {len(audio_bytes) / 1024 / 1024:.1f}MB)")
+        log_and_print(f"🎵 Optimizing audio (original: {len(audio_bytes) / 1024 / 1024:.1f}MB)")
 
         # Convert to low-quality MP3 for transcription
         with io.BytesIO(audio_bytes) as input_buffer:
@@ -254,19 +264,19 @@ def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -
                 optimized_bytes = output_buffer.getvalue()
 
         optimized_size_mb = len(optimized_bytes) / 1024 / 1024
-        print(f"✅ Audio optimized: {optimized_size_mb:.1f}MB ({len(optimized_bytes)} bytes)")
+        log_and_print(f"✅ Audio optimized: {optimized_size_mb:.1f}MB ({len(optimized_bytes)} bytes)")
 
         return optimized_bytes
 
     except Exception as e:
-        print(f"⚠️ Audio optimization failed: {e}, using original")
+        log_and_print(f"⚠️ Audio optimization failed: {e}, using original")
         return audio_bytes
 
 
 def transcribe_with_fal(audio_bytes: bytes) -> str:
     """Transcribe audio using FAL API with optimization and timeout."""
     try:
-        print("🎤 Starting FAL transcription...")
+        log_and_print("🎤 Starting FAL transcription...")
 
         # Check API key
         fal_key = os.getenv("FAL_KEY")
@@ -277,33 +287,33 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
         optimized_audio = optimize_audio_for_transcription(audio_bytes)
 
         # Check if still too large
-        if len(optimized_audio) > 10 * 1024 * 1024:  # 10MB limit
+        if len(optimized_audio) > 5 * 1024 * 1024:  # Reduced to 5MB limit
             return "[Audio file too large for transcription]"
 
-        print("📤 Uploading optimized audio to FAL...")
+        log_and_print("📤 Uploading optimized audio to FAL...")
         url = fal_client.upload(data=optimized_audio, content_type="audio/mp3")
-        print(f"✅ Upload successful")
+        log_and_print("✅ Upload successful")
 
-        # Quick transcription with shorter timeout
-        print("🔄 Starting transcription...")
+        # Quick transcription with very short timeout
+        log_and_print("🔄 Starting transcription...")
         result = fal_client.subscribe(
             "fal-ai/whisper",
             arguments={
                 "audio_url": url,
                 "task": "transcribe",
-                "language": "auto",  # Auto-detect language
-                "chunk_length": 15,  # Shorter chunks for faster processing
+                "language": "auto",
+                "chunk_length": 10,  # Even shorter chunks
             },
-            with_logs=False,  # Disable logs to reduce overhead
-            timeout=60,  # Shorter timeout (1 minute)
+            with_logs=False,
+            timeout=30,  # Very short timeout (30 seconds)
         )
 
-        print("✅ Transcription completed")
+        log_and_print("✅ Transcription completed")
         return whisper_result_to_txt(result)
 
     except Exception as e:
         error_msg = str(e)
-        print(f"❌ Transcription failed: {error_msg}")
+        log_and_print(f"❌ Transcription failed: {error_msg}")
 
         # Return specific error messages for debugging
         if "timeout" in error_msg.lower():
@@ -384,31 +394,6 @@ def simple_format_subtitle(subtitle: str) -> str:
     return "\n".join(formatted_lines)
 
 
-def standalone_youtube_loader(url: str) -> str:
-    """Standalone YouTube processing function."""
-    print(f"\n🎬 Loading YouTube video: {url}")
-
-    # Extract video info
-    info = extract_video_info(url)
-    title = info.get("title", "Unknown")
-    author = info.get("uploader", "Unknown")
-
-    print(f"✅ Video: {title} by {author}")
-
-    # Try existing subtitles first
-    subtitle = get_subtitle_from_captions(info)
-
-    if not subtitle:
-        print("🎯 No captions found, transcribing audio...")
-        audio_bytes = download_audio_bytes(info)
-        subtitle = transcribe_with_fal(audio_bytes)
-
-    # Simple formatting
-    formatted_subtitle = simple_format_subtitle(subtitle)
-
-    return f"Title: {title}\nAuthor: {author}\nSubtitle:\n{formatted_subtitle}"
-
-
 def quick_summary(text: str) -> str:
     """Generate summary using Gemini."""
     try:
@@ -421,25 +406,6 @@ def quick_summary(text: str) -> str:
         return response.text
     except Exception as e:
         return f"Summary generation failed: {str(e)}"
-
-
-def extract_video_metadata(content: str) -> Dict[str, str]:
-    """Extract metadata from youtube_loader output."""
-    lines = content.split("\n")
-    title = "Unknown"
-    author = "Unknown"
-    subtitle = ""
-
-    for i, line in enumerate(lines):
-        if line.startswith("Title: "):
-            title = line.replace("Title: ", "")
-        elif line.startswith("Author: "):
-            author = line.replace("Author: ", "")
-        elif line.startswith("Subtitle:"):
-            subtitle = "\n".join(lines[i + 1 :])
-            break
-
-    return {"title": title, "author": author, "subtitle": subtitle}
 
 
 # API Routes
@@ -635,11 +601,12 @@ async def get_web_interface():
 
 @app.post("/process", response_model=ProcessingResponse)
 async def process_youtube_video(request: YouTubeRequest):
-    """Process YouTube video with simplified robust approach."""
+    """Process YouTube video with robust error handling and visible logging."""
     start_time = datetime.now()
     logs = [f"🎬 Starting processing: {request.url}"]
 
     try:
+        log_and_print("📋 Step 1: Extracting video info...")
         logs.append("📋 Step 1: Extracting video info...")
 
         # Extract video info
@@ -647,65 +614,83 @@ async def process_youtube_video(request: YouTubeRequest):
         title = info.get("title", "Unknown")
         author = info.get("uploader", "Unknown")
 
+        log_and_print(f"✅ Video found: {title} by {author}")
         logs.append(f"✅ Video found: {title} by {author}")
 
         # Try captions first (fast and reliable)
+        log_and_print("📋 Step 2: Checking for existing captions...")
         logs.append("📋 Step 2: Checking for existing captions...")
         subtitle = get_subtitle_from_captions(info)
 
         if subtitle:
+            log_and_print("✅ Found existing captions - skipping transcription")
             logs.append("✅ Found existing captions - skipping transcription")
             formatted_subtitle = simple_format_subtitle(subtitle)
         else:
+            log_and_print("🎯 No captions found")
             logs.append("🎯 No captions found")
 
-            # For now, skip transcription to test if that's the issue
+            # Enable transcription with strict limits
             if False:  # Enable transcription now
                 logs.append("⏭️ Skipping transcription for debugging")
                 formatted_subtitle = "[No captions available. Transcription temporarily disabled for debugging.]"
             else:
                 try:
+                    log_and_print("📋 Step 3: Downloading audio...")
                     logs.append("📋 Step 3: Downloading audio...")
                     audio_bytes = download_audio_bytes(info)
 
-                    # Check size before transcription
+                    # Check size before transcription - very strict limit
                     audio_size_mb = len(audio_bytes) / 1024 / 1024
+                    log_and_print(f"📊 Audio size: {audio_size_mb:.1f}MB")
                     logs.append(f"📊 Audio size: {audio_size_mb:.1f}MB")
 
-                    if audio_size_mb > 8:  # 8MB limit for transcription
+                    if audio_size_mb > 5:  # Very strict 5MB limit
+                        log_and_print(f"⚠️ Audio too large ({audio_size_mb:.1f}MB) - skipping transcription")
                         logs.append(f"⚠️ Audio too large ({audio_size_mb:.1f}MB) - skipping transcription")
                         formatted_subtitle = f"[Audio too large: {audio_size_mb:.1f}MB. Please try a shorter video.]"
                     else:
+                        log_and_print("📋 Step 4: Optimizing and transcribing audio...")
                         logs.append("📋 Step 4: Optimizing and transcribing audio...")
 
                         # Optimize audio before transcription
                         optimized_audio = optimize_audio_for_transcription(audio_bytes)
                         optimized_size_mb = len(optimized_audio) / 1024 / 1024
+                        log_and_print(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
                         logs.append(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
 
                         # Transcribe with timeout
                         subtitle = transcribe_with_fal(optimized_audio)
                         formatted_subtitle = simple_format_subtitle(subtitle)
+                        log_and_print("✅ Transcription completed")
                         logs.append("✅ Transcription completed")
 
                 except Exception as audio_error:
-                    logs.append(f"❌ Audio processing failed: {str(audio_error)}")
+                    error_msg = f"❌ Audio processing failed: {str(audio_error)}"
+                    log_and_print(error_msg)
+                    logs.append(error_msg)
                     formatted_subtitle = f"[Audio processing failed: {str(audio_error)}]"
 
         # Generate summary if requested
         summary = None
         if request.generate_summary and not formatted_subtitle.startswith("["):
             try:
+                log_and_print("📋 Step 5: Generating summary...")
                 logs.append("📋 Step 5: Generating summary...")
                 full_content = f"Title: {title}\nAuthor: {author}\nTranscript:\n{formatted_subtitle}"
                 summary = quick_summary(full_content)
+                log_and_print("✅ Summary generated")
                 logs.append("✅ Summary generated")
             except Exception as summary_error:
-                logs.append(f"❌ Summary generation failed: {str(summary_error)}")
+                error_msg = f"❌ Summary generation failed: {str(summary_error)}"
+                log_and_print(error_msg)
+                logs.append(error_msg)
                 summary = f"[Summary generation failed: {str(summary_error)}]"
 
         processing_time = datetime.now() - start_time
-        logs.append(f"✅ Processing completed in {processing_time.total_seconds():.1f}s")
+        completion_msg = f"✅ Processing completed in {processing_time.total_seconds():.1f}s"
+        log_and_print(completion_msg)
+        logs.append(completion_msg)
 
         result_data = {
             "title": title,
@@ -721,8 +706,12 @@ async def process_youtube_video(request: YouTubeRequest):
     except Exception as e:
         processing_time = datetime.now() - start_time
         error_message = f"Processing error: {str(e)}"
+        failure_msg = f"💔 Failed after {processing_time.total_seconds():.1f}s"
+
+        log_and_print(f"❌ {error_message}")
+        log_and_print(failure_msg)
         logs.append(f"❌ {error_message}")
-        logs.append(f"💔 Failed after {processing_time.total_seconds():.1f}s")
+        logs.append(failure_msg)
 
         return ProcessingResponse(status="error", message=error_message, logs=logs)
 
