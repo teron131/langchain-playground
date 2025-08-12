@@ -274,7 +274,7 @@ def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -
 
 
 def transcribe_with_fal(audio_bytes: bytes) -> str:
-    """Transcribe audio using FAL API with optimization and timeout."""
+    """Transcribe audio using FAL API - matches original whisper_fal.py."""
     try:
         log_and_print("🎤 Starting FAL transcription...")
 
@@ -283,29 +283,29 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
         if not fal_key:
             return "[FAL_KEY not configured]"
 
-        # Optimize audio first to reduce size and processing time
-        optimized_audio = optimize_audio_for_transcription(audio_bytes)
-
-        # Check if still too large
-        if len(optimized_audio) > 5 * 1024 * 1024:  # Reduced to 5MB limit
-            return "[Audio file too large for transcription]"
-
-        log_and_print("📤 Uploading optimized audio to FAL...")
-        url = fal_client.upload(data=optimized_audio, content_type="audio/mp3")
+        # Upload audio (already optimized, don't optimize again)
+        log_and_print("📤 Uploading audio to FAL...")
+        url = fal_client.upload(data=audio_bytes, content_type="audio/mp3")
         log_and_print("✅ Upload successful")
 
-        # Quick transcription with very short timeout
+        # Transcribe using original FAL API structure (no timeout parameter)
         log_and_print("🔄 Starting transcription...")
+
+        def on_queue_update(update):
+            """Handle FAL queue updates."""
+            if isinstance(update, fal_client.InProgress):
+                for log_entry in update.logs:
+                    log_and_print(f"FAL: {log_entry['message']}")
+
         result = fal_client.subscribe(
             "fal-ai/whisper",
             arguments={
                 "audio_url": url,
                 "task": "transcribe",
-                "language": "auto",
-                "chunk_length": 10,  # Even shorter chunks
+                "language": None,  # Auto-detect language
             },
-            with_logs=False,
-            timeout=30,  # Very short timeout (30 seconds)
+            with_logs=True,
+            on_queue_update=on_queue_update,
         )
 
         log_and_print("✅ Transcription completed")
@@ -316,11 +316,7 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
         log_and_print(f"❌ Transcription failed: {error_msg}")
 
         # Return specific error messages for debugging
-        if "timeout" in error_msg.lower():
-            return "[Transcription timed out - audio too long]"
-        elif "too large" in error_msg.lower():
-            return "[Audio file too large]"
-        elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+        if "quota" in error_msg.lower() or "limit" in error_msg.lower():
             return "[FAL API quota exceeded]"
         else:
             return f"[Transcription failed: {error_msg}]"
