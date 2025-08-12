@@ -18,7 +18,7 @@ load_dotenv()
 
 
 def extract_video_info(url: str) -> dict:
-    """Extract video information using yt-dlp with advanced anti-detection and cookie support."""
+    """Extract video information using yt-dlp with optimized container-friendly strategies."""
     import os
     import random
     import time
@@ -30,118 +30,83 @@ def extract_video_info(url: str) -> dict:
             os.getenv("AWS_LAMBDA_FUNCTION_NAME"),
             os.getenv("FUNCTIONS_WORKER_RUNTIME"),  # Azure Functions
             os.getenv("GOOGLE_CLOUD_PROJECT"),  # Google Cloud
+            os.getenv("RENDER"),  # Render.com
             "/tmp" in os.getcwd(),  # Common in serverless
         ]
     )
 
     if is_cloud_env:
-        print("🌐 Detected cloud environment - using enhanced anti-detection strategies")
+        print("🌐 Detected cloud environment - using optimized container strategies")
 
     # Rotate through different user agents to avoid detection patterns
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
     ]
 
-    # Enhanced progressive fallback strategies optimized for cloud environments
-    base_strategies = [
-        # Strategy 1: Try with cookies from Chrome (local environments)
-        {
-            "cookies_from_browser": ["chrome"],
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
-        },
-        # Strategy 2: Try with cookies from Firefox (local environments)
-        {
-            "cookies_from_browser": ["firefox"],
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
-        },
-        # Strategy 3: iOS client (often bypasses cloud detection)
-        {
-            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-            "extractor_args": {"youtube": {"player_client": ["ios"]}},
-        },
-        # Strategy 4: Android TV client (different detection patterns)
-        {
-            "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
-            "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
-        },
-        # Strategy 5: Android client with embed context
-        {
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android_embedded"]}},
-        },
-        # Strategy 6: Web client with smart TV user agent
-        {
-            "user_agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.5) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.2 Chrome/63.0.3239.84 TV Safari/537.36",
-            "extractor_args": {"youtube": {"player_client": ["web"]}},
-        },
-        # Strategy 7: Multiple client fallback with aggressive options
-        {
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
-        },
-        # Strategy 8: Basic Android with conservative settings
-        {
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android"]}},
-        },
-        # Strategy 9: Final fallback with enhanced headers only
-        {
-            "user_agent": random.choice(user_agents),
-        },
-        # Strategy 10: Aggressive cloud bypass (experimental)
-        {
-            "user_agent": "Mozilla/5.0 (PlayStation 5 5.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Safari/605.1.15",
-            "extractor_args": {"youtube": {"player_client": ["android_testsuite"]}},
-        },
-        # Strategy 11: Music client bypass
-        {
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android_music"]}},
-        },
-        # Strategy 12: Creator studio bypass
-        {
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android_creator"]}},
-        },
-        # Strategy 13: Final nuclear option (experimental flags)
-        {
-            "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36",
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android"],
-                    "skip": ["dash", "hls"],
-                }
-            },
-        },
-    ]
-
-    # Reorder strategies based on environment
+    # Optimized strategies based on container testing results
     if is_cloud_env:
-        # For cloud environments, prioritize most aggressive strategies first
+        # Container-optimized strategies (prioritize proven working methods)
         strategies = [
-            base_strategies[9],  # PlayStation 5 + testsuite (most aggressive)
-            base_strategies[10],  # Android Music client
-            base_strategies[11],  # Android Creator client
-            base_strategies[12],  # Nuclear option with experimental flags
-            base_strategies[2],  # iOS client
-            base_strategies[3],  # Android TV
-            base_strategies[4],  # Android embedded
-            base_strategies[5],  # Smart TV user agent
-            base_strategies[6],  # Multiple client fallback
-            base_strategies[7],  # Basic Android
-            base_strategies[8],  # Final fallback
-            base_strategies[0],  # Chrome cookies (may not exist)
-            base_strategies[1],  # Firefox cookies (may not exist)
+            # Strategy 1: Android TV client (proven to work in containers)
+            {
+                "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
+                "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
+            },
+            # Strategy 2: Android client (reliable backup)
+            {
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android"]}},
+            },
+            # Strategy 3: Android embedded (alternative method)
+            {
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android_embedded"]}},
+            },
+            # Strategy 4: Web client with Android user agent
+            {
+                "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36",
+                "extractor_args": {"youtube": {"player_client": ["web"]}},
+            },
+            # Strategy 5: Multiple client fallback
+            {
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+            },
         ]
     else:
-        # For local environments, use original order (cookies first)
-        strategies = base_strategies
+        # Local environment strategies (include browser cookies for local development)
+        strategies = [
+            # Strategy 1: Try with cookies from Chrome (local environments)
+            {
+                "cookies_from_browser": ["chrome"],
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+            },
+            # Strategy 2: Try with cookies from Firefox (local environments)
+            {
+                "cookies_from_browser": ["firefox"],
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+            },
+            # Strategy 3: Android TV client (proven to work)
+            {
+                "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
+                "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
+            },
+            # Strategy 4: Android client
+            {
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android"]}},
+            },
+            # Strategy 5: Web client fallback
+            {
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["web"]}},
+            },
+        ]
 
     last_error = None
 
@@ -172,29 +137,27 @@ def extract_video_info(url: str) -> dict:
                 "sec-ch-ua-platform": '"Linux"',
                 "X-Forwarded-For": f"{random.randint(100, 199)}.{random.randint(1, 255)}.{random.randint(1, 255)}.{random.randint(1, 255)}",
             },
-            # Rate limiting to avoid triggering anti-bot measures
-            "sleep_interval": random.uniform(1, 3),
-            "max_sleep_interval": 8,
+            # Optimized rate limiting
+            "sleep_interval": random.uniform(0.5, 1.5),
+            "max_sleep_interval": 4,
             "writesubtitles": False,
             "writeautomaticsub": False,
-            # Additional options for cloud environments
+            # Container-optimized options
             "prefer_insecure": False,
             "no_check_certificate": False,
             "geo_bypass": True,
             "socket_timeout": 30,
         }
 
-        # Add aggressive cloud-specific options
-        if is_cloud_env and i >= 2:  # Apply to strategies 3+ for cloud
+        # Add container-specific optimizations for strategy 2+
+        if is_cloud_env and i >= 1:
             ydl_opts.update(
                 {
-                    # Experimental options for stubborn cloud blocking
-                    "extractor_retries": 3,
-                    "fragment_retries": 5,
-                    "retry_sleep": "exp",
+                    "extractor_retries": 2,
+                    "fragment_retries": 3,
+                    "retry_sleep": "linear",
                     "force_json": True,
                     "no_color": True,
-                    # Potentially bypass some checks
                     "youtube_include_dash_manifest": False,
                     "mark_watched": False,
                 }
@@ -209,11 +172,9 @@ def extract_video_info(url: str) -> dict:
             ydl_opts["extractor_args"] = strategy["extractor_args"]
             print(f"Using extractor args: {strategy['extractor_args']}")
 
-        # Add progressive delays for cloud environments (more aggressive than local)
+        # Reduced delays for faster processing
         if i > 0:
-            # Longer delays for cloud environments to avoid detection patterns
-            base_delay = 3 if i <= 2 else 5  # Shorter delays for first few attempts
-            delay = random.uniform(base_delay, base_delay + 4)
+            delay = random.uniform(1, 2)  # Much shorter delays
             print(f"Waiting {delay:.1f}s before retry...")
             time.sleep(delay)
 

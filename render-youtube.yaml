@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: youtube-summarizer-youtube
+    runtime: python
+    region: singapore
+    plan: starter
+    buildCommand: "pip install --upgrade pip && pip install -r requirements-youtube.txt"
+    startCommand: "uvicorn api.youtube_main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FAL_KEY
+        sync: false
