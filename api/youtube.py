@@ -129,22 +129,59 @@ def extract_video_info(url: str) -> dict:
         "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
     ]
 
-    # Prioritize working strategies for cloud
+    # Enhanced strategies to avoid 403 errors
     strategies = [
-        # Strategy 1: Android TV (proven to work)
+        # Strategy 1: Android TV with specific params
         {
-            "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
-            "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
+            "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android_tv"],
+                    "player_skip": ["configs"],
+                    "skip": ["hls", "dash"]
+                }
+            },
         },
-        # Strategy 2: Android client
+        # Strategy 2: Android mobile client
+        {
+            "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip", 
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android"],
+                    "player_skip": ["configs"],
+                }
+            },
+        },
+        # Strategy 3: iOS client
+        {
+            "user_agent": "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)",
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios"],
+                    "player_skip": ["configs"],
+                }
+            },
+        },
+        # Strategy 4: Android embedded
+        {
+            "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Mobile Safari/537.36",
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android_embedded"],
+                    "player_skip": ["configs", "webpage"],
+                }
+            },
+        },
+        # Strategy 5: Web fallback with age bypass
         {
             "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["android"]}},
-        },
-        # Strategy 3: Web client fallback
-        {
-            "user_agent": random.choice(user_agents),
-            "extractor_args": {"youtube": {"player_client": ["web"]}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["web"],
+                    "player_skip": ["configs"],
+                }
+            },
+            "age_limit": 999,  # Bypass age restrictions
         },
     ]
 
@@ -161,7 +198,17 @@ def extract_video_info(url: str) -> dict:
             "referer": "https://www.youtube.com/",
             "extractor_args": strategy["extractor_args"],
             "socket_timeout": 30,
+            "http_headers": {
+                "User-Agent": strategy["user_agent"],
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-us,en;q=0.5",
+                "Sec-Fetch-Mode": "navigate",
+            }
         }
+        
+        # Add age_limit if specified in strategy
+        if "age_limit" in strategy:
+            ydl_opts["age_limit"] = strategy["age_limit"]
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -184,45 +231,73 @@ def extract_video_info(url: str) -> dict:
 
 
 def download_audio_bytes(info: dict) -> bytes:
-    """Download audio from YouTube video info."""
+    """Download audio from YouTube video info with improved format selection."""
     formats = info.get("formats", [])
 
-    # Find audio format
-    audio_format = None
+    # Prioritize audio-only formats with known codecs
+    preferred_audio_formats = []
+    fallback_formats = []
+    
     for fmt in formats:
         if fmt.get("vcodec") == "none" and fmt.get("acodec") != "none":
-            audio_format = fmt
-            break
+            # Audio-only format - preferred
+            acodec = fmt.get("acodec", "").lower()
+            if any(codec in acodec for codec in ["mp4a", "aac", "opus"]):
+                preferred_audio_formats.append(fmt)
+            else:
+                fallback_formats.append(fmt)
+        elif fmt.get("acodec") != "none":
+            # Has audio track
+            fallback_formats.append(fmt)
 
-    if not audio_format:
-        for fmt in formats:
-            if fmt.get("acodec") != "none":
-                audio_format = fmt
-                break
+    # Try formats in order of preference
+    audio_format = None
+    for fmt_list in [preferred_audio_formats, fallback_formats]:
+        if fmt_list:
+            # Pick format with reasonable quality/size balance
+            audio_format = min(fmt_list, key=lambda f: f.get("filesize", float('inf')))
+            break
 
     if not audio_format:
         raise RuntimeError("No audio format available")
 
-    # Download audio
-    audio_url = audio_format["url"]
-    response = requests.get(audio_url, stream=True, timeout=30)
-    response.raise_for_status()
+    # Log format details for debugging
+    log_and_print(f"Selected format: {audio_format.get('format_id')} - {audio_format.get('acodec')} - {audio_format.get('filesize', 'unknown')} bytes")
 
-    audio_data = b"".join(chunk for chunk in response.iter_content(chunk_size=8192) if chunk)
+    # Download audio with better error handling
+    audio_url = audio_format["url"]
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.youtube.com/'
+    }
+    
+    try:
+        response = requests.get(audio_url, headers=headers, stream=True, timeout=60)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        if "403" in str(e):
+            raise RuntimeError(f"YouTube blocked audio download (HTTP 403). Try again later or use a different video.")
+        else:
+            raise RuntimeError(f"Failed to download audio: {e}")
+
+    # Download in chunks with progress
+    audio_data = b""
+    for chunk in response.iter_content(chunk_size=32768):
+        if chunk:
+            audio_data += chunk
+    
     log_and_print(f"Downloaded {len(audio_data)} bytes of audio")
 
-    # Convert to MP3 if possible
-    try:
-        with io.BytesIO(audio_data) as in_memory_file:
-            audio_segment = AudioSegment.from_file(in_memory_file)
-
-        with io.BytesIO() as output_buffer:
-            # Use reasonable quality for initial download - 64k bitrate, mono
-            audio_segment.export(output_buffer, format="mp3", bitrate="64k", parameters=["-ac", "1"])
-            return output_buffer.getvalue()
-    except Exception as e:
-        log_and_print(f"⚠️ Audio conversion failed: {e}, using raw audio")
-        return audio_data  # Return raw if conversion fails
+    # Skip conversion entirely - use raw audio for transcription
+    log_and_print("🔄 Skipping FFmpeg conversion, using raw audio for FAL")
+    
+    # Check file size before proceeding
+    audio_size_mb = len(audio_data) / 1024 / 1024
+    if audio_size_mb > 25:  # 25MB limit for raw audio
+        raise RuntimeError(f"Raw audio too large for transcription: {audio_size_mb:.1f}MB")
+    
+    log_and_print(f"✅ Using raw audio: {len(audio_data)} bytes ({audio_size_mb:.1f}MB)")
+    return audio_data
 
 
 def get_subtitle_from_captions(info: dict) -> str:
@@ -247,31 +322,16 @@ def get_subtitle_from_captions(info: dict) -> str:
 
 
 def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -> bytes:
-    """Optimize audio for transcription while maintaining reasonable quality."""
-    try:
-        log_and_print(f"🎵 Optimizing audio (original: {len(audio_bytes) / 1024 / 1024:.1f}MB)")
-
-        # Convert to efficient MP3 for transcription
-        with io.BytesIO(audio_bytes) as input_buffer:
-            audio = AudioSegment.from_file(input_buffer)
-
-            # Set optimal settings for speech transcription
-            audio = audio.set_frame_rate(16000)  # 16kHz sampling rate - optimal for speech
-            audio = audio.set_channels(1)  # Mono
-
-            # Export with reasonable quality for transcription
-            with io.BytesIO() as output_buffer:
-                audio.export(output_buffer, format="mp3", bitrate="32k", parameters=["-ac", "1", "-ar", "16000"])
-                optimized_bytes = output_buffer.getvalue()
-
-        optimized_size_mb = len(optimized_bytes) / 1024 / 1024
-        log_and_print(f"✅ Audio optimized: {optimized_size_mb:.1f}MB ({len(optimized_bytes)} bytes)")
-
-        return optimized_bytes
-
-    except Exception as e:
-        log_and_print(f"⚠️ Audio optimization failed: {e}, using original")
+    """Simplified audio handling - skip FFmpeg optimization to avoid conversion errors."""
+    raw_size_mb = len(audio_bytes) / 1024 / 1024
+    log_and_print(f"🎵 Audio size check: {raw_size_mb:.1f}MB")
+    
+    # Check if raw audio is reasonable size for transcription
+    if raw_size_mb <= 10:  # 10MB limit for raw audio
+        log_and_print(f"✅ Using raw audio for transcription ({raw_size_mb:.1f}MB)")
         return audio_bytes
+    else:
+        raise RuntimeError(f"Audio file too large for transcription: {raw_size_mb:.1f}MB. Please try a shorter video.")
 
 
 def transcribe_with_fal(audio_bytes: bytes) -> str:
@@ -284,10 +344,35 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
         if not fal_key:
             return "[FAL_KEY not configured]"
 
-        # Upload audio (already optimized, don't optimize again)
+        # Upload audio with better content type detection
         log_and_print("📤 Uploading audio to FAL...")
-        url = fal_client.upload(data=audio_bytes, content_type="audio/mp3")
-        log_and_print("✅ Upload successful")
+        
+        # Detect content type based on magic bytes
+        content_type = "audio/mpeg"  # Default to generic audio
+        if audio_bytes.startswith(b"ID3") or audio_bytes.startswith(b"\xFF\xFB"):
+            content_type = "audio/mpeg"  # MP3
+        elif audio_bytes.startswith(b"fLaC"):
+            content_type = "audio/flac"
+        elif audio_bytes.startswith(b"OggS"):
+            content_type = "audio/ogg"
+        elif audio_bytes.startswith(b"\x00\x00\x00\x18ftypmp4") or audio_bytes.startswith(b"\x00\x00\x00\x20ftypM4A"):
+            content_type = "audio/mp4"
+        elif audio_bytes.startswith(b"RIFF") and b"WAVE" in audio_bytes[:12]:
+            content_type = "audio/wav"
+        elif audio_bytes.startswith(b"\x1A\x45\xDF\xA3"):  # WebM/Matroska
+            content_type = "audio/webm"
+        
+        log_and_print(f"🔍 Detected format: {content_type}")
+        
+        try:
+            url = fal_client.upload(data=audio_bytes, content_type=content_type)
+            log_and_print(f"✅ Upload successful to FAL")
+        except Exception as upload_error:
+            log_and_print(f"❌ Upload failed: {upload_error}")
+            # Try with generic audio type as fallback
+            log_and_print("🔄 Retrying upload with generic audio type...")
+            url = fal_client.upload(data=audio_bytes, content_type="audio/mpeg")
+            log_and_print(f"✅ Upload successful (fallback)")
 
         # Transcribe using original FAL API structure (no timeout parameter)
         log_and_print("🔄 Starting transcription...")
@@ -298,29 +383,39 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
                 for log_entry in update.logs:
                     log_and_print(f"FAL: {log_entry['message']}")
 
-        result = fal_client.subscribe(
-            "fal-ai/whisper",
-            arguments={
-                "audio_url": url,
-                "task": "transcribe",
-                "language": None,  # Auto-detect language
-            },
-            with_logs=True,
-            on_queue_update=on_queue_update,
-        )
+        try:
+            result = fal_client.subscribe(
+                "fal-ai/whisper",
+                arguments={
+                    "audio_url": url,
+                    "task": "transcribe",
+                    "language": None,  # Auto-detect language
+                },
+                with_logs=True,
+                on_queue_update=on_queue_update,
+            )
 
-        log_and_print("✅ Transcription completed")
-        return whisper_result_to_txt(result)
+            log_and_print("✅ Transcription completed")
+            return whisper_result_to_txt(result)
+            
+        except Exception as transcribe_error:
+            error_msg = str(transcribe_error)
+            log_and_print(f"❌ FAL transcription failed: {error_msg}")
+            
+            # Check for specific error types
+            if "403" in error_msg or "forbidden" in error_msg.lower():
+                return "[FAL API access denied (403). Check API key permissions.]"
+            elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+                return "[FAL API quota exceeded]"
+            elif "timeout" in error_msg.lower():
+                return "[FAL API timeout - audio may be too long]"
+            else:
+                return f"[FAL transcription failed: {error_msg}]"
 
     except Exception as e:
         error_msg = str(e)
-        log_and_print(f"❌ Transcription failed: {error_msg}")
-
-        # Return specific error messages for debugging
-        if "quota" in error_msg.lower() or "limit" in error_msg.lower():
-            return "[FAL API quota exceeded]"
-        else:
-            return f"[Transcription failed: {error_msg}]"
+        log_and_print(f"❌ General transcription error: {error_msg}")
+        return f"[Transcription error: {error_msg}]"
 
 
 def process_youtube_video_sync(url: str, generate_summary: bool = True) -> dict:
@@ -628,7 +723,7 @@ async def process_youtube_video(request: YouTubeRequest):
             logs.append("🎯 No captions found")
 
             # Enable transcription with strict limits
-            if False:  # Enable transcription now
+            if False:  # Skip transcription for debugging 
                 logs.append("⏭️ Skipping transcription for debugging")
                 formatted_subtitle = "[No captions available. Transcription temporarily disabled for debugging.]"
             else:
