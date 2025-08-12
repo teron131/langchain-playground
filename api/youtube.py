@@ -288,42 +288,16 @@ def download_audio_bytes(info: dict) -> bytes:
     
     log_and_print(f"Downloaded {len(audio_data)} bytes of audio")
 
-    # Try conversion with better error handling and format detection
-    try:
-        # First try to detect and convert the audio format
-        acodec = audio_format.get("acodec", "").lower()
-        
-        with io.BytesIO(audio_data) as in_memory_file:
-            # Try different format hints based on codec
-            if "mp4a" in acodec or "aac" in acodec:
-                audio_segment = AudioSegment.from_file(in_memory_file, format="mp4")
-            elif "opus" in acodec:
-                audio_segment = AudioSegment.from_file(in_memory_file, format="webm")  
-            else:
-                # Let pydub auto-detect
-                audio_segment = AudioSegment.from_file(in_memory_file)
-
-        # Convert to MP3 with conservative settings
-        with io.BytesIO() as output_buffer:
-            audio_segment.export(
-                output_buffer, 
-                format="mp3", 
-                bitrate="64k", 
-                parameters=["-ac", "1", "-ar", "16000"]  # mono, 16kHz
-            )
-            converted_data = output_buffer.getvalue()
-            log_and_print(f"✅ Audio converted: {len(converted_data)} bytes")
-            return converted_data
-            
-    except Exception as e:
-        log_and_print(f"⚠️ Audio conversion failed: {e}")
-        
-        # If conversion fails, check if we can use raw audio for transcription
-        if len(audio_data) < 25 * 1024 * 1024:  # Under 25MB, try raw
-            log_and_print("📋 Using raw audio for transcription")
-            return audio_data
-        else:
-            raise RuntimeError(f"Audio conversion failed and file too large ({len(audio_data) / 1024 / 1024:.1f}MB): {e}")
+    # Skip conversion entirely - use raw audio for transcription
+    log_and_print("🔄 Skipping FFmpeg conversion, using raw audio for FAL")
+    
+    # Check file size before proceeding
+    audio_size_mb = len(audio_data) / 1024 / 1024
+    if audio_size_mb > 25:  # 25MB limit for raw audio
+        raise RuntimeError(f"Raw audio too large for transcription: {audio_size_mb:.1f}MB")
+    
+    log_and_print(f"✅ Using raw audio: {len(audio_data)} bytes ({audio_size_mb:.1f}MB)")
+    return audio_data
 
 
 def get_subtitle_from_captions(info: dict) -> str:
@@ -348,80 +322,16 @@ def get_subtitle_from_captions(info: dict) -> str:
 
 
 def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -> bytes:
-    """Optimize audio for transcription with multiple fallback strategies."""
-    try:
-        log_and_print(f"🎵 Optimizing audio (original: {len(audio_bytes) / 1024 / 1024:.1f}MB)")
-
-        # Strategy 1: Try direct format detection and conversion
-        try:
-            with io.BytesIO(audio_bytes) as input_buffer:
-                audio = AudioSegment.from_file(input_buffer)
-
-                # Set optimal settings for speech transcription
-                audio = audio.set_frame_rate(16000)  # 16kHz sampling rate - optimal for speech
-                audio = audio.set_channels(1)  # Mono
-
-                # Export with reasonable quality for transcription
-                with io.BytesIO() as output_buffer:
-                    audio.export(output_buffer, format="mp3", bitrate="32k", parameters=["-ac", "1", "-ar", "16000"])
-                    optimized_bytes = output_buffer.getvalue()
-
-            optimized_size_mb = len(optimized_bytes) / 1024 / 1024
-            log_and_print(f"✅ Audio optimized (direct): {optimized_size_mb:.1f}MB ({len(optimized_bytes)} bytes)")
-            return optimized_bytes
-            
-        except Exception as e1:
-            log_and_print(f"⚠️ Direct optimization failed: {e1}, trying format-specific approaches")
-
-        # Strategy 2: Try different format hints
-        format_attempts = [
-            ("mp4", "MP4/AAC"),
-            ("webm", "WebM/Opus"), 
-            ("m4a", "M4A"),
-            (None, "Auto-detect")
-        ]
-        
-        for format_hint, description in format_attempts:
-            try:
-                log_and_print(f"🔄 Trying {description} format...")
-                with io.BytesIO(audio_bytes) as input_buffer:
-                    if format_hint:
-                        audio = AudioSegment.from_file(input_buffer, format=format_hint)
-                    else:
-                        audio = AudioSegment.from_file(input_buffer)
-
-                    # Basic optimization
-                    audio = audio.set_frame_rate(16000).set_channels(1)
-
-                    with io.BytesIO() as output_buffer:
-                        audio.export(output_buffer, format="mp3", bitrate="32k")
-                        optimized_bytes = output_buffer.getvalue()
-
-                optimized_size_mb = len(optimized_bytes) / 1024 / 1024
-                log_and_print(f"✅ Audio optimized ({description}): {optimized_size_mb:.1f}MB")
-                return optimized_bytes
-                
-            except Exception as e2:
-                log_and_print(f"⚠️ {description} optimization failed: {e2}")
-                continue
-
-        # Strategy 3: If all conversions fail, check if raw audio is usable
-        raw_size_mb = len(audio_bytes) / 1024 / 1024
-        if raw_size_mb <= max_size_mb * 5:  # Allow up to 5x the target size for raw
-            log_and_print(f"📋 Using raw audio for transcription ({raw_size_mb:.1f}MB)")
-            return audio_bytes
-        else:
-            raise RuntimeError(f"Audio optimization failed and raw audio too large ({raw_size_mb:.1f}MB)")
-
-    except Exception as e:
-        log_and_print(f"❌ All audio optimization strategies failed: {e}")
-        # Last resort: try to use raw if not too large
-        raw_size_mb = len(audio_bytes) / 1024 / 1024
-        if raw_size_mb <= 10:  # Max 10MB for raw fallback
-            log_and_print(f"📋 Final fallback: using raw audio ({raw_size_mb:.1f}MB)")
-            return audio_bytes
-        else:
-            raise RuntimeError(f"Cannot optimize audio and raw file too large ({raw_size_mb:.1f}MB)")
+    """Simplified audio handling - skip FFmpeg optimization to avoid conversion errors."""
+    raw_size_mb = len(audio_bytes) / 1024 / 1024
+    log_and_print(f"🎵 Audio size check: {raw_size_mb:.1f}MB")
+    
+    # Check if raw audio is reasonable size for transcription
+    if raw_size_mb <= 10:  # 10MB limit for raw audio
+        log_and_print(f"✅ Using raw audio for transcription ({raw_size_mb:.1f}MB)")
+        return audio_bytes
+    else:
+        raise RuntimeError(f"Audio file too large for transcription: {raw_size_mb:.1f}MB. Please try a shorter video.")
 
 
 def transcribe_with_fal(audio_bytes: bytes) -> str:
@@ -434,20 +344,35 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
         if not fal_key:
             return "[FAL_KEY not configured]"
 
-        # Upload audio with proper content type detection
+        # Upload audio with better content type detection
         log_and_print("📤 Uploading audio to FAL...")
         
-        # Detect content type based on audio data
-        content_type = "audio/mp3"
-        if audio_bytes.startswith(b"fLaC"):
+        # Detect content type based on magic bytes
+        content_type = "audio/mpeg"  # Default to generic audio
+        if audio_bytes.startswith(b"ID3") or audio_bytes.startswith(b"\xFF\xFB"):
+            content_type = "audio/mpeg"  # MP3
+        elif audio_bytes.startswith(b"fLaC"):
             content_type = "audio/flac"
         elif audio_bytes.startswith(b"OggS"):
             content_type = "audio/ogg"
-        elif audio_bytes.startswith(b"\x00\x00\x00"):
+        elif audio_bytes.startswith(b"\x00\x00\x00\x18ftypmp4") or audio_bytes.startswith(b"\x00\x00\x00\x20ftypM4A"):
             content_type = "audio/mp4"
+        elif audio_bytes.startswith(b"RIFF") and b"WAVE" in audio_bytes[:12]:
+            content_type = "audio/wav"
+        elif audio_bytes.startswith(b"\x1A\x45\xDF\xA3"):  # WebM/Matroska
+            content_type = "audio/webm"
         
-        url = fal_client.upload(data=audio_bytes, content_type=content_type)
-        log_and_print(f"✅ Upload successful ({content_type})")
+        log_and_print(f"🔍 Detected format: {content_type}")
+        
+        try:
+            url = fal_client.upload(data=audio_bytes, content_type=content_type)
+            log_and_print(f"✅ Upload successful to FAL")
+        except Exception as upload_error:
+            log_and_print(f"❌ Upload failed: {upload_error}")
+            # Try with generic audio type as fallback
+            log_and_print("🔄 Retrying upload with generic audio type...")
+            url = fal_client.upload(data=audio_bytes, content_type="audio/mpeg")
+            log_and_print(f"✅ Upload successful (fallback)")
 
         # Transcribe using original FAL API structure (no timeout parameter)
         log_and_print("🔄 Starting transcription...")
@@ -458,29 +383,39 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
                 for log_entry in update.logs:
                     log_and_print(f"FAL: {log_entry['message']}")
 
-        result = fal_client.subscribe(
-            "fal-ai/whisper",
-            arguments={
-                "audio_url": url,
-                "task": "transcribe",
-                "language": None,  # Auto-detect language
-            },
-            with_logs=True,
-            on_queue_update=on_queue_update,
-        )
+        try:
+            result = fal_client.subscribe(
+                "fal-ai/whisper",
+                arguments={
+                    "audio_url": url,
+                    "task": "transcribe",
+                    "language": None,  # Auto-detect language
+                },
+                with_logs=True,
+                on_queue_update=on_queue_update,
+            )
 
-        log_and_print("✅ Transcription completed")
-        return whisper_result_to_txt(result)
+            log_and_print("✅ Transcription completed")
+            return whisper_result_to_txt(result)
+            
+        except Exception as transcribe_error:
+            error_msg = str(transcribe_error)
+            log_and_print(f"❌ FAL transcription failed: {error_msg}")
+            
+            # Check for specific error types
+            if "403" in error_msg or "forbidden" in error_msg.lower():
+                return "[FAL API access denied (403). Check API key permissions.]"
+            elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+                return "[FAL API quota exceeded]"
+            elif "timeout" in error_msg.lower():
+                return "[FAL API timeout - audio may be too long]"
+            else:
+                return f"[FAL transcription failed: {error_msg}]"
 
     except Exception as e:
         error_msg = str(e)
-        log_and_print(f"❌ Transcription failed: {error_msg}")
-
-        # Return specific error messages for debugging
-        if "quota" in error_msg.lower() or "limit" in error_msg.lower():
-            return "[FAL API quota exceeded]"
-        else:
-            return f"[Transcription failed: {error_msg}]"
+        log_and_print(f"❌ General transcription error: {error_msg}")
+        return f"[Transcription error: {error_msg}]"
 
 
 def process_youtube_video_sync(url: str, generate_summary: bool = True) -> dict:
