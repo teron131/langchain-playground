@@ -1,9 +1,9 @@
 """
 Railway deployment entry point.
-Imports the FastAPI app from api/youtube_with_ui.py for Railway's auto-detection.
+Imports the standalone FastAPI app to avoid complex package dependencies.
 """
 
-from api.youtube_with_ui import app
+from api.youtube_standalone import app
 
 # This allows Railway to auto-detect and start the FastAPI app
 if __name__ == "__main__":
