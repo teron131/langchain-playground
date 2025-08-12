@@ -23,7 +23,7 @@ def extract_video_info(url: str) -> dict:
     import random
     import time
 
-    # Detect if running in cloud environment (Vercel, etc.)
+    # Detect if running in cloud environment (including Railway)
     is_cloud_env = any(
         [
             os.getenv("VERCEL"),
@@ -31,6 +31,9 @@ def extract_video_info(url: str) -> dict:
             os.getenv("FUNCTIONS_WORKER_RUNTIME"),  # Azure Functions
             os.getenv("GOOGLE_CLOUD_PROJECT"),  # Google Cloud
             os.getenv("RENDER"),  # Render.com
+            os.getenv("RAILWAY_STATIC_URL"),  # Railway detection
+            os.getenv("RAILWAY_PROJECT_ID"),  # Railway alternative detection
+            os.getenv("PORT") and not os.getenv("DEVELOPMENT"),  # Generic cloud port detection
             "/tmp" in os.getcwd(),  # Common in serverless
         ]
     )
@@ -50,7 +53,7 @@ def extract_video_info(url: str) -> dict:
     if is_cloud_env:
         # Container-optimized strategies (prioritize proven working methods)
         strategies = [
-            # Strategy 1: Android TV client (proven to work in containers)
+            # Strategy 1: Android TV client (proven to work in containers - prioritized)
             {
                 "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
                 "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
@@ -77,29 +80,29 @@ def extract_video_info(url: str) -> dict:
             },
         ]
     else:
-        # Local environment strategies (include browser cookies for local development)
+        # Local environment strategies - prioritize android_tv to avoid browser cookie failures
         strategies = [
-            # Strategy 1: Try with cookies from Chrome (local environments)
+            # Strategy 1: Android TV client (proven to work - prioritized for local too)
+            {
+                "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
+                "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
+            },
+            # Strategy 2: Android client
+            {
+                "user_agent": random.choice(user_agents),
+                "extractor_args": {"youtube": {"player_client": ["android"]}},
+            },
+            # Strategy 3: Try with cookies from Chrome (local environments only if available)
             {
                 "cookies_from_browser": ["chrome"],
                 "user_agent": random.choice(user_agents),
                 "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
             },
-            # Strategy 2: Try with cookies from Firefox (local environments)
+            # Strategy 4: Try with cookies from Firefox (local environments only if available)
             {
                 "cookies_from_browser": ["firefox"],
                 "user_agent": random.choice(user_agents),
                 "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
-            },
-            # Strategy 3: Android TV client (proven to work)
-            {
-                "user_agent": "Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36",
-                "extractor_args": {"youtube": {"player_client": ["android_tv"]}},
-            },
-            # Strategy 4: Android client
-            {
-                "user_agent": random.choice(user_agents),
-                "extractor_args": {"youtube": {"player_client": ["android"]}},
             },
             # Strategy 5: Web client fallback
             {
@@ -165,8 +168,12 @@ def extract_video_info(url: str) -> dict:
 
         # Add strategy-specific options
         if "cookies_from_browser" in strategy:
-            ydl_opts["cookiesfrombrowser"] = strategy["cookies_from_browser"]
-            print(f"Using cookies from: {strategy['cookies_from_browser']}")
+            try:
+                ydl_opts["cookiesfrombrowser"] = strategy["cookies_from_browser"]
+                print(f"Using cookies from: {strategy['cookies_from_browser']}")
+            except Exception as e:
+                print(f"⚠️ Cookie extraction failed: {e} - skipping to next strategy")
+                continue
 
         if "extractor_args" in strategy:
             ydl_opts["extractor_args"] = strategy["extractor_args"]
@@ -174,7 +181,7 @@ def extract_video_info(url: str) -> dict:
 
         # Reduced delays for faster processing
         if i > 0:
-            delay = random.uniform(1, 2)  # Much shorter delays
+            delay = random.uniform(0.5, 1.0)  # Even shorter delays for cloud environments
             print(f"Waiting {delay:.1f}s before retry...")
             time.sleep(delay)
 
@@ -188,6 +195,11 @@ def extract_video_info(url: str) -> dict:
             error_msg = str(e)
             last_error = e
             print(f"❌ Strategy {i + 1} failed: {error_msg}")
+
+            # Skip to next strategy for browser cookie errors in local environment
+            if "could not find" in error_msg.lower() and "cookies database" in error_msg.lower():
+                print(f"Browser cookies not available - continuing to next strategy")
+                continue
 
             # If this is a non-bot-detection error, fail fast
             if any(keyword in error_msg.lower() for keyword in ["private video", "video unavailable", "age-restricted", "not available on this app", "watch on the latest version"]):

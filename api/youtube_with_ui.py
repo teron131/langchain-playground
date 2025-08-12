@@ -1,29 +1,28 @@
 """
-Clean YouTube Processing API with Web UI
-Railway deployment-ready with 15+ extraction strategies
+Enhanced YouTube Processing API using existing youtube_loader
+Railway deployment with web UI + full transcription & summarization
 """
 
-import asyncio
-import json
 import logging
 import os
-import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yt_dlp
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
+from google.genai import Client, types
 from pydantic import BaseModel, Field
+
+# Import the existing youtube_loader
+from langchain_playground.Tools.YouTubeLoader import youtube_loader
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
-app = FastAPI(title="YouTube Processor", description="Clean YouTube video processing with web UI")
+app = FastAPI(title="YouTube Processor", description="Full YouTube processing with transcription & summarization")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,8 +36,7 @@ app.add_middleware(
 # Request Models
 class YouTubeRequest(BaseModel):
     url: str = Field(..., description="YouTube video URL")
-    extract_audio: bool = Field(default=True, description="Extract audio for transcription")
-    format_subtitles: bool = Field(default=True, description="Format subtitles with LLM")
+    generate_summary: bool = Field(default=True, description="Generate AI summary")
 
 
 class ProcessingResponse(BaseModel):
@@ -48,117 +46,39 @@ class ProcessingResponse(BaseModel):
     logs: List[str] = []
 
 
-# YouTube Extraction Strategies
-EXTRACTION_STRATEGIES = [
-    # Android TV strategies
-    {"client": "android_tv", "player_client": "android_tv"},
-    {"client": "android_tv", "player_client": "android_tv", "use_oauth": True},
-    # Android strategies
-    {"client": "android", "player_client": "android"},
-    {"client": "android", "player_client": "android", "use_oauth": True},
-    {"client": "android_music", "player_client": "android_music"},
-    # iOS strategies
-    {"client": "ios", "player_client": "ios"},
-    {"client": "ios_music", "player_client": "ios_music"},
-    # Web strategies
-    {"client": "web", "player_client": "web"},
-    {"client": "web_music", "player_client": "web_music"},
-    {"client": "web_embedded", "player_client": "web_embedded"},
-    # TV strategies
-    {"client": "tv", "player_client": "tv"},
-    {"client": "tv_embedded", "player_client": "tv_embedded"},
-    # Alternative strategies
-    {"client": "mweb", "player_client": "mweb"},
-    {"client": "web_safari", "player_client": "web_safari"},
-    # Fallback strategies
-    {"extractor_args": {"youtube": {"player_client": ["android", "web"]}}},
-]
+def quick_summary(text: str) -> str:
+    """Generate summary using Gemini 2.5-pro like the user's example."""
+    try:
+        client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=f"Summarize with list out of the key facts mentioned. Follow the language of the text.\n\n{text}",
+            config=types.GenerateContentConfig(temperature=0),
+        )
+        return response.text
+    except Exception as e:
+        logger.error(f"Summary generation failed: {e}")
+        return f"Summary generation failed: {str(e)}"
 
 
-def extract_youtube_info(url: str, logs: List[str]) -> Optional[Dict[str, Any]]:
-    """
-    Extract YouTube video information using multiple strategies.
-    Tries all strategies persistently without early stopping.
-    """
-    logs.append(f"🎯 Starting extraction for: {url}")
-    logs.append(f"📋 Total strategies to try: {len(EXTRACTION_STRATEGIES)}")
+def extract_video_metadata(content: str) -> Dict[str, str]:
+    """Extract title and author from youtube_loader output."""
+    lines = content.split("\n")
+    title = "Unknown"
+    author = "Unknown"
+    subtitle = ""
 
-    for i, strategy in enumerate(EXTRACTION_STRATEGIES, 1):
-        try:
-            logs.append(f"🔧 Strategy {i}/{len(EXTRACTION_STRATEGIES)}: {strategy}")
+    for i, line in enumerate(lines):
+        if line.startswith("Title: "):
+            title = line.replace("Title: ", "")
+        elif line.startswith("Author: "):
+            author = line.replace("Author: ", "")
+        elif line.startswith("subtitle:"):
+            # Everything after "subtitle:" line
+            subtitle = "\n".join(lines[i + 1 :])
+            break
 
-            # Base yt-dlp options
-            ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": False, "writesubtitles": True, "writeautomaticsub": True, "subtitleslangs": ["en", "zh", "zh-cn", "zh-tw"], "format": "best[height<=720]/best", **strategy}
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-
-                if info and "title" in info:
-                    logs.append(f"✅ Strategy {i} SUCCESS! Title: {info.get('title', 'Unknown')[:50]}...")
-
-                    # Extract key information
-                    result = {"title": info.get("title", "Unknown"), "description": info.get("description", ""), "duration": info.get("duration", 0), "uploader": info.get("uploader", "Unknown"), "upload_date": info.get("upload_date", ""), "view_count": info.get("view_count", 0), "like_count": info.get("like_count", 0), "subtitles": info.get("subtitles", {}), "automatic_captions": info.get("automatic_captions", {}), "url": url, "successful_strategy": i, "strategy_used": strategy}
-
-                    logs.append(f"📊 Extracted: {len(result.get('subtitles', {}))} manual subs, {len(result.get('automatic_captions', {}))} auto subs")
-                    return result
-                else:
-                    logs.append(f"❌ Strategy {i} failed: No valid info extracted")
-
-        except Exception as e:
-            error_msg = str(e)
-            if "Video unavailable" in error_msg:
-                logs.append(f"❌ Strategy {i} failed: Video unavailable")
-            elif "Private video" in error_msg:
-                logs.append(f"❌ Strategy {i} failed: Private video")
-            elif "Sign in to confirm your age" in error_msg:
-                logs.append(f"❌ Strategy {i} failed: Age restriction")
-            else:
-                logs.append(f"❌ Strategy {i} failed: {error_msg[:100]}")
-            continue
-
-    logs.append("🚫 All strategies exhausted - extraction failed")
-    return None
-
-
-def format_duration(seconds: int) -> str:
-    """Format duration in human readable format."""
-    if not seconds:
-        return "Unknown"
-
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    seconds = seconds % 60
-
-    if hours > 0:
-        return f"{hours}h {minutes}m {seconds}s"
-    elif minutes > 0:
-        return f"{minutes}m {seconds}s"
-    else:
-        return f"{seconds}s"
-
-
-def extract_subtitles_text(subtitles: Dict, auto_captions: Dict) -> str:
-    """Extract and combine subtitle text from available sources."""
-    text_content = []
-
-    # Try manual subtitles first (higher quality)
-    for lang in ["en", "zh", "zh-cn", "zh-tw"]:
-        if lang in subtitles:
-            for sub in subtitles[lang]:
-                if "url" in sub:
-                    text_content.append(f"Manual subtitles ({lang}) available")
-                    break
-
-    # Try automatic captions
-    if not text_content:
-        for lang in ["en", "zh", "zh-cn", "zh-tw"]:
-            if lang in auto_captions:
-                for sub in auto_captions[lang]:
-                    if "url" in sub:
-                        text_content.append(f"Automatic captions ({lang}) available")
-                        break
-
-    return " | ".join(text_content) if text_content else "No subtitles available"
+    return {"title": title, "author": author, "subtitle": subtitle}
 
 
 # API Routes
@@ -184,9 +104,6 @@ async def get_web_interface():
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
         }
         
@@ -195,8 +112,8 @@ async def get_web_interface():
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             padding: 40px;
-            max-width: 800px;
-            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
         }
         
         .header {
@@ -241,8 +158,6 @@ async def get_web_interface():
         }
         
         .options {
-            display: flex;
-            gap: 20px;
             margin-bottom: 30px;
         }
         
@@ -333,16 +248,22 @@ async def get_web_interface():
             margin-bottom: 5px;
         }
         
-        .logs {
-            background: #2d3748;
-            color: #e2e8f0;
+        .summary-section {
+            background: #e6f3ff;
+            border-radius: 12px;
             padding: 20px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            max-height: 300px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .transcript-section {
+            background: #f0f8ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+            max-height: 400px;
             overflow-y: auto;
-            white-space: pre-wrap;
         }
         
         .error {
@@ -366,7 +287,7 @@ async def get_web_interface():
     <div class="container">
         <div class="header">
             <h1>🎬 YouTube Processor</h1>
-            <p>Clean extraction with 15+ persistent strategies</p>
+            <p>Extract • Transcribe • Summarize with AI</p>
         </div>
         
         <form id="processForm">
@@ -383,13 +304,8 @@ async def get_web_interface():
             
             <div class="options">
                 <div class="checkbox-group">
-                    <input type="checkbox" id="extractAudio" name="extract_audio" checked>
-                    <label for="extractAudio">Extract Audio</label>
-                </div>
-                
-                <div class="checkbox-group">
-                    <input type="checkbox" id="formatSubs" name="format_subtitles" checked>
-                    <label for="formatSubs">Format Subtitles</label>
+                    <input type="checkbox" id="generateSummary" name="generate_summary" checked>
+                    <label for="generateSummary">🤖 Generate AI Summary with Gemini</label>
                 </div>
             </div>
             
@@ -400,7 +316,7 @@ async def get_web_interface():
         
         <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
-            <p>Processing video with persistent strategies...</p>
+            <p>Processing video... This includes transcription and may take several minutes.</p>
         </div>
         
         <div id="result"></div>
@@ -413,8 +329,7 @@ async def get_web_interface():
             const formData = new FormData(e.target);
             const data = {
                 url: formData.get('url'),
-                extract_audio: formData.has('extract_audio'),
-                format_subtitles: formData.has('format_subtitles')
+                generate_summary: formData.has('generate_summary')
             };
             
             const loadingDiv = document.getElementById('loading');
@@ -459,6 +374,16 @@ async def get_web_interface():
             const resultDiv = document.getElementById('result');
             const data = result.data;
             
+            let summarySection = '';
+            if (data.summary) {
+                summarySection = `
+                    <div class="summary-section">
+                        <h4>🤖 AI Summary</h4>
+                        <div style="white-space: pre-wrap; line-height: 1.6;">${data.summary}</div>
+                    </div>
+                `;
+            }
+            
             resultDiv.innerHTML = `
                 <div class="success">
                     <strong>✅ Processing completed successfully!</strong>
@@ -472,39 +397,24 @@ async def get_web_interface():
                             ${data.title || 'Unknown'}
                         </div>
                         <div class="info-item">
-                            <strong>Duration</strong>
-                            ${formatDuration(data.duration)}
+                            <strong>Author</strong>
+                            ${data.author || 'Unknown'}
                         </div>
                         <div class="info-item">
-                            <strong>Uploader</strong>
-                            ${data.uploader || 'Unknown'}
+                            <strong>Processing Time</strong>
+                            ${data.processing_time || 'N/A'}
                         </div>
                         <div class="info-item">
-                            <strong>Views</strong>
-                            ${formatNumber(data.view_count)}
-                        </div>
-                        <div class="info-item">
-                            <strong>Strategy Used</strong>
-                            ${data.successful_strategy}/${data.total_strategies}
-                        </div>
-                        <div class="info-item">
-                            <strong>Subtitles</strong>
-                            ${data.subtitle_info || 'None available'}
+                            <strong>Status</strong>
+                            Full transcription & analysis completed
                         </div>
                     </div>
                     
-                    ${data.description ? `
-                        <div style="margin-top: 20px;">
-                            <strong>Description:</strong>
-                            <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 10px; max-height: 150px; overflow-y: auto;">
-                                ${data.description.substring(0, 500)}${data.description.length > 500 ? '...' : ''}
-                            </div>
-                        </div>
-                    ` : ''}
+                    ${summarySection}
                     
-                    <div style="margin-top: 20px;">
-                        <strong>📋 Processing Logs:</strong>
-                        <div class="logs">${result.logs.join('\\n')}</div>
+                    <div class="transcript-section">
+                        <h4>📝 Full Transcript</h4>
+                        <div style="white-space: pre-wrap; line-height: 1.6; font-size: 14px;">${data.subtitle || 'No transcript available'}</div>
                     </div>
                 </div>
             `;
@@ -518,27 +428,6 @@ async def get_web_interface():
                 </div>
             `;
         }
-        
-        function formatDuration(seconds) {
-            if (!seconds) return 'Unknown';
-            
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = seconds % 60;
-            
-            if (hours > 0) {
-                return `${hours}h ${minutes}m ${secs}s`;
-            } else if (minutes > 0) {
-                return `${minutes}m ${secs}s`;
-            } else {
-                return `${secs}s`;
-            }
-        }
-        
-        function formatNumber(num) {
-            if (!num) return '0';
-            return num.toLocaleString();
-        }
     </script>
 </body>
 </html>
@@ -548,39 +437,45 @@ async def get_web_interface():
 
 @app.post("/process", response_model=ProcessingResponse)
 async def process_youtube_video(request: YouTubeRequest):
-    """Process YouTube video with persistent extraction strategies."""
+    """Process YouTube video using the existing youtube_loader infrastructure."""
+    start_time = datetime.now()
     logs = []
 
     try:
-        logs.append(f"🎬 Processing request for: {request.url}")
-        logs.append(f"⚙️ Options - Audio: {request.extract_audio}, Subtitles: {request.format_subtitles}")
+        logs.append(f"🎬 Processing: {request.url}")
+        logs.append(f"🤖 Summary generation: {'Enabled' if request.generate_summary else 'Disabled'}")
 
-        # Extract video information
-        video_info = extract_youtube_info(request.url, logs)
+        # Use the existing youtube_loader function
+        logs.append("🔄 Starting full YouTube processing pipeline...")
+        youtube_content = youtube_loader(request.url)
 
-        if not video_info:
-            logs.append("❌ Extraction failed - all strategies exhausted")
-            return ProcessingResponse(status="error", message="Failed to extract video information after trying all strategies", logs=logs)
+        # Extract metadata from the content
+        metadata = extract_video_metadata(youtube_content)
 
-        # Process extracted information
+        # Generate summary if requested
+        summary = None
+        if request.generate_summary:
+            logs.append("🤖 Generating AI summary with Gemini 2.5-pro...")
+            summary = quick_summary(youtube_content)
+            logs.append("✅ Summary generation completed")
+
+        # Calculate processing time
+        processing_time = datetime.now() - start_time
+
         result_data = {
-            "title": video_info.get("title", "Unknown"),
-            "description": video_info.get("description", ""),
-            "duration": video_info.get("duration", 0),
-            "uploader": video_info.get("uploader", "Unknown"),
-            "upload_date": video_info.get("upload_date", ""),
-            "view_count": video_info.get("view_count", 0),
-            "like_count": video_info.get("like_count", 0),
-            "successful_strategy": video_info.get("successful_strategy", 0),
-            "total_strategies": len(EXTRACTION_STRATEGIES),
-            "subtitle_info": extract_subtitles_text(video_info.get("subtitles", {}), video_info.get("automatic_captions", {})),
-            "extraction_timestamp": datetime.now().isoformat(),
+            "title": metadata["title"],
+            "author": metadata["author"],
+            "subtitle": metadata["subtitle"],
+            "summary": summary,
+            "full_content": youtube_content,
+            "processing_time": f"{processing_time.total_seconds():.1f}s",
+            "url": request.url,
+            "timestamp": datetime.now().isoformat(),
         }
 
-        logs.append(f"✅ Successfully extracted video: {result_data['title'][:50]}...")
-        logs.append(f"📊 Final result: Duration {format_duration(result_data['duration'])}, Views {result_data['view_count']:,}")
+        logs.append(f"✅ Processing completed in {processing_time.total_seconds():.1f}s")
 
-        return ProcessingResponse(status="success", message="Video processed successfully", data=result_data, logs=logs)
+        return ProcessingResponse(status="success", message="Video processed successfully with full transcription and summarization", data=result_data, logs=logs)
 
     except Exception as e:
         error_message = f"Processing error: {str(e)}"
@@ -600,5 +495,5 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)

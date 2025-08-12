@@ -10,7 +10,6 @@ pydub>=0.25.1
 requests>=2.31.0
 
 # LLM and AI processing
-google-generativeai>=0.8.3
 google-genai>=0.4.0
 langchain>=0.3.25
 langchain-openai>=0.2.8
