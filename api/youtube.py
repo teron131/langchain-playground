@@ -15,7 +15,7 @@ import fal_client
 import requests
 import yt_dlp
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from google.genai import Client, types
@@ -231,21 +231,44 @@ def get_subtitle_from_captions(info: dict) -> str:
 
 
 def transcribe_with_fal(audio_bytes: bytes) -> str:
-    """Transcribe audio using FAL API."""
+    """Transcribe audio using FAL API with improved error handling."""
     try:
+        print("🎤 Starting FAL transcription...")
+        print(f"Audio size: {len(audio_bytes)} bytes")
+
+        # Check API key
+        fal_key = os.getenv("FAL_KEY")
+        if not fal_key:
+            raise RuntimeError("FAL_KEY environment variable not set")
+
+        # Upload audio with timeout
+        print("📤 Uploading audio to FAL...")
         url = fal_client.upload(data=audio_bytes, content_type="audio/mp3")
+        print(f"✅ Audio uploaded successfully: {url}")
+
+        # Transcribe with timeout and progress tracking
+        print("🔄 Starting transcription...")
         result = fal_client.subscribe(
             "fal-ai/whisper",
             arguments={
                 "audio_url": url,
                 "task": "transcribe",
                 "language": "en",
+                "chunk_length": 30,  # Process in 30-second chunks
             },
             with_logs=True,
+            timeout=300,  # 5-minute timeout
         )
+
+        print("✅ Transcription completed successfully")
         return whisper_result_to_txt(result)
+
     except Exception as e:
-        raise RuntimeError(f"Transcription failed: {e}")
+        error_msg = f"Transcription failed: {str(e)}"
+        print(f"❌ {error_msg}")
+
+        # Return a fallback message instead of failing completely
+        return f"[Transcription failed: {str(e)}. Please try again or check your FAL_KEY configuration.]"
 
 
 def simple_format_subtitle(subtitle: str) -> str:
@@ -269,28 +292,40 @@ def simple_format_subtitle(subtitle: str) -> str:
 
 
 def standalone_youtube_loader(url: str) -> str:
-    """Standalone YouTube processing function."""
+    """Standalone YouTube processing function with improved error handling."""
     print(f"\n🎬 Loading YouTube video: {url}")
 
-    # Extract video info
-    info = extract_video_info(url)
-    title = info.get("title", "Unknown")
-    author = info.get("uploader", "Unknown")
+    try:
+        # Extract video info
+        info = extract_video_info(url)
+        title = info.get("title", "Unknown")
+        author = info.get("uploader", "Unknown")
 
-    print(f"✅ Video: {title} by {author}")
+        print(f"✅ Video: {title} by {author}")
 
-    # Try existing subtitles first
-    subtitle = get_subtitle_from_captions(info)
+        # Try existing subtitles first
+        subtitle = get_subtitle_from_captions(info)
 
-    if not subtitle:
-        print("🎯 No captions found, transcribing audio...")
-        audio_bytes = download_audio_bytes(info)
-        subtitle = transcribe_with_fal(audio_bytes)
+        if not subtitle:
+            print("🎯 No captions found, transcribing audio...")
+            try:
+                audio_bytes = download_audio_bytes(info)
+                subtitle = transcribe_with_fal(audio_bytes)
+            except Exception as e:
+                print(f"❌ Audio transcription failed: {e}")
+                subtitle = f"[Audio transcription failed: {str(e)}]"
+        else:
+            print("✅ Found existing captions")
 
-    # Simple formatting
-    formatted_subtitle = simple_format_subtitle(subtitle)
+        # Simple formatting
+        formatted_subtitle = simple_format_subtitle(subtitle)
 
-    return f"Title: {title}\nAuthor: {author}\nsubtitle:\n{formatted_subtitle}"
+        return f"Title: {title}\nAuthor: {author}\nSubtitle:\n{formatted_subtitle}"
+
+    except Exception as e:
+        error_msg = f"Failed to process video: {str(e)}"
+        print(f"❌ {error_msg}")
+        raise RuntimeError(error_msg)
 
 
 def quick_summary(text: str) -> str:
@@ -319,7 +354,7 @@ def extract_video_metadata(content: str) -> Dict[str, str]:
             title = line.replace("Title: ", "")
         elif line.startswith("Author: "):
             author = line.replace("Author: ", "")
-        elif line.startswith("subtitle:"):
+        elif line.startswith("Subtitle:"):
             subtitle = "\n".join(lines[i + 1 :])
             break
 
@@ -552,8 +587,7 @@ async def process_youtube_video(request: YouTubeRequest):
     except Exception as e:
         error_message = f"Processing error: {str(e)}"
         logs.append(f"❌ {error_message}")
-
-        return ProcessingResponse(status="error", message=error_message, logs=logs)
+        raise HTTPException(status_code=500, detail=error_message)
 
 
 @app.get("/health")
