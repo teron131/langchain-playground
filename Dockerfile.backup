@@ -1,12 +1,13 @@
-# Render.com Dockerfile for YouTube Summarizer with Full Chromium Support
+# Multi-platform Dockerfile for YouTube Processor with Full Browser Support
 FROM python:3.11-slim
 
-# Install system dependencies for Chromium
+# Install system dependencies for Chromium and full browser support
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
     procps \
+    curl \
     libxss1 \
     libgconf-2-4 \
     libxtst6 \
@@ -43,7 +44,7 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome (full version)
+# Install Google Chrome (full version for better YouTube compatibility)
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
     && apt-get update \
@@ -53,33 +54,35 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements-render.txt .
+# Copy requirements for YouTube processing
+COPY requirements-youtube.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements-render.txt
+RUN pip install --no-cache-dir -r requirements-youtube.txt
 
-# Install Playwright browsers (for fallback)
+# Install Playwright browsers (for fallback strategies)
 RUN playwright install chromium
 
 # Copy application code
 COPY . .
 
-# Create cache directory for browser profiles
+# Create cache directory for browser profiles and YouTube extraction
 RUN mkdir -p /app/.cache/browser-profiles
+RUN mkdir -p /app/.cache/youtube-cache
 
-# Set environment variables
+# Set environment variables for optimal YouTube processing
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV CHROME_BIN=/usr/bin/google-chrome
 ENV DISPLAY=:99
+ENV USER_AGENT="Mozilla/5.0 (Linux; Android 10; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36"
 
 # Expose port
 EXPOSE 8000
 
-# Health check
+# Health check for the new UI
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Start command
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start the YouTube UI with persistent strategies
+CMD ["uvicorn", "api.youtube_with_ui:app", "--host", "0.0.0.0", "--port", "8000"]
