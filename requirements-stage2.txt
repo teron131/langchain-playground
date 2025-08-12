@@ -8,8 +8,8 @@ requests>=2.31.0
 # YouTube processing
 yt-dlp>=2023.12.30
 
-# AI/ML dependencies
-google-generativeai>=0.3.2
+# AI/ML dependencies - Fix the package name
+google-genai>=0.3.2
 
 # Audio processing
 fal-client>=0.4.0
