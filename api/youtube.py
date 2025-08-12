@@ -134,17 +134,11 @@ def extract_video_info(url: str) -> dict:
         # Strategy 1: Android TV with specific params
         {
             "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android_tv"],
-                    "player_skip": ["configs"],
-                    "skip": ["hls", "dash"]
-                }
-            },
+            "extractor_args": {"youtube": {"player_client": ["android_tv"], "player_skip": ["configs"], "skip": ["hls", "dash"]}},
         },
         # Strategy 2: Android mobile client
         {
-            "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip", 
+            "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android"],
@@ -203,9 +197,9 @@ def extract_video_info(url: str) -> dict:
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "en-us,en;q=0.5",
                 "Sec-Fetch-Mode": "navigate",
-            }
+            },
         }
-        
+
         # Add age_limit if specified in strategy
         if "age_limit" in strategy:
             ydl_opts["age_limit"] = strategy["age_limit"]
@@ -238,13 +232,13 @@ def download_audio_bytes(info: dict) -> bytes:
     high_efficiency_formats = []  # Opus, AAC - best compression
     medium_efficiency_formats = []  # MP4A, other modern codecs
     fallback_formats = []  # Older/larger formats
-    
+
     for fmt in formats:
         if fmt.get("vcodec") == "none" and fmt.get("acodec") != "none":
             # Audio-only format - preferred
             acodec = fmt.get("acodec", "").lower()
             filesize = fmt.get("filesize", 0) or fmt.get("filesize_approx", 0) or 0
-            
+
             # Prioritize by codec efficiency for transcription
             if any(codec in acodec for codec in ["opus"]):
                 # Opus is most efficient for speech
@@ -261,31 +255,20 @@ def download_audio_bytes(info: dict) -> bytes:
             fallback_formats.append((fmt, filesize))
 
     # Sort each category by filesize (prefer smaller)
-    high_efficiency_formats.sort(key=lambda x: x[1] if x[1] > 0 else float('inf'))
-    medium_efficiency_formats.sort(key=lambda x: x[1] if x[1] > 0 else float('inf'))
-    fallback_formats.sort(key=lambda x: x[1] if x[1] > 0 else float('inf'))
+    high_efficiency_formats.sort(key=lambda x: x[1] if x[1] > 0 else float("inf"))
+    medium_efficiency_formats.sort(key=lambda x: x[1] if x[1] > 0 else float("inf"))
+    fallback_formats.sort(key=lambda x: x[1] if x[1] > 0 else float("inf"))
 
     # Try formats in order of efficiency and size
     audio_format = None
     selected_from = "unknown"
-    
-    for fmt_list, category in [
-        (high_efficiency_formats, "high_efficiency"), 
-        (medium_efficiency_formats, "medium_efficiency"), 
-        (fallback_formats, "fallback")
-    ]:
+
+    for fmt_list, category in [(high_efficiency_formats, "high_efficiency"), (medium_efficiency_formats, "medium_efficiency"), (fallback_formats, "fallback")]:
         if fmt_list:
-            # Try smallest format first, but skip if estimated too large (>20MB)
-            for fmt_tuple in fmt_list:
-                fmt, size = fmt_tuple
-                if size > 0 and size > 20 * 1024 * 1024:  # Skip if >20MB
-                    log_and_print(f"⏭️ Skipping large format {fmt.get('format_id')}: {size/1024/1024:.1f}MB")
-                    continue
-                audio_format = fmt
-                selected_from = category
-                break
-            if audio_format:
-                break
+            # Select the smallest format from each category
+            audio_format, size = fmt_list[0]
+            selected_from = category
+            break
 
     # If no suitable format found, try any available format
     if not audio_format:
@@ -302,11 +285,8 @@ def download_audio_bytes(info: dict) -> bytes:
 
     # Download audio with better error handling
     audio_url = audio_format["url"]
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.youtube.com/'
-    }
-    
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Referer": "https://www.youtube.com/"}
+
     try:
         response = requests.get(audio_url, headers=headers, stream=True, timeout=60)
         response.raise_for_status()
@@ -321,17 +301,14 @@ def download_audio_bytes(info: dict) -> bytes:
     for chunk in response.iter_content(chunk_size=32768):
         if chunk:
             audio_data += chunk
-    
+
     log_and_print(f"Downloaded {len(audio_data)} bytes of audio")
 
     # Skip conversion entirely - use raw audio for transcription
     log_and_print("🔄 Skipping FFmpeg conversion, using raw audio for FAL")
-    
-    # Check file size before proceeding - allow larger files since we now have compression
+
+    # Log file size info but don't impose limits
     audio_size_mb = len(audio_data) / 1024 / 1024
-    if audio_size_mb > 50:  # 50MB limit for raw audio before optimization
-        raise RuntimeError(f"Raw audio too large for transcription: {audio_size_mb:.1f}MB")
-    
     log_and_print(f"✅ Using raw audio: {len(audio_data)} bytes ({audio_size_mb:.1f}MB)")
     return audio_data
 
@@ -357,25 +334,25 @@ def get_subtitle_from_captions(info: dict) -> str:
     return None
 
 
-def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 20) -> bytes:
-    """Optimize audio for transcription with progressive compression strategies."""
+def optimize_audio_for_transcription(audio_bytes: bytes, target_size_mb: int = 25) -> bytes:
+    """Optimize audio for transcription with intelligent compression strategies."""
     raw_size_mb = len(audio_bytes) / 1024 / 1024
     log_and_print(f"🎵 Audio size check: {raw_size_mb:.1f}MB")
-    
-    # If already small enough, use as-is
-    if raw_size_mb <= max_size_mb:
+
+    # If audio is reasonably sized, use as-is
+    if raw_size_mb <= target_size_mb:
         log_and_print(f"✅ Using raw audio for transcription ({raw_size_mb:.1f}MB)")
         return audio_bytes
-    
-    log_and_print(f"🔄 Audio too large ({raw_size_mb:.1f}MB), attempting compression...")
-    
+
+    log_and_print(f"🔄 Audio size is {raw_size_mb:.1f}MB, applying intelligent compression...")
+
     try:
         # Try to load audio with pydub for compression
         audio_io = io.BytesIO(audio_bytes)
-        
+
         # Try different audio formats in order of likelihood
         audio_segment = None
-        for fmt in ['mp3', 'mp4', 'm4a', 'webm', 'ogg']:
+        for fmt in ["mp3", "mp4", "m4a", "webm", "ogg"]:
             try:
                 audio_io.seek(0)
                 audio_segment = AudioSegment.from_file(audio_io, format=fmt)
@@ -384,7 +361,7 @@ def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 20) 
             except Exception as e:
                 log_and_print(f"⚠️ Failed to load as {fmt}: {str(e)[:100]}")
                 continue
-        
+
         if not audio_segment:
             # Fallback: try without specifying format
             try:
@@ -393,94 +370,102 @@ def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 20) 
                 log_and_print("✅ Successfully loaded audio with auto-detection")
             except Exception as e:
                 log_and_print(f"❌ Failed to load audio for compression: {e}")
-                # If compression fails, check if raw audio is within a larger limit
-                if raw_size_mb <= 25:  # 25MB absolute limit
-                    log_and_print(f"⚠️ Using raw audio despite size ({raw_size_mb:.1f}MB)")
-                    return audio_bytes
-                else:
-                    raise RuntimeError(f"Audio too large ({raw_size_mb:.1f}MB) and compression failed. Please try a shorter video.")
-        
-        # Progressive compression strategies
-        compression_strategies = [
-            # Strategy 1: Reduce bitrate only
-            {"bitrate": "64k", "channels": None, "frame_rate": None, "description": "Lower bitrate (64kbps)"},
-            # Strategy 2: Mono + lower bitrate  
-            {"bitrate": "48k", "channels": 1, "frame_rate": None, "description": "Mono + 48kbps"},
-            # Strategy 3: Mono + lower bitrate + sample rate
-            {"bitrate": "32k", "channels": 1, "frame_rate": 22050, "description": "Mono + 32kbps + 22kHz"},
-            # Strategy 4: Aggressive compression
-            {"bitrate": "24k", "channels": 1, "frame_rate": 16000, "description": "Aggressive (24kbps, mono, 16kHz)"},
-        ]
-        
+                # If compression fails, return raw audio
+                log_and_print(f"⚠️ Using raw audio despite size ({raw_size_mb:.1f}MB)")
+                return audio_bytes
+
+        # Calculate duration for intelligent bitrate selection
+        duration_minutes = len(audio_segment) / 60000  # Convert ms to minutes
+        log_and_print(f"📊 Audio duration: {duration_minutes:.1f} minutes")
+
+        # Dynamic compression strategies based on file size and duration
+        compression_strategies = []
+
+        if raw_size_mb > 100:  # Very large files
+            compression_strategies.extend(
+                [
+                    {"bitrate": "24k", "channels": 1, "frame_rate": 16000, "description": "Aggressive (24kbps, mono, 16kHz)"},
+                    {"bitrate": "32k", "channels": 1, "frame_rate": 22050, "description": "High compression (32kbps, mono, 22kHz)"},
+                ]
+            )
+        elif raw_size_mb > 50:  # Large files
+            compression_strategies.extend(
+                [
+                    {"bitrate": "32k", "channels": 1, "frame_rate": 22050, "description": "High compression (32kbps, mono, 22kHz)"},
+                    {"bitrate": "48k", "channels": 1, "frame_rate": None, "description": "Mono + 48kbps"},
+                ]
+            )
+        else:  # Medium files
+            compression_strategies.extend(
+                [
+                    {"bitrate": "48k", "channels": 1, "frame_rate": None, "description": "Mono + 48kbps"},
+                    {"bitrate": "64k", "channels": None, "frame_rate": None, "description": "Lower bitrate (64kbps)"},
+                ]
+            )
+
+        # Always add fallback strategies
+        compression_strategies.extend(
+            [
+                {"bitrate": "32k", "channels": 1, "frame_rate": 22050, "description": "Fallback compression"},
+                {"bitrate": "24k", "channels": 1, "frame_rate": 16000, "description": "Last resort compression"},
+            ]
+        )
+
         for strategy in compression_strategies:
             try:
                 log_and_print(f"🔄 Trying compression: {strategy['description']}")
-                
+
                 # Apply transformations
                 compressed_audio = audio_segment
-                
+
                 # Convert to mono if specified
                 if strategy["channels"] == 1:
                     compressed_audio = compressed_audio.set_channels(1)
-                
+
                 # Change sample rate if specified
                 if strategy["frame_rate"]:
                     compressed_audio = compressed_audio.set_frame_rate(strategy["frame_rate"])
-                
+
                 # Export with specified bitrate
                 output_buffer = io.BytesIO()
-                compressed_audio.export(
-                    output_buffer,
-                    format="mp3",
-                    bitrate=strategy["bitrate"],
-                    parameters=["-ac", "1"] if strategy["channels"] == 1 else []
-                )
+                compressed_audio.export(output_buffer, format="mp3", bitrate=strategy["bitrate"], parameters=["-ac", "1"] if strategy["channels"] == 1 else [])
                 compressed_bytes = output_buffer.getvalue()
                 compressed_size_mb = len(compressed_bytes) / 1024 / 1024
-                
+
                 log_and_print(f"📊 Compressed to {compressed_size_mb:.1f}MB (reduction: {((raw_size_mb - compressed_size_mb) / raw_size_mb * 100):.1f}%)")
-                
-                # Check if compression succeeded
-                if compressed_size_mb <= max_size_mb:
+
+                # Check if compression is good enough (achieved reasonable reduction)
+                if compressed_size_mb <= target_size_mb or compressed_size_mb < raw_size_mb * 0.7:
                     log_and_print(f"✅ Compression successful with {strategy['description']}")
                     return compressed_bytes
-                    
+
             except Exception as e:
                 log_and_print(f"⚠️ Compression strategy failed: {str(e)[:100]}")
                 continue
-        
-        # If all compression strategies failed, try one more fallback
+
+        # If all compression strategies failed, try basic MP3 export
         log_and_print("🔄 All compression strategies failed, trying basic MP3 export...")
         try:
             output_buffer = io.BytesIO()
             audio_segment.export(output_buffer, format="mp3", bitrate="32k")
             fallback_bytes = output_buffer.getvalue()
             fallback_size_mb = len(fallback_bytes) / 1024 / 1024
-            
-            if fallback_size_mb <= 25:  # More lenient limit for fallback
-                log_and_print(f"✅ Fallback compression: {fallback_size_mb:.1f}MB")
-                return fallback_bytes
+
+            log_and_print(f"✅ Fallback compression: {fallback_size_mb:.1f}MB")
+            return fallback_bytes
         except Exception as e:
             log_and_print(f"❌ Fallback compression failed: {e}")
-        
-        # Last resort: use raw audio if within absolute limit
-        if raw_size_mb <= 25:
-            log_and_print(f"⚠️ Using raw audio as last resort ({raw_size_mb:.1f}MB)")
-            return audio_bytes
-        else:
-            raise RuntimeError(f"Audio too large for transcription: {raw_size_mb:.1f}MB. Please try a shorter video.")
-            
+
+        # Last resort: use raw audio
+        log_and_print(f"⚠️ Using raw audio as last resort ({raw_size_mb:.1f}MB)")
+        return audio_bytes
+
     except Exception as e:
         error_msg = str(e)
-        if "too large" in error_msg:
-            raise  # Re-raise size errors as-is
         log_and_print(f"❌ Audio optimization error: {error_msg}")
-        # Fallback to raw audio if compression fails but size is reasonable
-        if raw_size_mb <= 25:
-            log_and_print(f"⚠️ Using raw audio after optimization failure ({raw_size_mb:.1f}MB)")
-            return audio_bytes
-        else:
-            raise RuntimeError(f"Audio optimization failed and file too large: {raw_size_mb:.1f}MB")
+        # Return raw audio if compression fails
+        log_and_print(f"⚠️ Using raw audio after optimization failure ({raw_size_mb:.1f}MB)")
+        return audio_bytes
 
 
 def transcribe_with_fal(audio_bytes: bytes) -> str:
@@ -495,10 +480,10 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
 
         # Upload audio with better content type detection
         log_and_print("📤 Uploading audio to FAL...")
-        
+
         # Detect content type based on magic bytes
         content_type = "audio/mpeg"  # Default to generic audio
-        if audio_bytes.startswith(b"ID3") or audio_bytes.startswith(b"\xFF\xFB"):
+        if audio_bytes.startswith(b"ID3") or audio_bytes.startswith(b"\xff\xfb"):
             content_type = "audio/mpeg"  # MP3
         elif audio_bytes.startswith(b"fLaC"):
             content_type = "audio/flac"
@@ -508,11 +493,11 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
             content_type = "audio/mp4"
         elif audio_bytes.startswith(b"RIFF") and b"WAVE" in audio_bytes[:12]:
             content_type = "audio/wav"
-        elif audio_bytes.startswith(b"\x1A\x45\xDF\xA3"):  # WebM/Matroska
+        elif audio_bytes.startswith(b"\x1a\x45\xdf\xa3"):  # WebM/Matroska
             content_type = "audio/webm"
-        
+
         log_and_print(f"🔍 Detected format: {content_type}")
-        
+
         try:
             url = fal_client.upload(data=audio_bytes, content_type=content_type)
             log_and_print(f"✅ Upload successful to FAL")
@@ -546,11 +531,11 @@ def transcribe_with_fal(audio_bytes: bytes) -> str:
 
             log_and_print("✅ Transcription completed")
             return whisper_result_to_txt(result)
-            
+
         except Exception as transcribe_error:
             error_msg = str(transcribe_error)
             log_and_print(f"❌ FAL transcription failed: {error_msg}")
-            
+
             # Check for specific error types
             if "403" in error_msg or "forbidden" in error_msg.lower():
                 return "[FAL API access denied (403). Check API key permissions.]"
@@ -587,11 +572,8 @@ def process_youtube_video_sync(url: str, generate_summary: bool = True) -> dict:
             try:
                 audio_bytes = download_audio_bytes(info)
 
-                # Skip transcription if audio too large to prevent timeout
-                if len(audio_bytes) > 30 * 1024 * 1024:  # 30MB limit before optimization
-                    subtitle = "[Audio file too large for transcription. Please try a shorter video.]"
-                else:
-                    subtitle = transcribe_with_fal(audio_bytes)
+                # Always attempt transcription with optimization
+                subtitle = transcribe_with_fal(audio_bytes)
             except Exception as e:
                 subtitle = f"[Audio processing failed: {str(e)}]"
         else:
@@ -871,67 +853,57 @@ async def process_youtube_video(request: YouTubeRequest):
             log_and_print("🎯 No captions found")
             logs.append("🎯 No captions found")
 
-            # Enable transcription with strict limits
-            if False:  # Skip transcription for debugging 
-                logs.append("⏭️ Skipping transcription for debugging")
-                formatted_subtitle = "[No captions available. Transcription temporarily disabled for debugging.]"
-            else:
+            try:
+                log_and_print("📋 Step 3: Downloading audio...")
+                logs.append("📋 Step 3: Downloading audio...")
+                audio_bytes = download_audio_bytes(info)
+
+                # Log audio size info
+                audio_size_mb = len(audio_bytes) / 1024 / 1024
+                log_and_print(f"📊 Audio size: {audio_size_mb:.1f}MB")
+                logs.append(f"📊 Audio size: {audio_size_mb:.1f}MB")
+
+                log_and_print("📋 Step 4: Starting audio optimization...")
+                logs.append("📋 Step 4: Starting audio optimization...")
+
                 try:
-                    log_and_print("📋 Step 3: Downloading audio...")
-                    logs.append("📋 Step 3: Downloading audio...")
-                    audio_bytes = download_audio_bytes(info)
+                    # Optimize audio before transcription
+                    optimized_audio = optimize_audio_for_transcription(audio_bytes)
+                    optimized_size_mb = len(optimized_audio) / 1024 / 1024
+                    log_and_print(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
+                    logs.append(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
 
-                    # Check size before transcription - reasonable limit
-                    audio_size_mb = len(audio_bytes) / 1024 / 1024
-                    log_and_print(f"📊 Audio size: {audio_size_mb:.1f}MB")
-                    logs.append(f"📊 Audio size: {audio_size_mb:.1f}MB")
+                    # Attempt transcription
+                    try:
+                        # Check FAL_KEY before attempting transcription
+                        if not os.getenv("FAL_KEY"):
+                            log_and_print("❌ FAL_KEY not configured")
+                            logs.append("❌ FAL_KEY not configured")
+                            formatted_subtitle = "[FAL_KEY not configured]"
+                        else:
+                            log_and_print("📋 Step 5: Starting FAL transcription...")
+                            logs.append("📋 Step 5: Starting FAL transcription...")
 
-                    if audio_size_mb > 30:  # More reasonable 30MB limit before optimization
-                        log_and_print(f"⚠️ Audio too large ({audio_size_mb:.1f}MB) - skipping transcription")
-                        logs.append(f"⚠️ Audio too large ({audio_size_mb:.1f}MB) - skipping transcription")
-                        formatted_subtitle = f"[Audio too large: {audio_size_mb:.1f}MB. Please try a shorter video.]"
-                    else:
-                        log_and_print("📋 Step 4: Starting audio optimization...")
-                        logs.append("📋 Step 4: Starting audio optimization...")
+                            # Transcribe the optimized audio
+                            subtitle = transcribe_with_fal(optimized_audio)
+                            formatted_subtitle = simple_format_subtitle(subtitle)
+                            log_and_print("✅ Transcription completed")
+                            logs.append("✅ Transcription completed")
+                    except Exception as fal_error:
+                        log_and_print(f"❌ FAL transcription failed: {fal_error}")
+                        logs.append(f"❌ FAL transcription failed: {fal_error}")
+                        formatted_subtitle = f"[Transcription failed: {str(fal_error)}]"
 
-                        try:
-                            # Optimize audio before transcription with error handling
-                            optimized_audio = optimize_audio_for_transcription(audio_bytes)
-                            optimized_size_mb = len(optimized_audio) / 1024 / 1024
-                            log_and_print(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
-                            logs.append(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
+                except Exception as opt_error:
+                    log_and_print(f"❌ Audio optimization failed: {opt_error}")
+                    logs.append(f"❌ Audio optimization failed: {opt_error}")
+                    formatted_subtitle = f"[Audio optimization failed: {str(opt_error)}]"
 
-                            # Only attempt transcription if optimization succeeded
-                            try:
-                                # Check FAL_KEY before attempting transcription
-                                if not os.getenv("FAL_KEY"):
-                                    log_and_print("❌ FAL_KEY not configured")
-                                    logs.append("❌ FAL_KEY not configured")
-                                    formatted_subtitle = "[FAL_KEY not configured]"
-                                else:
-                                    log_and_print("📋 Step 5: Starting FAL transcription...")
-                                    logs.append("📋 Step 5: Starting FAL transcription...")
-
-                                    # Transcribe with very aggressive timeout
-                                    subtitle = transcribe_with_fal(optimized_audio)
-                                    formatted_subtitle = simple_format_subtitle(subtitle)
-                                    log_and_print("✅ Transcription completed")
-                                    logs.append("✅ Transcription completed")
-                            except Exception as fal_error:
-                                log_and_print(f"❌ FAL transcription failed: {fal_error}")
-                                logs.append(f"❌ FAL transcription failed: {fal_error}")
-                                formatted_subtitle = f"[Transcription failed: {str(fal_error)}]"
-
-                        except Exception as opt_error:
-                            log_and_print(f"❌ Audio optimization failed: {opt_error}")
-                            logs.append(f"❌ Audio optimization failed: {opt_error}")
-                            formatted_subtitle = f"[Audio optimization failed: {str(opt_error)}]"
-
-                except Exception as audio_error:
-                    error_msg = f"❌ Audio processing failed: {str(audio_error)}"
-                    log_and_print(error_msg)
-                    logs.append(error_msg)
-                    formatted_subtitle = f"[Audio processing failed: {str(audio_error)}]"
+            except Exception as audio_error:
+                error_msg = f"❌ Audio processing failed: {str(audio_error)}"
+                log_and_print(error_msg)
+                logs.append(error_msg)
+                formatted_subtitle = f"[Audio processing failed: {str(audio_error)}]"
 
         # Generate summary if requested
         summary = None
