@@ -41,7 +41,7 @@ def log_and_print(message: str):
 
 
 # Initialize FastAPI
-app = FastAPI(title="YouTube Processor", description="Standalone YouTube processing with transcription & summarization")
+app = FastAPI(title="YouTube Summarizer", description="Standalone YouTube processing with transcription & summarization")
 
 app.add_middleware(
     CORSMiddleware,
@@ -217,7 +217,8 @@ def download_audio_bytes(info: dict) -> bytes:
             audio_segment = AudioSegment.from_file(in_memory_file)
 
         with io.BytesIO() as output_buffer:
-            audio_segment.export(output_buffer, format="mp3", bitrate="32k", parameters=["-ac", "1"])
+            # Use reasonable quality for initial download - 64k bitrate, mono
+            audio_segment.export(output_buffer, format="mp3", bitrate="64k", parameters=["-ac", "1"])
             return output_buffer.getvalue()
     except Exception as e:
         log_and_print(f"⚠️ Audio conversion failed: {e}, using raw audio")
@@ -246,21 +247,21 @@ def get_subtitle_from_captions(info: dict) -> str:
 
 
 def optimize_audio_for_transcription(audio_bytes: bytes, max_size_mb: int = 2) -> bytes:
-    """Optimize audio file size for faster transcription."""
+    """Optimize audio for transcription while maintaining reasonable quality."""
     try:
         log_and_print(f"🎵 Optimizing audio (original: {len(audio_bytes) / 1024 / 1024:.1f}MB)")
 
-        # Convert to low-quality MP3 for transcription
+        # Convert to efficient MP3 for transcription
         with io.BytesIO(audio_bytes) as input_buffer:
             audio = AudioSegment.from_file(input_buffer)
 
-            # Reduce quality aggressively for transcription
-            audio = audio.set_frame_rate(16000)  # 16kHz is enough for speech
+            # Set optimal settings for speech transcription
+            audio = audio.set_frame_rate(16000)  # 16kHz sampling rate - optimal for speech
             audio = audio.set_channels(1)  # Mono
 
-            # Export with very low bitrate
+            # Export with reasonable quality for transcription
             with io.BytesIO() as output_buffer:
-                audio.export(output_buffer, format="mp3", bitrate="16k", parameters=["-ac", "1", "-ar", "16000"])  # Very low bitrate
+                audio.export(output_buffer, format="mp3", bitrate="32k", parameters=["-ac", "1", "-ar", "16000"])
                 optimized_bytes = output_buffer.getvalue()
 
         optimized_size_mb = len(optimized_bytes) / 1024 / 1024
@@ -415,7 +416,7 @@ async def get_web_interface():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Processor</title>
+    <title>YouTube Summarizer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -483,7 +484,7 @@ async def get_web_interface():
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎬 YouTube Processor</h1>
+            <h1>🎬 YouTube Summarizer</h1>
             <p>Standalone • Extract • Transcribe • Summarize</p>
         </div>
         
