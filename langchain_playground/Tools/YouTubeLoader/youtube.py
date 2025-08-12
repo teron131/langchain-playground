@@ -3,8 +3,6 @@ import io
 import requests
 import yt_dlp
 from dotenv import load_dotenv
-from pydub import AudioSegment
-
 from langchain_playground.Tools.YouTubeLoader.llm_formatter import llm_format
 from langchain_playground.Tools.YouTubeLoader.utils import (
     parse_youtube_json_captions,
@@ -13,6 +11,7 @@ from langchain_playground.Tools.YouTubeLoader.utils import (
     whisper_result_to_txt,
 )
 from langchain_playground.Tools.YouTubeLoader.Whisper import whisper_fal
+from pydub import AudioSegment
 
 load_dotenv()
 
