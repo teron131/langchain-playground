@@ -650,20 +650,41 @@ async def process_youtube_video(request: YouTubeRequest):
                         logs.append(f"⚠️ Audio too large ({audio_size_mb:.1f}MB) - skipping transcription")
                         formatted_subtitle = f"[Audio too large: {audio_size_mb:.1f}MB. Please try a shorter video.]"
                     else:
-                        log_and_print("📋 Step 4: Optimizing and transcribing audio...")
-                        logs.append("📋 Step 4: Optimizing and transcribing audio...")
+                        log_and_print("📋 Step 4: Starting audio optimization...")
+                        logs.append("📋 Step 4: Starting audio optimization...")
 
-                        # Optimize audio before transcription
-                        optimized_audio = optimize_audio_for_transcription(audio_bytes)
-                        optimized_size_mb = len(optimized_audio) / 1024 / 1024
-                        log_and_print(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
-                        logs.append(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
+                        try:
+                            # Optimize audio before transcription with error handling
+                            optimized_audio = optimize_audio_for_transcription(audio_bytes)
+                            optimized_size_mb = len(optimized_audio) / 1024 / 1024
+                            log_and_print(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
+                            logs.append(f"🎵 Optimized to {optimized_size_mb:.1f}MB")
 
-                        # Transcribe with timeout
-                        subtitle = transcribe_with_fal(optimized_audio)
-                        formatted_subtitle = simple_format_subtitle(subtitle)
-                        log_and_print("✅ Transcription completed")
-                        logs.append("✅ Transcription completed")
+                            # Only attempt transcription if optimization succeeded
+                            try:
+                                # Check FAL_KEY before attempting transcription
+                                if not os.getenv("FAL_KEY"):
+                                    log_and_print("❌ FAL_KEY not configured")
+                                    logs.append("❌ FAL_KEY not configured")
+                                    formatted_subtitle = "[FAL_KEY not configured]"
+                                else:
+                                    log_and_print("📋 Step 5: Starting FAL transcription...")
+                                    logs.append("📋 Step 5: Starting FAL transcription...")
+
+                                    # Transcribe with very aggressive timeout
+                                    subtitle = transcribe_with_fal(optimized_audio)
+                                    formatted_subtitle = simple_format_subtitle(subtitle)
+                                    log_and_print("✅ Transcription completed")
+                                    logs.append("✅ Transcription completed")
+                            except Exception as fal_error:
+                                log_and_print(f"❌ FAL transcription failed: {fal_error}")
+                                logs.append(f"❌ FAL transcription failed: {fal_error}")
+                                formatted_subtitle = f"[Transcription failed: {str(fal_error)}]"
+
+                        except Exception as opt_error:
+                            log_and_print(f"❌ Audio optimization failed: {opt_error}")
+                            logs.append(f"❌ Audio optimization failed: {opt_error}")
+                            formatted_subtitle = f"[Audio optimization failed: {str(opt_error)}]"
 
                 except Exception as audio_error:
                     error_msg = f"❌ Audio processing failed: {str(audio_error)}"
