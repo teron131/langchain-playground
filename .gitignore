@@ -6,7 +6,7 @@ node_modules
 .cache
 cache
 *.log
-*test*
+# *test*
 images/*
 audio/*
 pdfs/*
