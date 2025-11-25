@@ -12,14 +12,6 @@ _optional_imports = []
 __all__ = ["get_tools"]
 
 try:
-    from .SmolagentsHF import UniversalAgent
-
-    _optional_imports.append("UniversalAgent")
-    __all__.append("UniversalAgent")
-except ImportError as e:
-    print(f"Warning: Could not import UniversalAgent: {e}")
-
-try:
     from .universal import UniversalChain, graph
 
     _optional_imports.extend(["UniversalChain", "graph"])

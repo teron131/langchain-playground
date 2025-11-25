@@ -4,9 +4,9 @@ from typing import List
 from langchain_core.tools import BaseTool, tool
 from rich import print
 
-from .WebLoader import webloader
-from .WebSearch import websearch
-from .YouTubeLoader import youtube_loader
+from .webloader import webloader
+from .websearch import websearch
+from .youtube import youtube_loader
 
 
 def print_tool_info(tool_func: BaseTool) -> None:
