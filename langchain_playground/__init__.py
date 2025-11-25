@@ -3,7 +3,7 @@
 from dotenv import load_dotenv
 
 # Import Tools (always available)
-from .Tools import get_tools
+from .tools import get_tools
 
 load_dotenv()
 

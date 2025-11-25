@@ -1,104 +1,89 @@
-"""Multimodal input utilities for images, PDFs, markdown, audio, and video files with OpenRouter."""
+"""Multimodal input utilities for images, PDFs, markdown, audio, and video files using LangChain content blocks."""
 
 import base64
 from pathlib import Path
 
 from langchain_core.messages import HumanMessage
+from langchain_core.messages.content import (
+    create_audio_block,
+    create_file_block,
+    create_image_block,
+    create_plaintext_block,
+    create_text_block,
+    create_video_block,
+)
+
+# Extension to (file_type, mime_type) mapping
+EXTENSION_MAP: dict[str, tuple[str, str]] = {
+    # Images
+    ".jpg": ("image", "image/jpeg"),
+    ".jpeg": ("image", "image/jpeg"),
+    ".png": ("image", "image/png"),
+    ".gif": ("image", "image/gif"),
+    ".webp": ("image", "image/webp"),
+    # Videos
+    ".mp4": ("video", "video/mp4"),
+    ".mpeg": ("video", "video/mpeg"),
+    ".mov": ("video", "video/quicktime"),
+    ".webm": ("video", "video/webm"),
+    # Audio
+    ".mp3": ("audio", "audio/mpeg"),
+    ".wav": ("audio", "audio/wav"),
+    # PDF
+    ".pdf": ("pdf", "application/pdf"),
+    # Text
+    ".txt": ("text", "text/plain"),
+    ".md": ("text", "text/markdown"),
+}
 
 
-def _normalize_paths(paths: str | Path | list[str | Path]) -> list[Path]:
-    """Normalize single path or list of paths, into list of Path objects."""
-    return [Path(paths)] if isinstance(paths, (str, Path)) else [Path(p) for p in paths]
+def _create_content_block(path: Path) -> dict:
+    """Create appropriate content block based on file extension.
 
-
-def _encode_file_to_base64(path: Path) -> str:
-    """Encode file to base64 string."""
-    with open(path, "rb") as file:
-        return base64.b64encode(file.read()).decode("utf-8")
-
-
-def _get_image_mime_type(path: Path) -> str:
-    """Get MIME type for image file based on extension.
-
-    The Responses API expects a data URL string in the `image_url` field, so we keep
-    the MIME type around to build that.
-    """
-    suffix = path.suffix.lower()
-    mime_types = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-    }
-    return mime_types.get(suffix, "image/jpeg")
-
-
-def _get_audio_format(path: Path) -> str:
-    """Get audio format for file based on extension.
+    Args:
+        path: File path (must exist)
 
     Returns:
-        Audio format string: "wav" or "mp3"
+        Content block dictionary
+
+    Raises:
+        ValueError: If file type is unsupported
     """
     suffix = path.suffix.lower()
-    if suffix == ".wav":
-        return "wav"
-    elif suffix == ".mp3":
-        return "mp3"
-    else:
-        raise ValueError(f"Unsupported audio format: {suffix}. Supported formats: .wav, .mp3")
+
+    if suffix not in EXTENSION_MAP:
+        supported = ", ".join(sorted(EXTENSION_MAP.keys()))
+        raise ValueError(f"Unsupported file type: {suffix}. Supported: {supported}")
+
+    file_type, mime_type = EXTENSION_MAP[suffix]
+
+    # Text files read as text
+    if file_type == "text":
+        text_content = path.read_text(encoding="utf-8")
+        if suffix == ".md":
+            return create_plaintext_block(text=text_content, mime_type=mime_type)
+        return create_text_block(text=text_content)
+
+    # Binary files encode as base64
+    data = base64.b64encode(path.read_bytes()).decode("utf-8")
+
+    if file_type == "image":
+        return create_image_block(base64=data, mime_type=mime_type)
+    elif file_type == "video":
+        return create_video_block(base64=data, mime_type=mime_type)
+    elif file_type == "audio":
+        return create_audio_block(base64=data, mime_type=mime_type)
+    elif file_type == "pdf":
+        return create_file_block(base64=data, mime_type=mime_type)
+
+    raise ValueError(f"Unhandled file type: {file_type}")
 
 
-def _get_video_mime_type(path: Path) -> str:
-    """Get MIME type for video file based on extension."""
-    suffix = path.suffix.lower()
-    mime_types = {
-        ".mp4": "video/mp4",
-        ".mpeg": "video/mpeg",
-        ".mov": "video/mov",
-        ".webm": "video/webm",
-    }
-    return mime_types.get(suffix, "video/mp4")
+class MediaMessage(HumanMessage):
+    """HumanMessage with media file content using LangChain content blocks.
 
-
-class ImageMessage(HumanMessage):
-    """HumanMessage with image file content encoded as base64."""
-
-    def __init__(
-        self,
-        paths: str | Path | list[str | Path],
-        description: str = "",
-    ):
-        """Initialize ImageMessage with image file(s).
-
-        Args:
-            paths: Single image path or list of image paths
-            description: Description of the image
-        """
-        paths: list[Path] = _normalize_paths(paths)
-
-        content = []
-        for path in paths:
-            image_base64 = _encode_file_to_base64(path)
-            mime_type = _get_image_mime_type(path)
-            data_url = f"data:{mime_type};base64,{image_base64}"
-            # Responses API uses `input_image` blocks instead of legacy chat `image_url`
-            content.append({"type": "input_image", "image_url": data_url, "detail": "auto"})
-
-        if description:
-            # Text blocks also use the `input_text` type in Responses API
-            content.append({"type": "input_text", "text": description})
-
-        super().__init__(content=content)
-
-
-class PDFMessage(HumanMessage):
-    """HumanMessage with PDF file content encoded as base64.
-
-    Uses OpenRouter's PDF format: base64-encoded data URLs in the file content type.
-    See https://openrouter.ai/docs/features/multimodal/pdfs for details.
-
-    Note: Some models (e.g. Gemini) may not support PDFs through OpenRouter. If you encounter "invalid_prompt" errors, try using a different model (e.g., GPT).
+    Automatically detects file type and uses appropriate content block helpers.
+    Supports images, videos, audio, PDFs, and text files.
     """
 
     def __init__(
@@ -106,136 +91,25 @@ class PDFMessage(HumanMessage):
         paths: str | Path | list[str | Path],
         description: str = "",
     ):
-        """Initialize PDFMessage with PDF file(s).
+        """Initialize MediaMessage with media file(s).
 
         Args:
-            paths: Single PDF path or list of PDF paths
-            description: Description of the PDF
-        """
-        paths: list[Path] = _normalize_paths(paths)
+            paths: Single file path or list of file paths
+            description: Optional description text to include with the media
 
-        content = []
-        for path in paths:
-            pdf_base64 = _encode_file_to_base64(path)
-            data_url = f"data:application/pdf;base64,{pdf_base64}"
-            # OpenRouter format: https://openrouter.ai/docs/features/multimodal/pdfs
-            content.append(
-                {
-                    "type": "file",
-                    "file": {"filename": path.name, "file_data": data_url},
-                }
-            )
+        Raises:
+            ValueError: If file type is unsupported
+            FileNotFoundError: If any file path does not exist
+        """
+        path_list = [Path(paths)] if isinstance(paths, (str, Path)) else [Path(p) for p in paths]
+
+        content_blocks = []
+        for path in path_list:
+            if not path.exists():
+                raise FileNotFoundError(f"File not found: {path}")
+            content_blocks.append(_create_content_block(path))
 
         if description:
-            content.append({"type": "text", "text": description})
+            content_blocks.append(create_text_block(text=description))
 
-        super().__init__(content=content)
-
-
-class MarkdownMessage(HumanMessage):
-    """HumanMessage with markdown file content loaded as text string."""
-
-    def __init__(
-        self,
-        paths: str | Path | list[str | Path],
-        description: str = "",
-    ):
-        """Initialize MarkdownMessage with markdown file(s).
-
-        Args:
-            paths: Single markdown path or list of markdown paths
-            description: Description of the markdown
-        """
-        paths: list[Path] = _normalize_paths(paths)
-
-        content = []
-        for path in paths:
-            with open(path, "r", encoding="utf-8") as f:
-                file_content = f.read()
-            content.append({"type": "text", "text": file_content})
-
-        if description:
-            content.append({"type": "text", "text": description})
-
-        super().__init__(content=content)
-
-
-class AudioMessage(HumanMessage):
-    """HumanMessage with audio file content encoded as base64.
-
-    Uses OpenRouter's audio format: base64-encoded data with format specification.
-    See https://openrouter.ai/docs/features/multimodal/audio for details.
-
-    Supported formats: wav, mp3
-    """
-
-    def __init__(
-        self,
-        paths: str | Path | list[str | Path],
-        description: str = "",
-    ):
-        """Initialize AudioMessage with audio file(s).
-
-        Args:
-            paths: Single audio path or list of audio paths (supports .wav, .mp3)
-            description: Description of the audio
-        """
-        paths: list[Path] = _normalize_paths(paths)
-
-        content = []
-        for path in paths:
-            audio_format = _get_audio_format(path)
-            audio_base64 = _encode_file_to_base64(path)
-            # OpenRouter format: https://openrouter.ai/docs/features/multimodal/audio
-            content.append(
-                {
-                    "type": "input_audio",
-                    "input_audio": {"data": audio_base64, "format": audio_format},
-                }
-            )
-
-        if description:
-            content.append({"type": "text", "text": description})
-
-        super().__init__(content=content)
-
-
-class VideoMessage(HumanMessage):
-    """HumanMessage with video file content encoded as base64.
-
-    Uses OpenRouter's video format: video_url with base64 data URL.
-    See https://openrouter.ai/docs/features/multimodal/videos for details.
-
-    Supported formats: mp4, mpeg, mov, webm
-    """
-
-    def __init__(
-        self,
-        paths: str | Path | list[str | Path],
-        description: str = "",
-    ):
-        """Initialize VideoMessage with video file(s).
-
-        Args:
-            paths: Single video path or list of video paths (supports .mp4, .mpeg, .mov, .webm)
-            description: Description of the video
-        """
-        paths: list[Path] = _normalize_paths(paths)
-
-        content = []
-        for path in paths:
-            video_base64 = _encode_file_to_base64(path)
-            mime_type = _get_video_mime_type(path)
-            data_url = f"data:{mime_type};base64,{video_base64}"
-            # OpenRouter format: https://openrouter.ai/docs/features/multimodal/videos
-            content.append(
-                {
-                    "type": "video_url",
-                    "video_url": {"url": data_url},
-                }
-            )
-
-        if description:
-            content.append({"type": "text", "text": description})
-
-        super().__init__(content=content)
+        super().__init__(content_blocks=content_blocks)
