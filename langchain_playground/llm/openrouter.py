@@ -4,9 +4,9 @@ import os
 from typing import Any, Generator, Literal, Optional
 
 from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -20,8 +20,6 @@ def ChatOpenRouter(
     **kwargs,
 ) -> BaseChatModel:
     """Initialize an OpenRouter model with sensible defaults.
-
-    Uses OpenAI Responses API and reasoning is returned by default.
 
     Args:
         model: Model identifier (PROVIDER/MODEL)
@@ -42,16 +40,14 @@ def ChatOpenRouter(
         base_extra_body=kwargs.pop("extra_body", {}) or {},
         provider_sort=provider_sort,
         pdf_engine=pdf_engine,
-        reasoning_effort=reasoning_effort,
     )
 
-    return init_chat_model(
+    return ChatOpenAI(
         model=model,
-        model_provider="openai",
         api_key=os.getenv("OPENROUTER_API_KEY"),
         base_url="https://openrouter.ai/api/v1",
         temperature=temperature,
-        use_responses_api=True,
+        reasoning_effort=reasoning_effort,
         extra_body=extra_body or None,
         **kwargs,
     )
@@ -62,15 +58,19 @@ def _build_extra_body(
     base_extra_body: dict[str, Any],
     provider_sort: Literal["throughput", "price", "latency"],
     pdf_engine: Optional[Literal["mistral-ocr", "pdf-text", "native"]],
-    reasoning_effort: Optional[Literal["minimal", "low", "medium", "high"]],
 ) -> dict[str, Any]:
     """Build OpenRouter extra_body config."""
-    return {
-        **base_extra_body,
-        **({"provider": {"sort": provider_sort}} if provider_sort and "provider" not in base_extra_body else {}),
-        **({"plugins": [{"id": "file-parser", "pdf": {"engine": pdf_engine}}]} if pdf_engine else {}),
-        "reasoning": {"exclude": False, **({"effort": reasoning_effort} if reasoning_effort else {})},
-    }
+    extra = {**base_extra_body}
+
+    if provider_sort and "provider" not in extra:
+        extra["provider"] = {"sort": provider_sort}
+
+    if pdf_engine:
+        plugins = list(extra.get("plugins", []))
+        plugins.append({"id": "file-parser", "pdf": {"engine": pdf_engine}})
+        extra["plugins"] = plugins
+
+    return extra
 
 
 # ============================================================================
