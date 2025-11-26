@@ -86,17 +86,46 @@ class MediaMessage(HumanMessage):
             else:
                 data = base64.b64encode(path.read_bytes()).decode("utf-8")
                 if category == "image":
-                    content_blocks.append({"type": "input_image", "image_url": f"data:{mime_type};base64,{data}"})
+                    content_blocks.append(
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:{mime_type};base64,{data}",
+                        }
+                    )
                 elif category == "video":
-                    content_blocks.append({"type": "input_video", "video_url": f"data:{mime_type};base64,{data}"})
+                    content_blocks.append(
+                        {
+                            "type": "input_video",
+                            "video_url": f"data:{mime_type};base64,{data}",
+                        }
+                    )
                 elif category == "audio":
-                    content_blocks.append({"type": "input_audio", "data": data, "format": "wav" if suffix == ".wav" else "mp3"})
+                    content_blocks.append(
+                        {
+                            "type": "input_audio",
+                            "data": data,
+                            "format": "wav" if suffix == ".wav" else "mp3",
+                        }
+                    )
                 elif category == "file":
-                    content_blocks.append({"type": "input_file", "file_data": f"data:{mime_type};base64,{data}"})
+                    content_blocks.append(
+                        {
+                            "type": "file",
+                            "file": {
+                                "filename": path.name,
+                                "file_data": f"data:{mime_type};base64,{data}",
+                            },
+                        }
+                    )
                 else:
                     raise ValueError(f"Unhandled category: {category}")
 
         if description:
-            content_blocks.append({"type": "input_text", "text": description})
+            content_blocks.append(
+                {
+                    "type": "input_text",
+                    "text": description,
+                }
+            )
 
         super().__init__(content=content_blocks)
