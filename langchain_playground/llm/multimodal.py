@@ -1,14 +1,6 @@
-"""Multimodal input utilities for OpenAI Response API.
+"""Multimodal input utilities for OpenAI Chat Completions API.
 
-Creates content blocks compatible with OpenAI's Response API format.
-Reference: https://platform.openai.com/docs/api-reference/responses
-
-Supported content block types:
-    - input_text:  {"type": "input_text", "text": "..."}
-    - input_image: {"type": "input_image", "image_url": "data:mime;base64,..."}
-    - input_audio: {"type": "input_audio", "data": "base64...", "format": "mp3|wav"}
-    - input_video: {"type": "input_video", "video_url": "data:mime;base64,..."}
-    - input_file:  {"type": "input_file", "file_data": "data:mime;base64,..."}
+Creates content blocks compatible with OpenAI's Chat Completions API format (used by OpenRouter).
 """
 
 import base64
@@ -24,7 +16,7 @@ SUPPORTED_EXTENSIONS: dict[str, tuple[str, str]] = {
     ".png": ("image", "image/png"),
     ".gif": ("image", "image/gif"),
     ".webp": ("image", "image/webp"),
-    # Videos
+    # Videos (mapped to image_url for vision models)
     ".mp4": ("video", "video/mp4"),
     ".mpeg": ("video", "video/mpeg"),
     ".mov": ("video", "video/quicktime"),
@@ -41,7 +33,7 @@ SUPPORTED_EXTENSIONS: dict[str, tuple[str, str]] = {
 
 
 class MediaMessage(HumanMessage):
-    """HumanMessage with media content for OpenAI Response API.
+    """HumanMessage with media content for Chat Completions API.
 
     Automatically detects file types and creates appropriate content blocks.
     Supports: images (.jpg, .png, .gif, .webp), videos (.mp4, .mov, .webm),
@@ -82,50 +74,48 @@ class MediaMessage(HumanMessage):
             category, mime_type = SUPPORTED_EXTENSIONS[suffix]
 
             if category == "text":
-                content_blocks.append({"type": "input_text", "text": path.read_text(encoding="utf-8")})
+                # Plain text content
+                content_blocks.append({"type": "text", "text": path.read_text(encoding="utf-8")})
             else:
                 data = base64.b64encode(path.read_bytes()).decode("utf-8")
+                data_url = f"data:{mime_type};base64,{data}"
+
                 if category == "image":
+                    # Standard image_url format for Chat Completions API
                     content_blocks.append(
                         {
-                            "type": "input_image",
-                            "image_url": f"data:{mime_type};base64,{data}",
+                            "type": "image_url",
+                            "image_url": {"url": data_url},
                         }
                     )
                 elif category == "video":
+                    # Video as image_url (some vision models support this)
                     content_blocks.append(
                         {
-                            "type": "input_video",
-                            "video_url": f"data:{mime_type};base64,{data}",
+                            "type": "image_url",
+                            "image_url": {"url": data_url},
                         }
                     )
                 elif category == "audio":
+                    # Audio input (model-specific support)
                     content_blocks.append(
                         {
                             "type": "input_audio",
-                            "data": data,
-                            "format": "wav" if suffix == ".wav" else "mp3",
+                            "input_audio": {"data": data, "format": "wav" if suffix == ".wav" else "mp3"},
                         }
                     )
                 elif category == "file":
+                    # OpenRouter file format for PDFs
                     content_blocks.append(
                         {
                             "type": "file",
-                            "file": {
-                                "filename": path.name,
-                                "file_data": f"data:{mime_type};base64,{data}",
-                            },
+                            "file": {"filename": path.name, "file_data": data_url},
                         }
                     )
                 else:
                     raise ValueError(f"Unhandled category: {category}")
 
         if description:
-            content_blocks.append(
-                {
-                    "type": "input_text",
-                    "text": description,
-                }
-            )
+            content_blocks.append({"type": "text", "text": description})
 
         super().__init__(content=content_blocks)
