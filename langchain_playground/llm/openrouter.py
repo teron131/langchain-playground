@@ -1,14 +1,37 @@
 """OpenRouter LLM client initialization and configuration."""
 
 import os
-from typing import Any, Generator, Literal, Optional
+from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 load_dotenv()
+
+
+def _is_openrouter_model(model: str) -> bool:
+    """Check if model is OpenRouter format (PROVIDER/MODEL)."""
+    return "/" in model and len(model.split("/")) == 2
+
+
+def _is_gemini_model(model: str) -> bool:
+    """Check if model is a Gemini model."""
+    return model.lower().startswith("gemini")
+
+
+def _get_openrouter_config(api_key: Optional[str] = None) -> tuple[str, str]:
+    """Get API key and base URL for OpenRouter models."""
+    api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+    base_url = "https://openrouter.ai/api/v1"
+    return api_key, base_url
+
+
+def _get_gemini_config(api_key: Optional[str] = None) -> tuple[str, str]:
+    """Get API key and base URL for Gemini models."""
+    api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    return api_key, base_url
 
 
 def ChatOpenRouter(
@@ -17,6 +40,7 @@ def ChatOpenRouter(
     reasoning_effort: Optional[Literal["minimal", "low", "medium", "high"]] = None,
     provider_sort: Literal["throughput", "price", "latency"] = "throughput",
     pdf_engine: Optional[Literal["mistral-ocr", "pdf-text", "native"]] = None,
+    cached_content: Optional[str] = None,
     **kwargs,
 ) -> BaseChatModel:
     """Initialize an OpenRouter model with sensible defaults.
@@ -32,20 +56,34 @@ def ChatOpenRouter(
             - "pdf-text": Best for well-structured PDFs (Free)
             - "native": Use model's native file processing (if available)
             If None, OpenRouter will auto-select based on model capabilities.
+        cached_content: Gemini cached content ID (e.g., "cachedContents/0000aaaa1111bbbb2222cccc3333dddd4444eeee")
+            Only used for Gemini models. Pass the full cached content resource name.
         **kwargs: Additional config (e.g. max_tokens, extra_body, etc.)
 
     Note: Some models (e.g., google/gemini-2.5-pro) may not support PDFs through OpenRouter in the same way as others. If you encounter "invalid_prompt" errors with PDFs, try a different model.
     """
-    extra_body = _build_extra_body(
-        base_extra_body=kwargs.pop("extra_body", {}) or {},
-        provider_sort=provider_sort,
-        pdf_engine=pdf_engine,
-    )
+    if not (_is_openrouter_model(model) or _is_gemini_model(model)):
+        raise ValueError(f"Invalid model: {model}. Use 'PROVIDER/MODEL' for OpenRouter or a Gemini model identifier.")
+
+    extra_body: dict[str, Any] | None = None
+    if _is_openrouter_model(model):
+        api_key, base_url = _get_openrouter_config()
+        extra_body = _build_openrouter_extra_body(
+            base_extra_body=kwargs.pop("extra_body", {}) or {},
+            provider_sort=provider_sort,
+            pdf_engine=pdf_engine,
+        )
+    elif _is_gemini_model(model):
+        api_key, base_url = _get_gemini_config()
+        extra_body = _build_gemini_extra_body(
+            base_extra_body=kwargs.pop("extra_body", {}) or {},
+            cached_content=cached_content,
+        )
 
     return ChatOpenAI(
         model=model,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+        base_url=base_url,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         extra_body=extra_body or None,
@@ -53,10 +91,10 @@ def ChatOpenRouter(
     )
 
 
-def _build_extra_body(
+def _build_openrouter_extra_body(
     *,
     base_extra_body: dict[str, Any],
-    provider_sort: Literal["throughput", "price", "latency"],
+    provider_sort: Optional[Literal["throughput", "price", "latency"]],
     pdf_engine: Optional[Literal["mistral-ocr", "pdf-text", "native"]],
 ) -> dict[str, Any]:
     """Build OpenRouter extra_body config."""
@@ -66,94 +104,60 @@ def _build_extra_body(
         extra["provider"] = {"sort": provider_sort}
 
     if pdf_engine:
-        plugins = list(extra.get("plugins", []))
-        plugins.append({"id": "file-parser", "pdf": {"engine": pdf_engine}})
+        plugins = [*extra.get("plugins", []), {"id": "file-parser", "pdf": {"engine": pdf_engine}}]
         extra["plugins"] = plugins
 
     return extra
 
 
-# ============================================================================
-# Response parsing utilities
-# ============================================================================
+def _build_gemini_extra_body(
+    *,
+    base_extra_body: dict[str, Any],
+    cached_content: Optional[str],
+) -> dict[str, Any] | None:
+    """Build Gemini extra_body config with cached content support."""
+    extra = {**base_extra_body}
+
+    if cached_content:
+        # Merge with existing google config if present
+        google_config = extra.get("google", {})
+        google_config["cached_content"] = cached_content
+        extra["google"] = google_config
+
+    return extra
 
 
-def _extract_reasoning(content_blocks: list[dict]) -> str | None:
-    """Extract reasoning from response content_blocks."""
-    if not content_blocks:
-        return None
+def EmbeddingsOpenRouter(
+    model: str = "google/gemini-embedding-001",
+    api_key: Optional[str] = None,
+    **kwargs,
+) -> OpenAIEmbeddings:
+    """Initialize an OpenRouter embedding model with sensible defaults.
 
-    block = content_blocks[0]
-    if reasoning := block.get("reasoning"):
-        return reasoning
+    Args:
+        model: Model identifier (PROVIDER/MODEL format, e.g., "google/gemini-embedding-001")
+        api_key: Optional API key. If not provided, reads from environment variables.
+        **kwargs: Additional config (e.g., check_embedding_ctx_length, etc.)
 
-    if extras := block.get("extras"):
-        if isinstance(extras, dict) and (content := extras.get("content")):
-            if isinstance(content, list) and content and isinstance(content[-1], dict):
-                return content[-1].get("text")
+    Returns:
+        OpenAIEmbeddings instance configured for OpenRouter or Gemini.
 
-    return None
+    Note: For Gemini embedding models via OpenRouter, use "google/gemini-embedding-001".
+          For native Gemini embeddings, use a Gemini model identifier and it will use
+          the Gemini API endpoint.
+    """
+    if not (_is_openrouter_model(model) or _is_gemini_model(model)):
+        raise ValueError(f"Invalid model: {model}. Use 'PROVIDER/MODEL' for OpenRouter or a Gemini model identifier.")
 
+    if _is_openrouter_model(model):
+        api_key, base_url = _get_openrouter_config(api_key)
+    elif _is_gemini_model(model):
+        api_key, base_url = _get_gemini_config(api_key)
 
-def parse_invoke(
-    response: AIMessage,
-    include_reasoning: bool = False,
-) -> str | tuple[str | None, str]:
-    """Parse response to extract answer and optionally reasoning."""
-    answer = response.content_blocks[-1]["text"]
-    if include_reasoning:
-        reasoning = _extract_reasoning(response.content_blocks)
-        return reasoning, answer
-    return answer
-
-
-def parse_batch(
-    responses: list[AIMessage],
-    include_reasoning: bool = False,
-) -> list[str] | list[tuple[str | None, str]]:
-    """Parse batched responses, optionally with reasoning."""
-    return [parse_invoke(response, include_reasoning) for response in responses]
-
-
-def get_stream_generator(
-    stream: Generator[AIMessage, None, None],
-    include_reasoning: bool = False,
-) -> Generator[str | tuple[str, str | None], None, None]:
-    """Yield streaming chunks, optionally with reasoning."""
-    reasoning_yielded = False
-
-    for chunk in stream:
-        if not (blocks := getattr(chunk, "content_blocks", None)):
-            continue
-
-        if include_reasoning and not reasoning_yielded and (reasoning := _extract_reasoning(blocks)):
-            reasoning_yielded = True
-            yield (reasoning, None)
-
-        if answer := blocks[-1].get("text"):
-            yield (None, answer) if include_reasoning else answer
-
-
-def parse_stream(
-    stream: Generator[AIMessage, None, None],
-    include_reasoning: bool = False,
-) -> str | tuple[str | None, str]:
-    """Print streamed chunks and return the final result."""
-    reasoning = None
-    answer_parts: list[str] = []
-
-    for item in get_stream_generator(stream, include_reasoning):
-        if isinstance(item, tuple):
-            reasoning_chunk, answer_chunk = item
-            if reasoning_chunk is not None:
-                reasoning = reasoning_chunk
-                print(f"Reasoning: {reasoning}", flush=True)
-            if answer_chunk is not None:
-                answer_parts.append(answer_chunk)
-                print(answer_chunk, end="", flush=True)
-        else:
-            answer_parts.append(item)
-            print(item, end="", flush=True)
-
-    answer = "".join(answer_parts)
-    return (reasoning, answer) if include_reasoning else answer
+    return OpenAIEmbeddings(
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        check_embedding_ctx_length=kwargs.pop("check_embedding_ctx_length", False),
+        **kwargs,
+    )
