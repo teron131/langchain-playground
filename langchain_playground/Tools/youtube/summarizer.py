@@ -111,13 +111,7 @@ class Quality(BaseModel):
         return self.percentage_score >= Config.MIN_QUALITY_SCORE
 
 
-class GraphInput(BaseModel):
-    """Input schema for the summarization graph."""
-
-    transcript_or_url: str = Field(description="YouTube URL or transcript text")
-
-
-class GraphState(BaseModel):
+class SummarizerState(BaseModel):
     """State schema for the summarization graph."""
 
     transcript: Optional[str] = None
@@ -127,7 +121,13 @@ class GraphState(BaseModel):
     is_complete: bool = Field(default=False)
 
 
-class GraphOutput(BaseModel):
+class SummarizerInput(BaseModel):
+    """Input schema for the summarization graph."""
+
+    transcript_or_url: str = Field(description="YouTube URL or transcript text")
+
+
+class SummarizerOutput(BaseModel):
     """Output schema for the summarization graph."""
 
     analysis: Analysis
@@ -145,7 +145,7 @@ class LangChainAnalysisNode:
     """Node for generating analysis using LangChain."""
 
     @staticmethod
-    def execute(state: GraphState) -> dict:
+    def execute(state: SummarizerState) -> dict:
         """Execute analysis generation."""
         llm = ChatOpenRouter(
             model=Config.ANALYSIS_MODEL,
@@ -190,7 +190,7 @@ class LangChainQualityNode:
     """Node for quality assessment using LangChain."""
 
     @staticmethod
-    def execute(state: GraphState) -> dict:
+    def execute(state: SummarizerState) -> dict:
         """Execute quality assessment."""
         llm = ChatOpenRouter(
             model=Config.QUALITY_MODEL,
@@ -240,7 +240,7 @@ Evaluate each aspect and provide ratings (Pass/Refine/Fail) with reasons.""",
 # ============================================================================
 
 
-def should_continue_langchain(state: GraphState) -> str:
+def should_continue_langchain(state: SummarizerState) -> str:
     """Determine next step in LangChain workflow."""
     if state.is_complete:
         print(f"✅ LangChain workflow complete (quality: {state.quality.percentage_score if state.quality else 'None'}%)")
@@ -255,7 +255,11 @@ def should_continue_langchain(state: GraphState) -> str:
 
 def create_summarization_graph() -> StateGraph:
     """Create the summarization workflow graph with conditional routing."""
-    builder = StateGraph(GraphState, output_schema=GraphOutput)
+    builder = StateGraph(
+        SummarizerState,
+        input_schema=SummarizerInput,
+        output_schema=SummarizerOutput,
+    )
 
     # Add nodes
     builder.add_node("langchain_analysis", LangChainAnalysisNode.execute)
@@ -309,16 +313,16 @@ def summarize_video(transcript_or_url: str) -> Analysis:
             raise ValueError("Video does not have a transcript available")
         transcript = result.parsed_transcript or ""
 
-    # Invoke with GraphState
-    initial_state = GraphState(transcript=transcript)
+    # Invoke with SummarizerState
+    initial_state = SummarizerState(transcript=transcript)
     result: dict = graph.invoke(initial_state.model_dump())
-    result: GraphOutput = GraphOutput.model_validate(result)
+    result: SummarizerOutput = SummarizerOutput.model_validate(result)
 
     print(f"🎯 Final quality score: {result.quality.percentage_score if result.quality else 'N/A'}% (after {result.iteration_count} iterations)")
     return result.analysis
 
 
-def stream_summarize_video(transcript_or_url: str) -> Generator[GraphState, None, None]:
+def stream_summarize_video(transcript_or_url: str) -> Generator[SummarizerState, None, None]:
     """Stream the summarization process with progress updates using LangGraph's stream_mode='values'.
 
     This allows for both getting adhoc progress status updates and the final result.
@@ -329,7 +333,7 @@ def stream_summarize_video(transcript_or_url: str) -> Generator[GraphState, None
         transcript_or_url: YouTube URL or transcript text
 
     Yields:
-        GraphState: Current state of the summarization process
+        SummarizerState: Current state of the summarization process
     """
     graph = create_compiled_graph()
 
@@ -341,7 +345,7 @@ def stream_summarize_video(transcript_or_url: str) -> Generator[GraphState, None
             raise ValueError("Video does not have a transcript available")
         transcript = result.parsed_transcript or ""
 
-    # Stream with GraphState
-    initial_state = GraphState(transcript=transcript)
+    # Stream with SummarizerState
+    initial_state = SummarizerState(transcript=transcript)
     for chunk in graph.stream(initial_state.model_dump(), stream_mode="values"):
-        yield GraphState.model_validate(chunk)
+        yield SummarizerState.model_validate(chunk)
