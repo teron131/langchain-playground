@@ -45,6 +45,8 @@ class TranscriptSegment(BaseModel):
 class YouTubeScrapperResult(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
+    id: Optional[str] = None
+    thumbnail: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     likeCountInt: Optional[int] = None
