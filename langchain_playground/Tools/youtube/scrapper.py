@@ -48,16 +48,16 @@ class WatchNextVideo(BaseModel):
 
 
 class TranscriptSegment(BaseModel):
-    text: str
-    startMs: str
-    endMs: str
-    startTimeText: str
+    text: Optional[str] = None
+    startMs: Optional[str] = None
+    endMs: Optional[str] = None
+    startTimeText: Optional[str] = None
 
 
 class YouTubeScrapperResult(BaseModel):
-    id: str
+    id: Optional[str] = None
     thumbnail: Optional[str] = None
-    type: str
+    type: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     commentCountText: Optional[str] = None
@@ -108,9 +108,6 @@ def scrap_youtube(youtube_url: str) -> YouTubeScrapperResult:
 
     Returns:
         YouTubeScrapperResult: Parsed video data including transcript and metadata
-
-    Raises:
-        ValueError: If URL is invalid or API key is missing
     """
     if not is_youtube_url(youtube_url):
         raise ValueError("Invalid YouTube URL")

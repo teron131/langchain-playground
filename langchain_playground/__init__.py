@@ -2,21 +2,13 @@
 
 from dotenv import load_dotenv
 
-# Import Tools (always available)
+from .llm import ChatOpenRouter, MediaMessage
 from .tools import get_tools
 
 load_dotenv()
 
-# Optional imports that may fail due to dependency issues
-_optional_imports = []
-__all__ = ["get_tools"]
-
-try:
-    from .universal import UniversalChain, graph
-
-    _optional_imports.extend(["UniversalChain", "graph"])
-    __all__.extend(["UniversalChain", "graph"])
-except ImportError as e:
-    print(f"Warning: Could not import UniversalChain/graph: {e}")
-
-__version__ = "0.1.0"
+__all__ = [
+    "get_tools",
+    "ChatOpenRouter",
+    "MediaMessage",
+]

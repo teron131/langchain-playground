@@ -6,9 +6,10 @@ from typing import Any, Generator, Literal, Optional, Union
 
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
+
+from langchain_playground.llm import ChatOpenRouter
 
 from .scrapper import is_youtube_url, scrap_youtube
 from .utils import schema_to_string
@@ -146,10 +147,8 @@ class LangChainAnalysisNode:
     @staticmethod
     def execute(state: GraphState) -> dict:
         """Execute analysis generation."""
-        llm = ChatOpenAI(
+        llm = ChatOpenRouter(
             model=Config.ANALYSIS_MODEL,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url="https://openrouter.ai/api/v1",
             temperature=0,
         )
 
@@ -193,10 +192,8 @@ class LangChainQualityNode:
     @staticmethod
     def execute(state: GraphState) -> dict:
         """Execute quality assessment."""
-        llm = ChatOpenAI(
+        llm = ChatOpenRouter(
             model=Config.QUALITY_MODEL,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url="https://openrouter.ai/api/v1",
             temperature=0,
         )
 
