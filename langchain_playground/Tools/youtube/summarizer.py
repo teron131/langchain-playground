@@ -193,17 +193,17 @@ def quality_node(state: SummarizerState) -> dict:
 
 def should_continue(state: SummarizerState) -> str:
     """Determine next step in workflow."""
-    quality_percentage = state.quality.percentage_score if state.quality else None
+    quality_percent = state.quality.percentage_score if state.quality else None
 
     if state.is_complete:
-        print(f"✅ Workflow complete (quality: {quality_percentage}%)")
+        print(f"✅ Complete: quality {quality_percent}%")
         return END
 
     if state.quality and not state.quality.is_acceptable and state.iteration_count < MAX_ITERATIONS:
-        print(f"🔄 Quality {quality_percentage}% below threshold {MIN_QUALITY_SCORE}%, re-entering analysis (iteration {state.iteration_count + 1})")
+        print(f"🔄 Refining: quality {quality_percent}% < {MIN_QUALITY_SCORE}% (iteration {state.iteration_count + 1})")
         return "analysis"
 
-    print(f"⚠️ Workflow ending (quality: {quality_percentage}%, iterations: {state.iteration_count})")
+    print(f"⚠️ Stopping: quality {quality_percent}%, {state.iteration_count} iterations")
     return END
 
 
@@ -273,8 +273,8 @@ def summarize_video(
     result: dict = graph.invoke(initial_state.model_dump())
     output = SummarizerOutput.model_validate(result)
 
-    quality_pct = output.quality.percentage_score if output.quality else "N/A"
-    print(f"🎯 Final: {quality_pct}% after {output.iteration_count} iterations")
+    quality_percent = output.quality.percentage_score if output.quality else None
+    print(f"🎯 Final: quality {quality_percent}%, {output.iteration_count} iterations")
     return output.analysis
 
 
