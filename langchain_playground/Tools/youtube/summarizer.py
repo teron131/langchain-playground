@@ -1,41 +1,25 @@
-"""This module provides functions for processing transcribed text to generate formatted subtitles and AI-powered summaries using LangChain with LangGraph self-checking workflow."""
+"""YouTube video transcript summarization using LangChain with LangGraph self-checking workflow."""
 
-import os
-import re
-from typing import Any, Generator, Literal, Optional, Union
+from typing import Generator, Literal, Optional
 
-from dotenv import load_dotenv
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from langchain_playground.llm import ChatOpenRouter
 
-from .scrapper import is_youtube_url, scrap_youtube
-from .utils import schema_to_string
-
-load_dotenv()
-
+from .scrapper import YouTubeScrapperResult, scrap_youtube
+from .utils import is_youtube_url, s2hk
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
-
-class Config:
-    """Centralized configuration for the summarization workflow."""
-
-    # Model configuration
-    ANALYSIS_MODEL = "openai/gpt-5-mini"
-    QUALITY_MODEL = "openai/gpt-5-mini"
-
-    # Quality thresholds
-    MIN_QUALITY_SCORE = 90
-    MAX_ITERATIONS = 2
-
-    # Translation configuration
-    ENABLE_TRANSLATION = False
-    TARGET_LANGUAGE = "zh-TW"  # ISO language code (en, es, fr, de, etc.)
+ANALYSIS_MODEL = "x-ai/grok-4.1-fast"
+QUALITY_MODEL = "x-ai/grok-4.1-fast"
+MIN_QUALITY_SCORE = 80
+MAX_ITERATIONS = 2
+TARGET_LANGUAGE = "en"  # ISO language code (en, es, fr, de, etc.)
 
 
 # ============================================================================
@@ -50,6 +34,16 @@ class Chapter(BaseModel):
     summary: str = Field(description="A comprehensive summary of the chapter content")
     key_points: list[str] = Field(description="Important takeaways and insights from this chapter")
 
+    @field_validator("header", "summary")
+    def convert_string_to_hk(cls, value: str) -> str:
+        """Convert string fields to Traditional Chinese."""
+        return s2hk(value)
+
+    @field_validator("key_points")
+    def convert_list_to_hk(cls, value: list[str]) -> list[str]:
+        """Convert list fields to Traditional Chinese."""
+        return [s2hk(item) for item in value]
+
 
 class Analysis(BaseModel):
     """Complete analysis of video content."""
@@ -57,16 +51,25 @@ class Analysis(BaseModel):
     title: str = Field(description="The main title or topic of the video content")
     summary: str = Field(description="A comprehensive summary of the video content")
     takeaways: list[str] = Field(description="Key insights and actionable takeaways for the audience", min_length=3, max_length=8)
-    key_facts: list[str] = Field(description="Important facts, statistics, or data points mentioned", min_length=3, max_length=6)
     chapters: list[Chapter] = Field(description="Structured breakdown of content into logical chapters")
     keywords: list[str] = Field(description="The most relevant keywords in the analysis worthy of highlighting", min_length=3, max_length=3)
     target_language: Optional[str] = Field(default=None, description="The language the content to be translated to")
+
+    @field_validator("title", "summary")
+    def convert_string_to_hk(cls, value: str) -> str:
+        """Convert string fields to Traditional Chinese."""
+        return s2hk(value)
+
+    @field_validator("takeaways", "keywords")
+    def convert_list_to_hk(cls, value: list[str]) -> list[str]:
+        """Convert list fields to Traditional Chinese."""
+        return [s2hk(item) for item in value]
 
 
 class Rate(BaseModel):
     """Quality rating for a single aspect."""
 
-    rate: Literal["Fail", "Refine", "Pass"] = Field(description="Score for the quality aspect (Fail=poor, Refine=adequate, Pass=excellent)")
+    rate: Literal["Fail", "Refine", "Pass"] = Field(description="Score for the quality aspect")
     reason: str = Field(description="Reason for the score")
 
 
@@ -75,7 +78,6 @@ class Quality(BaseModel):
 
     completeness: Rate = Field(description="Rate for completeness: The entire transcript has been considered")
     structure: Rate = Field(description="Rate for structure: The result is in desired structures")
-    grammar: Rate = Field(description="Rate for grammar: No typos, grammatical mistakes, appropriate wordings")
     no_garbage: Rate = Field(description="Rate for no_garbage: The promotional and meaningless content are removed")
     meta_language_avoidance: Rate = Field(description="Rate for meta-language avoidance: No phrases like 'This chapter introduces', 'This section covers', etc.")
     useful_keywords: Rate = Field(description="Rate for keywords: The keywords are useful for highlighting the analysis")
@@ -87,7 +89,6 @@ class Quality(BaseModel):
         return [
             self.completeness,
             self.structure,
-            self.grammar,
             self.no_garbage,
             self.meta_language_avoidance,
             self.useful_keywords,
@@ -97,18 +98,16 @@ class Quality(BaseModel):
     @property
     def percentage_score(self) -> int:
         """Calculate percentage score based on Pass/Refine/Fail ratings."""
-        pass_count = sum(1 for aspect in self.all_aspects if aspect.rate == "Pass")
-        refine_count = sum(1 for aspect in self.all_aspects if aspect.rate == "Refine")
-        total = len(self.all_aspects)
-
+        aspects = self.all_aspects
+        pass_count = sum(1 for a in aspects if a.rate == "Pass")
+        refine_count = sum(1 for a in aspects if a.rate == "Refine")
         # Pass = 100%, Refine = 50%, Fail = 0%
-        score = (pass_count * 100 + refine_count * 50) / total
-        return int(score)
+        return int((pass_count * 100 + refine_count * 50) / len(aspects))
 
     @property
     def is_acceptable(self) -> bool:
         """Check if quality score meets minimum threshold."""
-        return self.percentage_score >= Config.MIN_QUALITY_SCORE
+        return self.percentage_score >= MIN_QUALITY_SCORE
 
 
 class SummarizerState(BaseModel):
@@ -117,14 +116,9 @@ class SummarizerState(BaseModel):
     transcript: Optional[str] = None
     analysis: Optional[Analysis] = None
     quality: Optional[Quality] = None
-    iteration_count: int = Field(default=0)
-    is_complete: bool = Field(default=False)
-
-
-class SummarizerInput(BaseModel):
-    """Input schema for the summarization graph."""
-
-    transcript_or_url: str = Field(description="YouTube URL or transcript text")
+    target_language: Optional[str] = None
+    iteration_count: int = 0
+    is_complete: bool = False
 
 
 class SummarizerOutput(BaseModel):
@@ -141,98 +135,55 @@ class SummarizerOutput(BaseModel):
 # ============================================================================
 
 
-class LangChainAnalysisNode:
-    """Node for generating analysis using LangChain."""
+def analysis_node(state: SummarizerState) -> dict:
+    """Generate analysis from transcript."""
+    llm = ChatOpenRouter(
+        model=ANALYSIS_MODEL,
+        temperature=0,
+        reasoning_effort="medium",
+    ).with_structured_output(Analysis)
 
-    @staticmethod
-    def execute(state: SummarizerState) -> dict:
-        """Execute analysis generation."""
-        llm = ChatOpenRouter(
-            model=Config.ANALYSIS_MODEL,
-            temperature=0,
-        )
+    system_prompt = "Analyze the transcript and create a comprehensive analysis with clear structure, key insights, and meaningful keywords. Avoid meta-language phrases."
+    if state.target_language:
+        system_prompt += f" Output the analysis in {state.target_language}."
 
-        analysis_schema_str = schema_to_string(Analysis)
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    f"""You are an expert content analyst. Analyze the provided transcript and create a comprehensive analysis.
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"Transcript:\n{state.transcript}"),
+    ]
 
-Output Schema:
-{analysis_schema_str}
+    analysis = llm.invoke(messages)
 
-Guidelines:
-- Extract key information accurately
-- Structure content into logical chapters
-- Identify important facts and takeaways
-- Select meaningful keywords
-- Write in clear, concise language
-- Avoid meta-language phrases like "This chapter introduces" or "This section covers"
-""",
-                ),
-                ("human", "Transcript:\n{transcript}"),
-            ]
-        )
-
-        structured_llm = llm.with_structured_output(Analysis)
-        chain = prompt | structured_llm
-
-        analysis = chain.invoke({"transcript": state.transcript})
-
-        return {
-            "analysis": analysis,
-            "iteration_count": state.iteration_count + 1,
-        }
+    return {
+        "analysis": analysis,
+        "iteration_count": state.iteration_count + 1,
+    }
 
 
-class LangChainQualityNode:
-    """Node for quality assessment using LangChain."""
+def quality_node(state: SummarizerState) -> dict:
+    """Assess quality of analysis."""
+    llm = ChatOpenRouter(
+        model=QUALITY_MODEL,
+        temperature=0,
+        reasoning_effort="low",
+    ).with_structured_output(Quality)
 
-    @staticmethod
-    def execute(state: SummarizerState) -> dict:
-        """Execute quality assessment."""
-        llm = ChatOpenRouter(
-            model=Config.QUALITY_MODEL,
-            temperature=0,
-        )
+    system_prompt = "Evaluate the analysis against the transcript and provide each aspect a rating (Pass/Refine/Fail) with reasons."
+    if state.target_language:
+        system_prompt += f" Verify that the analysis is in {state.target_language}."
 
-        quality_schema_str = schema_to_string(Quality)
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    f"""You are a quality assessor. Evaluate the analysis against the transcript.
+    analysis_json = state.analysis.model_dump_json() if state.analysis else "No analysis provided"
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"Transcript:\n{state.transcript}\n\nAnalysis:\n{analysis_json}"),
+    ]
 
-Quality Schema:
-{quality_schema_str}
+    quality: Quality = llm.invoke(messages)
 
-Transcript:
-{{transcript}}
-
-Analysis:
-{{analysis}}
-
-Evaluate each aspect and provide ratings (Pass/Refine/Fail) with reasons.""",
-                ),
-                (
-                    "human",
-                    "Please assess the quality of this analysis based on the transcript provided.",
-                ),
-            ]
-        )
-
-        structured_llm = llm.with_structured_output(Quality)
-        chain = prompt | structured_llm
-
-        quality = chain.invoke(
-            {
-                "transcript": state.transcript,
-                "analysis": state.analysis.model_dump_json() if state.analysis else "",
-            }
-        )
-
-        return {"quality": quality, "is_complete": quality.is_acceptable}
+    return {
+        "quality": quality,
+        "is_complete": quality.is_acceptable,
+    }
 
 
 # ============================================================================
@@ -240,53 +191,66 @@ Evaluate each aspect and provide ratings (Pass/Refine/Fail) with reasons.""",
 # ============================================================================
 
 
-def should_continue_langchain(state: SummarizerState) -> str:
-    """Determine next step in LangChain workflow."""
+def should_continue(state: SummarizerState) -> str:
+    """Determine next step in workflow."""
+    quality_percentage = state.quality.percentage_score if state.quality else None
+
     if state.is_complete:
-        print(f"✅ LangChain workflow complete (quality: {state.quality.percentage_score if state.quality else 'None'}%)")
-        return END
-    elif state.quality and not state.quality.is_acceptable and state.iteration_count < Config.MAX_ITERATIONS:
-        print(f"🔄 LangChain quality {state.quality.percentage_score}% below threshold {Config.MIN_QUALITY_SCORE}%, re-entering analysis (iteration {state.iteration_count + 1})")
-        return "langchain_analysis"
-    else:
-        print(f"🔄 LangChain workflow ending (quality: {state.quality.percentage_score if state.quality else 'None'}%, iterations: {state.iteration_count})")
+        print(f"✅ Workflow complete (quality: {quality_percentage}%)")
         return END
 
+    if state.quality and not state.quality.is_acceptable and state.iteration_count < MAX_ITERATIONS:
+        print(f"🔄 Quality {quality_percentage}% below threshold {MIN_QUALITY_SCORE}%, re-entering analysis (iteration {state.iteration_count + 1})")
+        return "analysis"
 
-def create_summarization_graph() -> StateGraph:
+    print(f"⚠️ Workflow ending (quality: {quality_percentage}%, iterations: {state.iteration_count})")
+    return END
+
+
+def create_graph() -> StateGraph:
     """Create the summarization workflow graph with conditional routing."""
     builder = StateGraph(
         SummarizerState,
-        input_schema=SummarizerInput,
         output_schema=SummarizerOutput,
     )
 
-    # Add nodes
-    builder.add_node("langchain_analysis", LangChainAnalysisNode.execute)
-    builder.add_node("langchain_quality", LangChainQualityNode.execute)
+    builder.add_node("analysis", analysis_node)
+    builder.add_node("quality", quality_node)
 
-    # Add edge from START to analysis
-    builder.add_edge(START, "langchain_analysis")
+    builder.add_edge(START, "analysis")
+    builder.add_edge("analysis", "quality")
 
-    # Add edge from analysis to quality
-    builder.add_edge("langchain_analysis", "langchain_quality")
-
-    # Add conditional edges from quality node
     builder.add_conditional_edges(
-        "langchain_quality",
-        should_continue_langchain,
+        "quality",
+        should_continue,
         {
-            "langchain_analysis": "langchain_analysis",
+            "analysis": "analysis",
             END: END,
         },
     )
 
-    return builder
+    return builder.compile()
 
 
-def create_compiled_graph():
-    """Create and compile the summarization graph."""
-    return create_summarization_graph().compile()
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+
+def _extract_transcript(transcript_or_url: str) -> str:
+    """Extract transcript from URL or return text directly."""
+    if is_youtube_url(transcript_or_url):
+        result: YouTubeScrapperResult = scrap_youtube(transcript_or_url)
+        if not result.has_transcript:
+            raise ValueError("Video has no transcript")
+        if not result.parsed_transcript:
+            raise ValueError("Transcript is empty")
+        return result.parsed_transcript
+
+    if not transcript_or_url or not transcript_or_url.strip():
+        raise ValueError("Transcript cannot be empty")
+
+    return transcript_or_url
 
 
 # ============================================================================
@@ -294,58 +258,37 @@ def create_compiled_graph():
 # ============================================================================
 
 
-def summarize_video(transcript_or_url: str) -> Analysis:
-    """Summarize the text using LangChain with LangGraph self-checking workflow.
+def summarize_video(
+    transcript_or_url: str,
+    target_language: Optional[str] = None,
+) -> Analysis:
+    """Summarize YouTube video or text transcript with quality self-checking."""
+    graph = create_graph()
+    transcript = _extract_transcript(transcript_or_url)
 
-    Args:
-        transcript_or_url: YouTube URL or transcript text
-
-    Returns:
-        Analysis: Complete analysis of the video content
-    """
-    graph = create_compiled_graph()
-
-    # Extract transcript if URL provided
-    transcript = transcript_or_url
-    if is_youtube_url(transcript_or_url):
-        result = scrap_youtube(transcript_or_url)
-        if not result.has_transcript:
-            raise ValueError("Video does not have a transcript available")
-        transcript = result.parsed_transcript or ""
-
-    # Invoke with SummarizerState
-    initial_state = SummarizerState(transcript=transcript)
+    initial_state = SummarizerState(
+        transcript=transcript,
+        target_language=target_language or TARGET_LANGUAGE,
+    )
     result: dict = graph.invoke(initial_state.model_dump())
-    result: SummarizerOutput = SummarizerOutput.model_validate(result)
+    output = SummarizerOutput.model_validate(result)
 
-    print(f"🎯 Final quality score: {result.quality.percentage_score if result.quality else 'N/A'}% (after {result.iteration_count} iterations)")
-    return result.analysis
+    quality_pct = output.quality.percentage_score if output.quality else "N/A"
+    print(f"🎯 Final: {quality_pct}% after {output.iteration_count} iterations")
+    return output.analysis
 
 
-def stream_summarize_video(transcript_or_url: str) -> Generator[SummarizerState, None, None]:
-    """Stream the summarization process with progress updates using LangGraph's stream_mode='values'.
+def stream_summarize_video(
+    transcript_or_url: str,
+    target_language: Optional[str] = None,
+) -> Generator[SummarizerState, None, None]:
+    """Stream the summarization process with progress updates."""
+    graph = create_graph()
+    transcript = _extract_transcript(transcript_or_url)
 
-    This allows for both getting adhoc progress status updates and the final result.
-
-    The final chunk will contain the complete graph state with the final analysis.
-
-    Args:
-        transcript_or_url: YouTube URL or transcript text
-
-    Yields:
-        SummarizerState: Current state of the summarization process
-    """
-    graph = create_compiled_graph()
-
-    # Extract transcript if URL provided
-    transcript = transcript_or_url
-    if is_youtube_url(transcript_or_url):
-        result = scrap_youtube(transcript_or_url)
-        if not result.has_transcript:
-            raise ValueError("Video does not have a transcript available")
-        transcript = result.parsed_transcript or ""
-
-    # Stream with SummarizerState
-    initial_state = SummarizerState(transcript=transcript)
+    initial_state = SummarizerState(
+        transcript=transcript,
+        target_language=target_language or TARGET_LANGUAGE,
+    )
     for chunk in graph.stream(initial_state.model_dump(), stream_mode="values"):
         yield SummarizerState.model_validate(chunk)

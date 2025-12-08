@@ -18,7 +18,7 @@ from typing import List, Optional
 
 import requests
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 
 from .utils import clean_text, clean_youtube_url, is_youtube_url
 
@@ -28,26 +28,14 @@ SCRAPECREATORS_API_KEY = os.getenv("SCRAPECREATORS_API_KEY")
 
 
 class Channel(BaseModel):
-    id: Optional[str] = None
-    url: Optional[str] = None
-    handle: Optional[str] = None
-    title: Optional[str] = None
+    model_config = ConfigDict(extra="ignore")
 
-
-class WatchNextVideo(BaseModel):
-    id: Optional[str] = None
     title: Optional[str] = None
-    thumbnail: Optional[str] = None
-    channel: Optional[Channel] = None
-    publishDateText: Optional[str] = None
-    publishDate: Optional[str] = None  # API returns ISO string, not datetime
-    viewCountText: Optional[str] = None
-    viewCountInt: Optional[int] = None
-    lengthText: Optional[str] = None
-    videoUrl: Optional[str] = None
 
 
 class TranscriptSegment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     text: Optional[str] = None
     startMs: Optional[str] = None
     endMs: Optional[str] = None
@@ -55,47 +43,29 @@ class TranscriptSegment(BaseModel):
 
 
 class YouTubeScrapperResult(BaseModel):
-    id: Optional[str] = None
-    thumbnail: Optional[str] = None
-    type: Optional[str] = None
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
     title: Optional[str] = None
     description: Optional[str] = None
-    commentCountText: Optional[str] = None
-    commentCountInt: Optional[int] = None
-    likeCountText: Optional[str] = None
     likeCountInt: Optional[int] = None
-    viewCountText: Optional[str] = None
     viewCountInt: Optional[int] = None
     publishDateText: Optional[str] = None
-    publishDate: Optional[str] = None  # API returns ISO string, not datetime
     channel: Optional[Channel] = None
-    watchNextVideos: List[WatchNextVideo] = Field(default_factory=list)
-    keywords: List[str] = Field(default_factory=list)
-    durationMs: Optional[int] = None
     durationFormatted: Optional[str] = None
     transcript: Optional[List[TranscriptSegment]] = None
     transcript_only_text: Optional[str] = None
 
     @property
     def parsed_transcript(self) -> Optional[str]:
-        """Parse transcript into a single string.
-
-        Since the API doesn't provide chapter information, this simply returns
-        the cleaned transcript_only_text if available.
-
-        Returns:
-            A cleaned string with the transcript text.
-            Returns None if no transcript is available.
-        """
-        # Handle case where transcript_only_text is None or empty
-        if self.transcript_only_text is None or not self.transcript_only_text.strip():
+        """Return cleaned transcript text or None if unavailable."""
+        if not self.transcript_only_text or not self.transcript_only_text.strip():
             return None
         return clean_text(self.transcript_only_text)
 
     @property
     def has_transcript(self) -> bool:
-        """Check if this video has a transcript available."""
-        return self.transcript is not None and len(self.transcript) > 0 and self.transcript_only_text is not None and self.transcript_only_text.strip() != ""
+        """Check if video has a transcript available."""
+        return bool(self.transcript and self.transcript_only_text and self.transcript_only_text.strip())
 
 
 def scrap_youtube(youtube_url: str) -> YouTubeScrapperResult:
