@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 import os
 import re
-from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate

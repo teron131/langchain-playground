@@ -1,10 +1,9 @@
 import base64
 import io
-from typing import Tuple
 
 import httpx
-import opencc
 from IPython.display import HTML, display
+import opencc
 from PIL import Image
 
 
@@ -33,7 +32,7 @@ def _load_image(image_source: str) -> Image.Image:
 
 def _resize_image_proportionally(
     image: Image.Image,
-    max_size: Tuple[int, int],
+    max_size: tuple[int, int],
 ) -> Image.Image:
     """Resize an image proportionally to fit within max_size dimensions."""
     ratio = min(max_size[0] / image.width, max_size[1] / image.height)
@@ -62,7 +61,7 @@ def _image_to_base64(
 
 def load_image_base64(
     image_source: str,
-    max_size: Tuple[int, int] = (768, 768),
+    max_size: tuple[int, int] = (768, 768),
     format: str = "JPEG",
 ) -> str:
     """Load and resize an image from a URL, local file, or PIL Image and return the result as a base64 string.

@@ -93,10 +93,7 @@ class MediaMessage(HumanMessage):
 
         content_blocks: list[dict[str, Any]] = []
         for idx, item in enumerate(items, 1):
-            if isinstance(item, bytes):
-                blocks = self._from_bytes(item, mime_type)
-            else:
-                blocks = self._from_path(Path(item))
+            blocks = self._from_bytes(item, mime_type) if isinstance(item, bytes) else self._from_path(Path(item))
 
             if label_pages and blocks:
                 content_blocks.append(_create_text_block(f"Page {idx}:"))

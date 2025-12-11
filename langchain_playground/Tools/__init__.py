@@ -15,7 +15,7 @@ def print_tool_info(tool_func: BaseTool) -> None:
     print(f"Arguments: {tool_func.args}\n")
 
 
-def get_tools() -> List[BaseTool]:
+def get_tools() -> list[BaseTool]:
     """Get the list of available tools for the UniversalChain. The tools are wrapped with their original docstrings and registered as langchain tools.
 
     Returns:
@@ -48,7 +48,7 @@ def get_tools() -> List[BaseTool]:
 
 __all__ = [
     "get_tools",
-    "websearch",
     "webloader",
+    "websearch",
     "youtube_loader",
 ]

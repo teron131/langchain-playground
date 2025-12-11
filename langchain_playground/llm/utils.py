@@ -1,4 +1,4 @@
-from typing import Generator
+from collections.abc import Generator
 
 from langchain_core.messages import AIMessage
 
@@ -12,10 +12,15 @@ def _extract_reasoning(content_blocks: list[dict]) -> str | None:
     if reasoning := block.get("reasoning"):
         return reasoning
 
-    if extras := block.get("extras"):
-        if isinstance(extras, dict) and (content := extras.get("content")):
-            if isinstance(content, list) and content and isinstance(content[-1], dict):
-                return content[-1].get("text")
+    if (
+        (extras := block.get("extras"))
+        and isinstance(extras, dict)
+        and (content := extras.get("content"))
+        and isinstance(content, list)
+        and content
+        and isinstance(content[-1], dict)
+    ):
+        return content[-1].get("text")
 
     return None
 

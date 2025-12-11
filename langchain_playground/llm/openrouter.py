@@ -1,7 +1,7 @@
 """OpenRouter LLM client initialization and configuration."""
 
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
@@ -21,7 +21,7 @@ def _is_gemini(model: str) -> bool:
     return model.lower().startswith("gemini")
 
 
-def _get_config(model: str, api_key: Optional[str] = None) -> tuple[str, str]:
+def _get_config(model: str, api_key: str | None = None) -> tuple[str, str]:
     """Get API key and base URL based on model type."""
     if _is_openrouter(model):
         return api_key or os.getenv("OPENROUTER_API_KEY"), "https://openrouter.ai/api/v1"
@@ -34,10 +34,10 @@ def _get_config(model: str, api_key: Optional[str] = None) -> tuple[str, str]:
 def ChatOpenRouter(
     model: str,
     temperature: float = 0.0,
-    reasoning_effort: Optional[Literal["minimal", "low", "medium", "high"]] = None,
+    reasoning_effort: Literal["minimal", "low", "medium", "high"] | None = None,
     provider_sort: Literal["throughput", "price", "latency"] = "throughput",
-    pdf_engine: Optional[Literal["mistral-ocr", "pdf-text", "native"]] = None,
-    cached_content: Optional[str] = None,
+    pdf_engine: Literal["mistral-ocr", "pdf-text", "native"] | None = None,
+    cached_content: str | None = None,
     **kwargs,
 ) -> BaseChatModel:
     """Initialize OpenRouter or Gemini model.
@@ -81,7 +81,7 @@ def ChatOpenRouter(
 
 def EmbeddingsOpenRouter(
     model: str = "google/gemini-embedding-001",
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     **kwargs,
 ) -> OpenAIEmbeddings:
     """Initialize an OpenRouter embedding model with sensible defaults."""
@@ -112,10 +112,15 @@ def _extract_reasoning(content_blocks: list[dict]) -> str | None:
     if reasoning := block.get("reasoning"):
         return reasoning
 
-    if (extras := block.get("extras")) and isinstance(extras, dict):
-        if (content := extras.get("content")) and isinstance(content, list) and content:
-            if isinstance(content[-1], dict):
-                return content[-1].get("text")
+    if (
+        (extras := block.get("extras"))
+        and isinstance(extras, dict)
+        and (content := extras.get("content"))
+        and isinstance(content, list)
+        and content
+        and isinstance(content[-1], dict)
+    ):
+        return content[-1].get("text")
     return None
 
 

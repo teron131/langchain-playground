@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_community.chat_models import ChatLiteLLM
@@ -70,7 +69,7 @@ graph = create_graph()
 class UniversalChain:
     """A chain implementation that wraps the compiled state graph with manual memory management outside LangGraph deployment, with contrast to the automatic memory management in deployment."""
 
-    def __init__(self, model_id: str, llm: Optional[BaseChatModel] = None):
+    def __init__(self, model_id: str, llm: BaseChatModel | None = None):
         """Initialize the UniversalChain with a language model.
 
         Args:
@@ -86,7 +85,7 @@ class UniversalChain:
         """Get the messages from the result."""
         return self.result["messages"]
 
-    def invoke(self, text: str, image: Optional[str] = None) -> MessagesState:
+    def invoke(self, text: str, image: str | None = None) -> MessagesState:
         """Invoke and get the response from the ReAct agent.
 
         Args:
@@ -112,7 +111,7 @@ class UniversalChain:
         )
         return self.result
 
-    def invoke_as_str(self, text: str, image: Optional[str] = None) -> str:
+    def invoke_as_str(self, text: str, image: str | None = None) -> str:
         """Invoke and get the string response from the ReAct agent.
 
         Args:
@@ -126,7 +125,7 @@ class UniversalChain:
         return self.messages[-1].content
 
 
-def create_message(text: str, image: Optional[str] = None) -> HumanMessage:
+def create_message(text: str, image: str | None = None) -> HumanMessage:
     """Create a human message with text and optional image content.
 
     Args:
