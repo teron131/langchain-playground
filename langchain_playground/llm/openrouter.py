@@ -1,37 +1,34 @@
 """OpenRouter LLM client initialization and configuration."""
 
 import os
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 load_dotenv()
 
 
-def _is_openrouter_model(model: str) -> bool:
+def _is_openrouter(model: str) -> bool:
     """Check if model is OpenRouter format (PROVIDER/MODEL)."""
     return "/" in model and len(model.split("/")) == 2
 
 
-def _is_gemini_model(model: str) -> bool:
+def _is_gemini(model: str) -> bool:
     """Check if model is a Gemini model."""
     return model.lower().startswith("gemini")
 
 
-def _get_openrouter_config(api_key: Optional[str] = None) -> tuple[str, str]:
-    """Get API key and base URL for OpenRouter models."""
-    api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-    base_url = "https://openrouter.ai/api/v1"
-    return api_key, base_url
+def _get_config(model: str, api_key: Optional[str] = None) -> tuple[str, str]:
+    """Get API key and base URL based on model type."""
+    if _is_openrouter(model):
+        return api_key or os.getenv("OPENROUTER_API_KEY"), "https://openrouter.ai/api/v1"
 
-
-def _get_gemini_config(api_key: Optional[str] = None) -> tuple[str, str]:
-    """Get API key and base URL for Gemini models."""
-    api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    return api_key, base_url
+    # Default to Gemini/Google (via OpenAI compatibility endpoint)
+    key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    return key, "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 def ChatOpenRouter(
@@ -43,42 +40,33 @@ def ChatOpenRouter(
     cached_content: Optional[str] = None,
     **kwargs,
 ) -> BaseChatModel:
-    """Initialize an OpenRouter model with sensible defaults.
+    """Initialize OpenRouter or Gemini model.
 
     Args:
-        model: Model identifier (PROVIDER/MODEL)
+        model: PROVIDER/MODEL for OpenRouter, or gemini-* for Gemini
         temperature: Sampling temperature (0.0-2.0)
-        reasoning_effort: Level of reasoning effort for reasoning models.
-            Can be "minimal", "low", "medium", or "high".
-        provider_sort: Routing preference for OpenRouter (default: "throughput")
-        pdf_engine: PDF processing engine for file attachments. Options:
-            - "mistral-ocr": Best for scanned documents ($2 per 1,000 pages)
-            - "pdf-text": Best for well-structured PDFs (Free)
-            - "native": Use model's native file processing (if available)
-            If None, OpenRouter will auto-select based on model capabilities.
-        cached_content: Gemini cached content ID (e.g., "cachedContents/0000aaaa1111bbbb2222cccc3333dddd4444eeee")
-            Only used for Gemini models. Pass the full cached content resource name.
-        **kwargs: Additional config (e.g. max_tokens, extra_body, etc.)
-
-    Note: Some models (e.g., google/gemini-2.5-pro) may not support PDFs through OpenRouter in the same way as others. If you encounter "invalid_prompt" errors with PDFs, try a different model.
+        reasoning_effort: "minimal", "low", "medium", "high"
+        provider_sort: OpenRouter routing - "throughput", "price", "latency"
+        pdf_engine: "mistral-ocr" (scanned), "pdf-text" (structured), "native"
+        cached_content: Gemini cached content ID
+        **kwargs: Additional arguments passed to ChatOpenAI
     """
-    if not (_is_openrouter_model(model) or _is_gemini_model(model)):
-        raise ValueError(f"Invalid model: {model}. Use 'PROVIDER/MODEL' for OpenRouter or a Gemini model identifier.")
+    if not (_is_openrouter(model) or _is_gemini(model)):
+        raise ValueError(f"Invalid model: {model}")
 
-    extra_body: dict[str, Any] | None = None
-    if _is_openrouter_model(model):
-        api_key, base_url = _get_openrouter_config()
-        extra_body = _build_openrouter_extra_body(
-            base_extra_body=kwargs.pop("extra_body", {}) or {},
-            provider_sort=provider_sort,
-            pdf_engine=pdf_engine,
-        )
-    elif _is_gemini_model(model):
-        api_key, base_url = _get_gemini_config()
-        extra_body = _build_gemini_extra_body(
-            base_extra_body=kwargs.pop("extra_body", {}) or {},
-            cached_content=cached_content,
-        )
+    api_key, base_url = _get_config(model)
+    extra_body = kwargs.pop("extra_body", {}) or {}
+
+    if _is_openrouter(model):
+        if provider_sort and "provider" not in extra_body:
+            extra_body["provider"] = {"sort": provider_sort}
+        if pdf_engine:
+            plugins = extra_body.get("plugins", [])
+            plugins.append({"id": "file-parser", "pdf": {"engine": pdf_engine}})
+            extra_body["plugins"] = plugins
+
+    elif _is_gemini(model) and cached_content:
+        extra_body.setdefault("google", {})["cached_content"] = cached_content
 
     return ChatOpenAI(
         model=model,
@@ -91,69 +79,16 @@ def ChatOpenRouter(
     )
 
 
-def _build_openrouter_extra_body(
-    *,
-    base_extra_body: dict[str, Any],
-    provider_sort: Optional[Literal["throughput", "price", "latency"]],
-    pdf_engine: Optional[Literal["mistral-ocr", "pdf-text", "native"]],
-) -> dict[str, Any]:
-    """Build OpenRouter extra_body config."""
-    extra = {**base_extra_body}
-
-    if provider_sort and "provider" not in extra:
-        extra["provider"] = {"sort": provider_sort}
-
-    if pdf_engine:
-        plugins = [*extra.get("plugins", []), {"id": "file-parser", "pdf": {"engine": pdf_engine}}]
-        extra["plugins"] = plugins
-
-    return extra
-
-
-def _build_gemini_extra_body(
-    *,
-    base_extra_body: dict[str, Any],
-    cached_content: Optional[str],
-) -> dict[str, Any] | None:
-    """Build Gemini extra_body config with cached content support."""
-    extra = {**base_extra_body}
-
-    if cached_content:
-        # Merge with existing google config if present
-        google_config = extra.get("google", {})
-        google_config["cached_content"] = cached_content
-        extra["google"] = google_config
-
-    return extra
-
-
 def EmbeddingsOpenRouter(
     model: str = "google/gemini-embedding-001",
     api_key: Optional[str] = None,
     **kwargs,
 ) -> OpenAIEmbeddings:
-    """Initialize an OpenRouter embedding model with sensible defaults.
+    """Initialize an OpenRouter embedding model with sensible defaults."""
+    if not (_is_openrouter(model) or _is_gemini(model)):
+        raise ValueError(f"Invalid model: {model}")
 
-    Args:
-        model: Model identifier (PROVIDER/MODEL format, e.g., "google/gemini-embedding-001")
-        api_key: Optional API key. If not provided, reads from environment variables.
-        **kwargs: Additional config (e.g., check_embedding_ctx_length, etc.)
-
-    Returns:
-        OpenAIEmbeddings instance configured for OpenRouter or Gemini.
-
-    Note: For Gemini embedding models via OpenRouter, use "google/gemini-embedding-001".
-          For native Gemini embeddings, use a Gemini model identifier and it will use
-          the Gemini API endpoint.
-    """
-    if not (_is_openrouter_model(model) or _is_gemini_model(model)):
-        raise ValueError(f"Invalid model: {model}. Use 'PROVIDER/MODEL' for OpenRouter or a Gemini model identifier.")
-
-    if _is_openrouter_model(model):
-        api_key, base_url = _get_openrouter_config(api_key)
-    elif _is_gemini_model(model):
-        api_key, base_url = _get_gemini_config(api_key)
-
+    api_key, base_url = _get_config(model, api_key)
     return OpenAIEmbeddings(
         model=model,
         api_key=api_key,
@@ -161,3 +96,52 @@ def EmbeddingsOpenRouter(
         check_embedding_ctx_length=kwargs.pop("check_embedding_ctx_length", False),
         **kwargs,
     )
+
+
+# ============================================================================
+# Response parsing utilities
+# ============================================================================
+
+
+def _extract_reasoning(content_blocks: list[dict]) -> str | None:
+    """Extract reasoning from response content_blocks."""
+    if not content_blocks:
+        return None
+
+    block = content_blocks[0]
+    if reasoning := block.get("reasoning"):
+        return reasoning
+
+    if (extras := block.get("extras")) and isinstance(extras, dict):
+        if (content := extras.get("content")) and isinstance(content, list) and content:
+            if isinstance(content[-1], dict):
+                return content[-1].get("text")
+    return None
+
+
+def parse_invoke(
+    response: AIMessage,
+    include_reasoning: bool = False,
+) -> str | tuple[str | None, str]:
+    """Parse response to extract answer and optionally reasoning."""
+    if isinstance(response.content, str):
+        return (None, response.content) if include_reasoning else response.content
+
+    content_blocks = getattr(response, "content_blocks", [])
+    if not content_blocks:
+        # Fallback if no content blocks but also not string (unlikely for ChatOpenAI)
+        return ("", "") if include_reasoning else ""
+
+    answer = content_blocks[-1].get("text", "")
+    if include_reasoning:
+        reasoning = _extract_reasoning(content_blocks)
+        return reasoning, answer
+    return answer
+
+
+def parse_batch(
+    responses: list[AIMessage],
+    include_reasoning: bool = False,
+) -> list[str] | list[tuple[str | None, str]]:
+    """Parse batched responses, optionally with reasoning."""
+    return [parse_invoke(response, include_reasoning) for response in responses]
