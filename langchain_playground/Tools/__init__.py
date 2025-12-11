@@ -1,5 +1,4 @@
 from functools import wraps
-from typing import List
 
 from langchain_core.tools import BaseTool, tool
 from rich import print
