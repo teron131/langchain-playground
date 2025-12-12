@@ -33,9 +33,12 @@ def _get_config(model: str, api_key: str | None = None) -> tuple[str, str]:
 
 def ChatOpenRouter(
     model: str,
-    temperature: float = 0.0,
+    temperature: float = 0,
     reasoning_effort: Literal["minimal", "low", "medium", "high"] | None = None,
     provider_sort: Literal["throughput", "price", "latency"] = "throughput",
+    web_search: bool = False,
+    web_search_engine: Literal["native", "exa"] | None = None,
+    web_search_max_results: int = 5,
     pdf_engine: Literal["mistral-ocr", "pdf-text", "native"] | None = None,
     cached_content: str | None = None,
     **kwargs,
@@ -47,6 +50,9 @@ def ChatOpenRouter(
         temperature: Sampling temperature (0.0-2.0)
         reasoning_effort: "minimal", "low", "medium", "high"
         provider_sort: OpenRouter routing - "throughput", "price", "latency"
+        web_search: Enable web search plugin
+        web_search_engine: "native" (provider built-in), "exa" (Exa API), or None (auto-detect)
+        web_search_max_results: Maximum number of search results (default: 5)
         pdf_engine: "mistral-ocr" (scanned), "pdf-text" (structured), "native"
         cached_content: Gemini cached content ID
         **kwargs: Additional arguments passed to ChatOpenAI
@@ -60,9 +66,21 @@ def ChatOpenRouter(
     if _is_openrouter(model):
         if provider_sort and "provider" not in extra_body:
             extra_body["provider"] = {"sort": provider_sort}
+
+        plugins = extra_body.get("plugins", [])
+
         if pdf_engine:
-            plugins = extra_body.get("plugins", [])
             plugins.append({"id": "file-parser", "pdf": {"engine": pdf_engine}})
+
+        if web_search:
+            web_plugin: dict = {"id": "web"}
+            if web_search_engine:
+                web_plugin["engine"] = web_search_engine
+            if web_search_max_results != 5:
+                web_plugin["max_results"] = web_search_max_results
+            plugins.append(web_plugin)
+
+        if plugins:
             extra_body["plugins"] = plugins
 
     elif _is_gemini(model) and cached_content:
