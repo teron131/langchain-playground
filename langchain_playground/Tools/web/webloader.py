@@ -1,10 +1,8 @@
-import os
 import re
 
 from docling.document_converter import DocumentConverter
 from dotenv import load_dotenv
 from langchain_community.document_loaders import WebBaseLoader
-from tavily import TavilyClient
 
 load_dotenv()
 
@@ -37,25 +35,6 @@ def webloader_docling(url: str) -> str:
     return result.document.export_to_markdown()
 
 
-def webloader_tavily(url: str) -> str:
-    """Execute a Tavily search query.
-    https://docs.tavily.com/documentation/api-reference/endpoint/search
-
-    args:
-        websearch_args (WebSearchArgs): Search arguments containing query and max_results
-
-    Returns:
-        dict: Raw Tavily API response
-    """
-    tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    response = tavily_client.extract(
-        urls=url,
-        include_images=False,
-        search_depth="advanced",
-    )
-    return response["results"][0]["raw_content"]
-
-
 def webloader(url: str) -> str:
     """Load and process the content of a website from URL into a rich unified markdown representation.
 
@@ -66,7 +45,7 @@ def webloader(url: str) -> str:
         str: Formatted string in markdown containing the website URL followed by the processed content
     """
     # Try each loader in sequence, falling back to the next if one fails
-    webloaders = [webloader_docling, webloader_langchain, webloader_tavily]
+    webloaders = [webloader_docling, webloader_langchain]
 
     for loader in webloaders:
         try:
