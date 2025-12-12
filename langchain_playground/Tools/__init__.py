@@ -3,7 +3,7 @@ from functools import wraps
 from langchain_core.tools import BaseTool, tool
 from rich import print
 
-from .web import webloader, websearch
+from .web import webloader
 from .youtube import youtube_loader
 
 
@@ -21,11 +21,6 @@ def get_tools() -> list[BaseTool]:
     """
 
     @tool
-    @wraps(websearch)
-    def websearch_tool(query: str) -> str:
-        return websearch(query)
-
-    @tool
     @wraps(webloader)
     def webloader_tool(url: str) -> str:
         return webloader(url)
@@ -35,7 +30,7 @@ def get_tools() -> list[BaseTool]:
     def youtubeloader_tool(url: str) -> str:
         return youtube_loader(url)
 
-    tools = [websearch_tool, webloader_tool, youtubeloader_tool]
+    tools = [webloader_tool, youtubeloader_tool]
 
     # Print info for all tools
     # for tool_func in tools:
@@ -47,7 +42,6 @@ def get_tools() -> list[BaseTool]:
 __all__ = [
     "get_tools",
     "webloader",
-    "websearch",
     "youtube_loader",
     "youtubeloader",
 ]

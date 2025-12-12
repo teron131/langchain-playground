@@ -1,6 +1,6 @@
 """YouTubeLoader - Load and extract transcript from YouTube videos using Scrape Creators API."""
 
-from .scrapper import YouTubeScrapperResult, scrap_youtube
+from .scrapper import scrap_youtube
 from .summarizer import stream_summarize_video, summarize_video
 
 
@@ -55,7 +55,6 @@ def youtube_loader(url: str) -> str:
 
 
 __all__ = [
-    "YouTubeScrapperResult",
     "stream_summarize_video",
     "summarize_video",
     "youtube_loader",
