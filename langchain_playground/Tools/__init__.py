@@ -3,8 +3,7 @@ from functools import wraps
 from langchain_core.tools import BaseTool, tool
 from rich import print
 
-from .webloader import webloader
-from .websearch import websearch
+from .web import webloader, websearch
 from .youtube import youtube_loader
 
 
@@ -50,4 +49,5 @@ __all__ = [
     "webloader",
     "websearch",
     "youtube_loader",
+    "youtubeloader",
 ]
