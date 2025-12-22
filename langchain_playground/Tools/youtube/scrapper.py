@@ -69,7 +69,7 @@ class YouTubeScrapperResult(BaseModel):
         return bool(self.transcript and self.transcript_only_text and self.transcript_only_text.strip())
 
 
-def scrap_youtube(youtube_url: str) -> YouTubeScrapperResult:
+def scrape_youtube(youtube_url: str) -> YouTubeScrapperResult:
     """Scrape a YouTube video and return the transcript and other metadata.
 
     Uses the Scrape Creators YouTube API: https://api.scrapecreators.com/v1/youtube/video

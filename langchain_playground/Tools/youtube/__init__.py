@@ -1,6 +1,6 @@
 """YouTubeLoader - Load and extract transcript from YouTube videos using Scrape Creators API."""
 
-from .scrapper import scrap_youtube
+from .scrapper import scrape_youtube
 from .summarizer import stream_summarize_video, summarize_video
 
 
@@ -17,7 +17,7 @@ def youtube_loader(url: str) -> str:
         ValueError: If URL is invalid or API key is missing
         requests.RequestException: If API request fails
     """
-    result = scrap_youtube(url)
+    result = scrape_youtube(url)
 
     # Build formatted output
     output_parts = []
