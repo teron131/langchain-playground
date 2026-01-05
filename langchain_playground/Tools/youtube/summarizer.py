@@ -16,7 +16,7 @@ from .utils import is_youtube_url, s2hk
 # Configuration
 # ============================================================================
 
-ANALYSIS_MODEL = "x-ai/grok-4.1-fast"
+SUMMARY_MODEL = "x-ai/grok-4.1-fast"
 QUALITY_MODEL = "x-ai/grok-4.1-fast"
 FAST_MODEL = "google/gemini-2.5-flash-lite-preview-09-2025"
 MIN_QUALITY_SCORE = 80
@@ -30,7 +30,7 @@ TARGET_LANGUAGE = "en"  # ISO language code (en, es, fr, de, etc.)
 
 
 class Chapter(BaseModel):
-    """Represents a single chapter in the analysis."""
+    """Represents a single chapter in the summary."""
 
     header: str = Field(description="A descriptive title for the chapter")
     summary: str = Field(description="A comprehensive summary of the chapter content")
@@ -47,8 +47,8 @@ class Chapter(BaseModel):
         return [s2hk(item) for item in value]
 
 
-class Analysis(BaseModel):
-    """Complete analysis of video content."""
+class Summary(BaseModel):
+    """Complete summary of video content."""
 
     title: str = Field(description="The main title or topic of the video content")
     summary: str = Field(description="A comprehensive summary of the video content")
@@ -59,7 +59,7 @@ class Analysis(BaseModel):
     )
     chapters: list[Chapter] = Field(description="Structured breakdown of content into logical chapters")
     keywords: list[str] = Field(
-        description="The most relevant keywords in the analysis worthy of highlighting",
+        description="The most relevant keywords in the summary worthy of highlighting",
         min_length=3,
         max_length=3,
     )
@@ -84,7 +84,7 @@ class Rate(BaseModel):
 
 
 class Quality(BaseModel):
-    """Quality assessment of the analysis."""
+    """Quality assessment of the summary."""
 
     completeness: Rate = Field(description="Rate for completeness: The entire transcript has been considered")
     structure: Rate = Field(description="Rate for structure: The result is in desired structures")
@@ -92,7 +92,7 @@ class Quality(BaseModel):
         description="Rate for no_garbage: The promotional and meaningless content such as cliche intros, outros, filler, sponsorships, and other irrelevant segments are effectively removed"
     )
     meta_language_avoidance: Rate = Field(description="Rate for meta-language avoidance: No phrases like 'This chapter introduces', 'This section covers', etc.")
-    useful_keywords: Rate = Field(description="Rate for keywords: The keywords are useful for highlighting the analysis")
+    useful_keywords: Rate = Field(description="Rate for keywords: The keywords are useful for highlighting the summary")
     correct_language: Rate = Field(description="Rate for language: Match the original language of the transcript or user requested")
 
     @property
@@ -132,7 +132,7 @@ class SummarizerState(BaseModel):
     """State schema for the summarization graph."""
 
     transcript: str | None = None
-    analysis: Analysis | None = None
+    summary: Summary | None = None
     quality: Quality | None = None
     target_language: str | None = None
     iteration_count: int = 0
@@ -142,7 +142,7 @@ class SummarizerState(BaseModel):
 class SummarizerOutput(BaseModel):
     """Output schema for the summarization graph."""
 
-    analysis: Analysis
+    summary: Summary
     quality: Quality | None = None
     iteration_count: int
     transcript: str | None = None
@@ -175,7 +175,7 @@ def garbage_filter_node(state: SummarizerState) -> dict:
 
     if garbage.garbage_ranges:
         filtered_transcript = filter_content(tagged_transcript, garbage.garbage_ranges)
-        # Untag for the next stage (analysis)
+        # Untag for the next stage (summary)
         cleaned_transcript = untag_content(filtered_transcript)
         print(f"🧹 Removed {len(garbage.garbage_ranges)} garbage sections.")
         return {"transcript": cleaned_transcript}
@@ -183,47 +183,47 @@ def garbage_filter_node(state: SummarizerState) -> dict:
     return {}
 
 
-def analysis_node(state: SummarizerState) -> dict:
-    """Generate analysis from transcript."""
+def summary_node(state: SummarizerState) -> dict:
+    """Generate summary from transcript."""
     llm = ChatOpenRouter(
-        model=ANALYSIS_MODEL,
+        model=SUMMARY_MODEL,
         temperature=0,
         reasoning_effort="medium",
-    ).with_structured_output(Analysis)
+    ).with_structured_output(Summary)
 
-    system_prompt = "Analyze the transcript and create a comprehensive analysis with clear structure, key insights, and meaningful keywords. Avoid meta-language phrases."
+    system_prompt = "Summarize the transcript and create a comprehensive summary with clear structure, key insights, and meaningful keywords. Avoid meta-language phrases."
     if state.target_language:
-        system_prompt += f" Output the analysis in {state.target_language}."
+        system_prompt += f" Output the summary in {state.target_language}."
 
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"Transcript:\n{state.transcript}"),
     ]
 
-    analysis = llm.invoke(messages)
+    summary = llm.invoke(messages)
 
     return {
-        "analysis": analysis,
+        "summary": summary,
         "iteration_count": state.iteration_count + 1,
     }
 
 
 def quality_node(state: SummarizerState) -> dict:
-    """Assess quality of analysis."""
+    """Assess quality of summary."""
     llm = ChatOpenRouter(
         model=QUALITY_MODEL,
         temperature=0,
         reasoning_effort="low",
     ).with_structured_output(Quality)
 
-    system_prompt = "Evaluate the analysis against the transcript and provide each aspect a rating (Pass/Refine/Fail) with reasons."
+    system_prompt = "Evaluate the summary against the transcript and provide each aspect a rating (Pass/Refine/Fail) with reasons."
     if state.target_language:
-        system_prompt += f" Verify that the analysis is in {state.target_language}."
+        system_prompt += f" Verify that the summary is in {state.target_language}."
 
-    analysis_json = state.analysis.model_dump_json() if state.analysis else "No analysis provided"
+    summary_json = state.summary.model_dump_json() if state.summary else "No summary provided"
     messages = [
         SystemMessage(content=system_prompt),
-        HumanMessage(content=f"Transcript:\n{state.transcript}\n\nAnalysis:\n{analysis_json}"),
+        HumanMessage(content=f"Transcript:\n{state.transcript}\n\nSummary:\n{summary_json}"),
     ]
 
     quality: Quality = llm.invoke(messages)
@@ -250,7 +250,7 @@ def should_continue(state: SummarizerState) -> str:
 
     if state.quality and not state.quality.is_acceptable and state.iteration_count < MAX_ITERATIONS:
         print(f"🔄 Refining: quality {quality_display} < {MIN_QUALITY_SCORE}% (iteration {state.iteration_count + 1})")
-        return "analysis"
+        return "summary"
 
     print(f"⚠️ Stopping: quality {quality_display}, {state.iteration_count} iterations")
     return END
@@ -264,18 +264,18 @@ def create_graph() -> StateGraph:
     )
 
     builder.add_node("garbage_filter", garbage_filter_node)
-    builder.add_node("analysis", analysis_node)
+    builder.add_node("summary", summary_node)
     builder.add_node("quality", quality_node)
 
     builder.add_edge(START, "garbage_filter")
-    builder.add_edge("garbage_filter", "analysis")
-    builder.add_edge("analysis", "quality")
+    builder.add_edge("garbage_filter", "summary")
+    builder.add_edge("summary", "quality")
 
     builder.add_conditional_edges(
         "quality",
         should_continue,
         {
-            "analysis": "analysis",
+            "summary": "summary",
             END: END,
         },
     )
@@ -312,7 +312,7 @@ def _extract_transcript(transcript_or_url: str) -> str:
 def summarize_video(
     transcript_or_url: str,
     target_language: str | None = None,
-) -> Analysis:
+) -> Summary:
     """Summarize YouTube video or text transcript with quality self-checking."""
     graph = create_graph()
     transcript = _extract_transcript(transcript_or_url)
@@ -327,7 +327,7 @@ def summarize_video(
     quality_percent = output.quality.percentage_score if output.quality else None
     quality_display = f"{quality_percent}%" if quality_percent is not None else "N/A"
     print(f"🎯 Final: quality {quality_display}, {output.iteration_count} iterations")
-    return output.analysis
+    return output.summary
 
 
 def stream_summarize_video(

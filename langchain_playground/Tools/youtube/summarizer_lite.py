@@ -46,21 +46,21 @@ def scrape_youtube(youtube_url: str) -> str:
 
 
 class Chapter(BaseModel):
-    """Represents a single chapter in the analysis."""
+    """Represents a single chapter in the summary."""
 
     header: str = Field(description="A descriptive title for the chapter")
     summary: str = Field(description="A comprehensive summary of the chapter content")
     key_points: list[str] = Field(description="Important takeaways and insights from this chapter")
 
 
-class Analysis(BaseModel):
-    """Complete analysis of video content."""
+class Summary(BaseModel):
+    """Complete summary of video content."""
 
     title: str = Field(description="The main title or topic of the video content")
     summary: str = Field(description="A comprehensive summary of the video content")
     takeaways: list[str] = Field(description="Key insights and actionable takeaways for the audience")
     chapters: list[Chapter] = Field(description="Structured breakdown of content into logical chapters")
-    keywords: list[str] = Field(description="The most relevant keywords in the analysis worthy of highlighting")
+    keywords: list[str] = Field(description="The most relevant keywords in the summary worthy of highlighting")
     target_language: str | None = Field(default=None, description="The language the content to be translated to")
 
 
@@ -117,46 +117,46 @@ def create_summarizer_agent(target_language: str | None = None):
         reasoning_effort="medium",
     )
 
-    system_prompt = "Analyze the transcript and create a comprehensive analysis with clear structure, key insights, and meaningful keywords. Avoid meta-language phrases."
+    system_prompt = "Summarize the transcript and create a comprehensive summary with clear structure, key insights, and meaningful keywords. Avoid meta-language phrases."
     if target_language:
-        system_prompt += f" Output the analysis in {target_language}."
+        system_prompt += f" Output the summary in {target_language}."
 
     agent = create_agent(
         model=llm,
         tools=[scrape_youtube],
         system_prompt=system_prompt,
         middleware=[garbage_filter_middleware],  # Add the garbage filter middleware
-        response_format=ToolStrategy(Analysis),  # Use ToolStrategy for better error handling
+        response_format=ToolStrategy(Summary),  # Use ToolStrategy for better error handling
     )
 
     return agent
 
 
-def _parse_result(analysis: Analysis) -> str:
-    """Format Analysis object into a readable string.
+def _parse_result(summary: Summary) -> str:
+    """Format Summary object into a readable string.
 
     Args:
-        analysis: The Analysis object to format
+        summary: The Summary object to format
 
     Returns:
-        Formatted string representation of the analysis
+        Formatted string representation of the summary
     """
     lines = [
         "=" * 80,
-        "ANALYSIS:",
+        "SUMMARY:",
         "=" * 80,
-        f"\nTitle: {analysis.title}",
-        f"\nSummary:\n{analysis.summary}",
+        f"\nTitle: {summary.title}",
+        f"\nSummary:\n{summary.summary}",
         "\nTakeaways:",
     ]
 
-    for i, takeaway in enumerate(analysis.takeaways, 1):
+    for i, takeaway in enumerate(summary.takeaways, 1):
         lines.append(f"  {i}. {takeaway}")
 
-    lines.append(f"\nKeywords: {', '.join(analysis.keywords)}")
-    lines.append(f"\nChapters ({len(analysis.chapters)}):")
+    lines.append(f"\nKeywords: {', '.join(summary.keywords)}")
+    lines.append(f"\nChapters ({len(summary.chapters)}):")
 
-    for i, chapter in enumerate(analysis.chapters, 1):
+    for i, chapter in enumerate(summary.chapters, 1):
         lines.append(f"\n  Chapter {i}: {chapter.header}")
         lines.append(f"    Summary: {chapter.summary}")
         lines.append("    Key Points:")
@@ -177,7 +177,7 @@ def summarize_video(
         target_language: Optional target language code (e.g., "en", "es", "fr")
 
     Returns:
-        Formatted string representation of the analysis
+        Formatted string representation of the summary
     """
     agent = create_summarizer_agent(target_language)
 
