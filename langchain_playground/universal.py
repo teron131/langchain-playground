@@ -28,7 +28,11 @@ class UniversalChain:
         else:
             llm = ChatOpenRouter(model="google/gemini-2.5-flash")
 
-        self.agent = create_agent(model=llm, tools=get_tools(), checkpointer=MemorySaver())
+        self.agent = create_agent(
+            model=llm,
+            tools=get_tools(),
+            checkpointer=MemorySaver(),
+        )
         self.thread_id = "universal-chain-session"
 
     def invoke(self, text: str, image: str | None = None) -> dict:
